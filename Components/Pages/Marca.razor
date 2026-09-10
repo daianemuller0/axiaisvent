@@ -1,0 +1,122 @@
+@page "/axiais/marca"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject BrandingRepository Branding
+@inject NavigationManager Nav
+
+<h1>Identidade Visual</h1>
+<p class="subtitle">
+    Dois logos, trocáveis a qualquer momento: o do <strong>documento</strong> (cabeçalho das
+    propostas em PDF/Word) e o do <strong>sistema</strong> (tela de login e barra lateral).
+    Envie PNG ou JPG de até 2&nbsp;MB — de preferência PNG com fundo transparente.
+</p>
+
+<div class="prop-grid">
+    <div class="panel">
+        <h3 class="dash-title">Logo do documento (propostas)</h3>
+        <InputFile OnChange="e => Enviar(e, doc: true)" accept="image/png,image/jpeg" />
+        <div class="logo-preview" style="margin-top:14px">
+            @if (_logoDoc is not null)
+            {
+                <img src="@_logoDoc" alt="Logo do documento" />
+            }
+            else
+            {
+                <div style="text-align:right">
+                    <div style="font-weight:bold;font-size:30px;color:#00539B;letter-spacing:.5px;line-height:1">Howden</div>
+                    <div style="font-style:italic;font-size:12px;color:#00539B;margin-top:2px">A Chart Industries Company</div>
+                    <div style="font-size:12px;color:var(--muted);margin-top:12px">Wordmark padrão (nenhum logo enviado).</div>
+                </div>
+            }
+        </div>
+        @if (_logoDoc is not null)
+        {
+            <button class="btn-ghost" style="margin-top:12px" @onclick="() => Remover(doc: true)">Remover logo do documento</button>
+        }
+    </div>
+
+    <div class="panel">
+        <h3 class="dash-title">Logo do sistema (login e barra lateral)</h3>
+        <InputFile OnChange="e => Enviar(e, doc: false)" accept="image/png,image/jpeg" />
+        <div class="logo-preview" style="margin-top:14px; background:#14315c">
+            @if (_logoSis is not null)
+            {
+                <span class="brand-img"><img src="@_logoSis" alt="Logo do sistema" /></span>
+            }
+            else
+            {
+                <div style="color:#fff; text-align:center">
+                    <div style="font-weight:bold;font-size:26px;letter-spacing:.5px;line-height:1">Howden</div>
+                    <div style="font-style:italic;font-size:11px;opacity:.8;margin-top:2px">A Chart Industries Company</div>
+                    <div style="font-size:12px;opacity:.7;margin-top:12px">Wordmark padrão (nenhum logo enviado).</div>
+                </div>
+            }
+        </div>
+        @if (_logoSis is not null)
+        {
+            <button class="btn-ghost" style="margin-top:12px" @onclick="() => Remover(doc: false)">Remover logo do sistema</button>
+        }
+    </div>
+</div>
+
+@if (_erro is not null)
+{
+    <div class="alert-error" style="margin-top:14px; max-width:760px; text-align:left">@_erro</div>
+}
+@if (_msg is not null)
+{
+    <div class="side-ok" style="margin-top:14px; max-width:760px">@_msg</div>
+}
+
+@code {
+    private string? _logoDoc, _logoSis;
+    private string? _msg, _erro;
+
+    protected override void OnInitialized()
+    {
+        _logoDoc = Branding.GetLogo();
+        _logoSis = Branding.GetLogoSistema();
+    }
+
+    private async Task Enviar(InputFileChangeEventArgs e, bool doc)
+    {
+        _erro = null; _msg = null;
+        try
+        {
+            var f = e.File;
+            if (f.Size > 2 * 1024 * 1024)
+            {
+                _erro = "Arquivo muito grande (máx. 2 MB).";
+                return;
+            }
+            var tipo = string.IsNullOrWhiteSpace(f.ContentType) ? "image/png" : f.ContentType;
+
+            using var ms = new MemoryStream();
+            await f.OpenReadStream(maxAllowedSize: 2 * 1024 * 1024).CopyToAsync(ms);
+            var dataUri = $"data:{tipo};base64,{Convert.ToBase64String(ms.ToArray())}";
+
+            if (doc)
+            {
+                Branding.SaveLogo(dataUri);
+                _logoDoc = dataUri;
+                _msg = "Logo do documento salvo — as próximas propostas já saem com ele.";
+            }
+            else
+            {
+                Branding.SaveLogoSistema(dataUri);
+                _logoSis = dataUri;
+                _msg = "Logo do sistema salvo — aparece no login e na barra lateral (recarregue a página para ver na barra).";
+            }
+        }
+        catch (Exception ex)
+        {
+            _erro = "Falha ao enviar o arquivo: " + ex.Message;
+        }
+    }
+
+    private void Remover(bool doc)
+    {
+        if (doc) { Branding.ClearLogo(); _logoDoc = null; _msg = "Logo do documento removido — volta o wordmark padrão."; }
+        else { Branding.ClearLogoSistema(); _logoSis = null; _msg = "Logo do sistema removido — volta o wordmark padrão."; }
+    }
+}

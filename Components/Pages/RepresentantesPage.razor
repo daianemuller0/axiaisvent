@@ -1,0 +1,89 @@
+@page "/axiais/representantes"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject RepresentanteRepository Repo
+
+<div class="page-head">
+    <div>
+        <h1>Representantes</h1>
+        <p class="subtitle">
+            Representantes comerciais e suas comissões (a tabela de representantes da planilha).
+            Ao escolher um representante na proposta, a comissão dele entra sozinha no pricing —
+            e lá pode ser ajustada caso a caso, sem alterar este cadastro.
+        </p>
+    </div>
+    <div class="page-actions">
+        @if (_salvo)
+        {
+            <span class="saved-flag">Salvo ✓</span>
+        }
+        <button class="btn-primary" @onclick="Adicionar">+ Representante</button>
+    </div>
+</div>
+
+<div class="views">
+    <button class="view @(_aba == "Brasil" ? "active" : "")" @onclick="@(() => _aba = "Brasil")">Brasil</button>
+    <button class="view @(_aba == "Exterior" ? "active" : "")" @onclick="@(() => _aba = "Exterior")">Exterior</button>
+    <button class="view @(_aba == "Todos" ? "active" : "")" @onclick="@(() => _aba = "Todos")">Todos</button>
+</div>
+
+<table class="grid">
+    <thead>
+        <tr>
+            <th style="width:24%">Nome</th>
+            <th style="width:12%">Região</th>
+            <th class="right" style="width:10%">Comissão (%)</th>
+            <th>Contato (impresso na proposta)</th>
+            <th style="width:42px"></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var x in Filtrados)
+        {
+            <tr>
+                <td><input class="cell" @bind="x.Nome" @bind:after="() => Salvar(x)" /></td>
+                <td><input class="cell" @bind="x.Local" @bind:after="() => Salvar(x)" /></td>
+                <td><input class="cell num" @bind="x.ComissaoPct" @bind:after="() => Salvar(x)" /></td>
+                <td><input class="cell" @bind="x.Contato" @bind:after="() => Salvar(x)" /></td>
+                <td class="center"><button class="btn-link" @onclick="() => Excluir(x)">✕</button></td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    private List<Representante> _itens = new();
+    private string _aba = "Brasil";
+    private bool _salvo;
+
+    private IEnumerable<Representante> Filtrados => _aba == "Todos"
+        ? _itens
+        : _itens.Where(x => x.Local.Contains(_aba, StringComparison.OrdinalIgnoreCase));
+
+    protected override void OnInitialized() => _itens = Repo.All();
+
+    private void Salvar(Representante x)
+    {
+        Repo.Save(x);
+        _salvo = true;
+    }
+
+    private void Adicionar()
+    {
+        var novo = new Representante
+        {
+            Id = $"rep-{Guid.NewGuid():N}"[..12],
+            Nome = "NOVO REPRESENTANTE",
+            Local = _aba == "Exterior" ? "Exterior" : "Brasil",
+            ComissaoPct = "3",
+        };
+        Repo.Save(novo);
+        _itens = Repo.All();
+    }
+
+    private void Excluir(Representante x)
+    {
+        Repo.Delete(x.Id);
+        _itens = Repo.All();
+    }
+}

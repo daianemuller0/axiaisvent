@@ -1,0 +1,78 @@
+@page "/axiais/vendedores"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject VendedorRepository Repo
+
+<div class="page-head">
+    <div>
+        <h1>Vendedores</h1>
+        <p class="subtitle">
+            Quem assina a proposta (a tabela de contatos do modelo Word). Ao escolher um
+            vendedor no cabeçalho da proposta, cargo, e-mail e telefones entram sozinhos —
+            e podem ser ajustados caso a caso, sem alterar este cadastro.
+        </p>
+    </div>
+    <div class="page-actions">
+        @if (_salvo)
+        {
+            <span class="saved-flag">Salvo ✓</span>
+        }
+        <button class="btn-primary" @onclick="Adicionar">+ Vendedor</button>
+    </div>
+</div>
+
+<table class="grid">
+    <thead>
+        <tr>
+            <th style="width:20%">Nome</th>
+            <th style="width:18%">Cargo</th>
+            <th style="width:18%">Área</th>
+            <th style="width:22%">Telefones</th>
+            <th>E-mail</th>
+            <th style="width:42px"></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var x in _itens)
+        {
+            <tr>
+                <td><input class="cell" @bind="x.Nome" @bind:after="() => Salvar(x)" /></td>
+                <td><input class="cell" @bind="x.Cargo" @bind:after="() => Salvar(x)" /></td>
+                <td><input class="cell" @bind="x.Area" @bind:after="() => Salvar(x)" /></td>
+                <td><input class="cell" @bind="x.Fones" @bind:after="() => Salvar(x)" /></td>
+                <td><input class="cell" @bind="x.Email" @bind:after="() => Salvar(x)" /></td>
+                <td class="center"><button class="btn-link" @onclick="() => Excluir(x)">✕</button></td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    private List<Vendedor> _itens = new();
+    private bool _salvo;
+
+    protected override void OnInitialized() => _itens = Repo.All();
+
+    private void Salvar(Vendedor x)
+    {
+        Repo.Save(x);
+        _salvo = true;
+    }
+
+    private void Adicionar()
+    {
+        var novo = new Vendedor
+        {
+            Id = $"vend-{Guid.NewGuid():N}"[..13],
+            Nome = "NOVO VENDEDOR",
+        };
+        Repo.Save(novo);
+        _itens = Repo.All();
+    }
+
+    private void Excluir(Vendedor x)
+    {
+        Repo.Delete(x.Id);
+        _itens = Repo.All();
+    }
+}

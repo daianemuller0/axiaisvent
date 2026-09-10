@@ -1,0 +1,126 @@
+@page "/axiais/parametros"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject ParametroRepository Repo
+
+<div class="page-head">
+    <div>
+        <h1>Tabela de Custos</h1>
+        <p class="subtitle">
+            Valores padrão de custo usados ao abrir uma proposta nova: custo/hora dos serviços
+            e preço unitário das despesas. É a base fixa da guia CUSTO da planilha.
+        </p>
+    </div>
+    <div class="page-actions">
+        @if (_salvo)
+        {
+            <span class="saved-flag">Salvo ✓</span>
+        }
+        <button class="btn-ghost" @onclick="@(() => Adicionar("MO"))">+ Serviço</button>
+        <button class="btn-ghost" @onclick="@(() => Adicionar("DESPESA"))">+ Despesa</button>
+    </div>
+</div>
+
+<div class="views">
+    @foreach (var pais in new[] { "Brasil", "Chile", "Peru" })
+    {
+        var x = pais;
+        <button class="view @(_pais == x ? "active" : "")" @onclick="@(() => _pais = x)">@x</button>
+    }
+    <span style="width:18px"></span>
+    <button class="view @(_aba == "MO" ? "active" : "")" @onclick="@(() => _aba = "MO")">Mão de obra</button>
+    <button class="view @(_aba == "DESPESA" ? "active" : "")" @onclick="@(() => _aba = "DESPESA")">Despesas</button>
+</div>
+
+<table class="grid">
+    <thead>
+        <tr>
+            <th style="width:34%">Descrição</th>
+            <th style="width:26%">Obs</th>
+            @if (_aba == "MO") { <th class="right">Horas</th> }
+            <th class="right">@(_aba == "MO" ? $"Custo hora ({MoedaAba})" : $"Custo unitário ({MoedaAba})")</th>
+            @if (_aba == "MO") { <th class="right">× hora-base</th> }
+            <th class="center">× técnicos</th>
+            <th class="right">Ordem</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var p in _itens.Where(x => x.Tipo == _aba && PaisDe(x) == _pais))
+        {
+            <tr>
+                <td><input class="cell" @bind="p.Descricao" @bind:after="() => Salvar(p)" /></td>
+                <td><input class="cell" @bind="p.Obs" @bind:after="() => Salvar(p)" /></td>
+                @if (_aba == "MO")
+                {
+                    <td><input class="cell num" @bind="p.Horas" @bind:after="() => Salvar(p)" /></td>
+                }
+                <td><input class="cell num" @bind="p.Valor" @bind:after="() => Salvar(p)" /></td>
+                @if (_aba == "MO")
+                {
+                    <td><input class="cell num" @bind="p.Mult" @bind:after="() => Salvar(p)" /></td>
+                }
+                <td class="center">
+                    <select class="cell" @bind="p.PorTecnico" @bind:after="() => Salvar(p)">
+                        <option value="Sim">Sim</option>
+                        <option value="Não">Não</option>
+                    </select>
+                </td>
+                <td><input class="cell num" @bind="p.Ordem" @bind:after="() => Salvar(p)" /></td>
+                <td class="center"><button class="btn-link" @onclick="() => Excluir(p)">✕</button></td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+<div class="side-note" style="margin-top:14px; max-width:760px">
+    Cada país tem a sua tabela: <strong>Brasil</strong> (BU HSA-SP/HSA-ES, em R$),
+    <strong>Chile</strong> (BU HCHL, em CLP) e <strong>Peru</strong> (BU HPU, em USD) —
+    ao escolher a BU na proposta, a tabela do país entra sozinha, sem impostos para Chile/Peru.
+    Alterar a tabela não mexe nas propostas já cadastradas — ela vale para as próximas.
+    "× técnicos" indica se o item é multiplicado pela quantidade de técnicos em campo;
+    "× hora-base" é o multiplicador sobre a hora do 1º turno (1,5 = HE/2º turno; 2 = sáb/dom/fer;
+    0 = valor independente).
+</div>
+
+@code {
+    private List<Parametro> _itens = new();
+    private string _aba = "MO";
+    private string _pais = "Brasil";
+    private bool _salvo;
+
+    private static string PaisDe(Parametro p) => string.IsNullOrWhiteSpace(p.Pais) ? "Brasil" : p.Pais;
+    private string MoedaAba => _pais switch { "Chile" => "CLP", "Peru" => "USD", _ => "R$" };
+
+    protected override void OnInitialized() => _itens = Repo.All();
+
+    private void Salvar(Parametro p)
+    {
+        Repo.Save(p);
+        _salvo = true;
+    }
+
+    private void Adicionar(string tipo)
+    {
+        var novo = new Parametro
+        {
+            Id = $"{(tipo == "MO" ? "mo" : "de")}-{Guid.NewGuid():N}"[..12],
+            Tipo = tipo,
+            Descricao = "NOVO ITEM",
+            Horas = tipo == "MO" ? "8" : "",
+            Valor = "0",
+            PorTecnico = "Sim",
+            Ordem = (_itens.Count + 1).ToString("D3"),
+            Pais = _pais,
+        };
+        Repo.Save(novo);
+        _itens = Repo.All();
+        _aba = tipo;
+    }
+
+    private void Excluir(Parametro p)
+    {
+        Repo.Delete(p.Id);
+        _itens = Repo.All();
+    }
+}
