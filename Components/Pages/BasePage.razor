@@ -1,0 +1,288 @@
+@page "/axiais/base"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject BaseRepository Repo
+@inject IJSRuntime JS
+
+<div class="page-head">
+    <div>
+        <h1>Base</h1>
+        <p class="subtitle">
+            A planilha da base de ventiladores axiais: suba o arquivo, ajuste as linhas
+            e exporte quando precisar.
+        </p>
+    </div>
+    <div class="page-actions">
+        @if (TemBase)
+        {
+            <button class="btn-ghost" @onclick="ExportarExcel">⬇ Exportar Excel</button>
+            <button class="btn-ghost" @onclick="ExportarCsv">⬇ Exportar CSV</button>
+            <button class="btn-primary" @onclick="Adicionar">+ Linha</button>
+        }
+    </div>
+</div>
+
+@if (_msg is not null)
+{
+    <div class="panel @(_erro ? "alert-error" : "")" style="margin-bottom:14px">@_msg</div>
+}
+
+<!-- ---------- subir planilha ---------- -->
+<div class="panel" style="margin-bottom:16px">
+    <div class="toolbar" style="margin-bottom:0; flex-wrap:wrap">
+        <strong>Subir planilha</strong>
+        <InputFile OnChange="Subir" accept=".xlsx,.xlsm,.csv,.txt" class="cell" />
+        <label style="display:flex; align-items:center; gap:6px">
+            <input type="radio" name="modo" checked="@(_modo == Modo.Substituir)"
+                   @onchange="@(() => _modo = Modo.Substituir)" />
+            <span>substituir a base</span>
+        </label>
+        <label style="display:flex; align-items:center; gap:6px">
+            <input type="radio" name="modo" checked="@(_modo == Modo.Acrescentar)"
+                   @onchange="@(() => _modo = Modo.Acrescentar)" />
+            <span>acrescentar linhas</span>
+        </label>
+        @if (_lendo)
+        {
+            <span class="saved-flag">lendo o arquivo…</span>
+        }
+    </div>
+    <p class="subtitle" style="margin:10px 0 0">
+        Aceita <strong>.xlsx</strong>, <strong>.xlsm</strong> e <strong>.csv</strong>.
+        A primeira linha da planilha é o cabeçalho — vira o nome das colunas da base.
+        Em "acrescentar", as colunas já existentes são mantidas.
+    </p>
+</div>
+
+@if (!TemBase)
+{
+    <div class="panel empty" style="padding:48px 22px">
+        <p>Nenhuma planilha na base ainda.</p>
+        <p class="subtitle">Suba um arquivo acima para começar.</p>
+    </div>
+}
+else
+{
+    <!-- ---------- ajustar linhas ---------- -->
+    <div class="toolbar" style="flex-wrap:wrap">
+        <input class="cell" style="min-width:280px" placeholder="Procurar em todas as colunas…"
+               @bind="_busca" @bind:event="oninput" />
+        <span class="subtitle" style="margin:0">
+            @Filtradas.Count de @_linhas.Count linha(s) · @_colunas.Count coluna(s)
+        </span>
+        <span style="flex:1"></span>
+        @if (_paginas > 1)
+        {
+            <button class="btn-ghost" disabled="@(_pagina <= 1)" @onclick="() => _pagina--">‹</button>
+            <span class="subtitle" style="margin:0">página @_pagina de @_paginas</span>
+            <button class="btn-ghost" disabled="@(_pagina >= _paginas)" @onclick="() => _pagina++">›</button>
+        }
+        <button class="btn-ghost" @onclick="LimparTudo">Limpar base</button>
+    </div>
+
+    <div class="panel" style="padding:0; overflow-x:auto">
+        <table class="grid">
+            <thead>
+                <tr>
+                    <th class="nowrap" style="width:64px">#</th>
+                    @foreach (var c in _colunas)
+                    {
+                        <th class="nowrap">@c</th>
+                    }
+                    <th class="nowrap" style="width:132px"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var linha in Pagina)
+                {
+                    <tr @key="linha.Id">
+                        <td class="center nowrap">@(_linhas.IndexOf(linha) + 1)</td>
+                        @for (var i = 0; i < _colunas.Count; i++)
+                        {
+                            var col = i;
+                            <td>
+                                <input class="cell" value="@linha.Valor(col)"
+                                       @onchange="e => Editar(linha, col, e.Value?.ToString() ?? string.Empty)" />
+                            </td>
+                        }
+                        <td class="nowrap center">
+                            <button class="btn-link" title="Subir" @onclick="() => Mover(linha, -1)">↑</button>
+                            <button class="btn-link" title="Descer" @onclick="() => Mover(linha, 1)">↓</button>
+                            <button class="btn-link" title="Apagar" @onclick="() => Apagar(linha)">✕</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private enum Modo { Substituir, Acrescentar }
+
+    private const int PorPagina = 100;
+    private const long TamanhoMaximo = 40L * 1024 * 1024;   // 40 MB
+
+    private List<string> _colunas = new();
+    private List<LinhaBase> _linhas = new();
+
+    private Modo _modo = Modo.Substituir;
+    private string _busca = "";
+    private int _pagina = 1;
+    private bool _lendo;
+    private string? _msg;
+    private bool _erro;
+
+    private bool TemBase => _colunas.Count > 0;
+
+    protected override void OnInitialized() => Recarregar();
+
+    private void Recarregar()
+    {
+        _colunas = Repo.Colunas();
+        _linhas = Repo.Linhas();
+        _pagina = 1;
+    }
+
+    // ---------- subir ----------
+
+    private async Task Subir(InputFileChangeEventArgs e)
+    {
+        var arquivo = e.File;
+        _msg = null;
+        _erro = false;
+
+        if (!PlanilhaIO.ExtensaoAceita(arquivo.Name))
+        {
+            Aviso($"\"{arquivo.Name}\" não é uma planilha aceita. Use .xlsx, .xlsm ou .csv.", erro: true);
+            return;
+        }
+
+        _lendo = true;
+        try
+        {
+            // O arquivo vai inteiro para a memória: o ClosedXML precisa de um
+            // stream que aceite posicionamento, e o do navegador é sequencial.
+            using var memoria = new MemoryStream();
+            await arquivo.OpenReadStream(TamanhoMaximo).CopyToAsync(memoria);
+            memoria.Position = 0;
+
+            var lido = PlanilhaIO.Ler(memoria, arquivo.Name);
+
+            if (_modo == Modo.Substituir || !TemBase)
+            {
+                Repo.SubstituirTudo(lido.Colunas, lido.Linhas);
+                Recarregar();
+                Aviso($"Base substituída por \"{arquivo.Name}\": {_linhas.Count} linha(s), {_colunas.Count} coluna(s).");
+            }
+            else
+            {
+                // Acrescentar mantém as colunas da base; a planilha nova é
+                // encaixada por POSIÇÃO de coluna (1ª com 1ª, 2ª com 2ª…).
+                foreach (var linha in lido.Linhas)
+                    while (linha.Valores.Count < _colunas.Count) linha.Valores.Add("");
+
+                Repo.Acrescentar(lido.Linhas);
+                Recarregar();
+                Aviso($"{lido.Linhas.Count} linha(s) de \"{arquivo.Name}\" acrescentada(s). Total: {_linhas.Count}.");
+
+                if (lido.Colunas.Count != _colunas.Count)
+                    Aviso($"Atenção: a planilha tem {lido.Colunas.Count} coluna(s) e a base tem {_colunas.Count}. " +
+                          "As linhas foram encaixadas pela posição das colunas.", erro: true);
+            }
+        }
+        catch (Exception ex)
+        {
+            Aviso("Não consegui ler a planilha: " + ex.Message, erro: true);
+        }
+        finally
+        {
+            _lendo = false;
+        }
+    }
+
+    // ---------- ajustar linhas ----------
+
+    private void Editar(LinhaBase linha, int coluna, string valor)
+    {
+        linha.Definir(coluna, valor);
+        Repo.Salvar(linha, _colunas.Count);
+    }
+
+    private void Adicionar()
+    {
+        var nova = new LinhaBase { Ordem = _linhas.Count == 0 ? 0 : _linhas.Max(l => l.Ordem) + 1 };
+        for (var i = 0; i < _colunas.Count; i++) nova.Valores.Add("");
+        Repo.Salvar(nova, _colunas.Count);
+        _linhas.Add(nova);
+        _pagina = _paginas;
+        Aviso("Linha adicionada no fim da base.");
+    }
+
+    private void Apagar(LinhaBase linha)
+    {
+        Repo.Apagar(linha.Id);
+        _linhas.Remove(linha);
+        if (_pagina > _paginas) _pagina = _paginas;
+        Aviso("Linha apagada.");
+    }
+
+    /// <summary>Troca a linha de lugar com a vizinha e regrava as duas ordens.</summary>
+    private void Mover(LinhaBase linha, int direcao)
+    {
+        var i = _linhas.IndexOf(linha);
+        var j = i + direcao;
+        if (i < 0 || j < 0 || j >= _linhas.Count) return;
+
+        var vizinha = _linhas[j];
+        (linha.Ordem, vizinha.Ordem) = (vizinha.Ordem, linha.Ordem);
+        _linhas[i] = vizinha;
+        _linhas[j] = linha;
+
+        Repo.Salvar(linha, _colunas.Count);
+        Repo.Salvar(vizinha, _colunas.Count);
+    }
+
+    private void LimparTudo()
+    {
+        Repo.LimparTudo();
+        Recarregar();
+        Aviso("Base limpa. Suba uma planilha para recomeçar.");
+    }
+
+    // ---------- exportar ----------
+
+    private async Task ExportarExcel()
+    {
+        var bytes = PlanilhaIO.ParaExcel(_colunas, Filtradas);
+        await Baixar($"base-axiais-{DateTime.Now:yyyy-MM-dd}.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", bytes);
+    }
+
+    private async Task ExportarCsv()
+    {
+        var bytes = PlanilhaIO.ParaCsv(_colunas, Filtradas);
+        await Baixar($"base-axiais-{DateTime.Now:yyyy-MM-dd}.csv", "text/csv; charset=utf-8", bytes);
+    }
+
+    private async Task Baixar(string nome, string mime, byte[] bytes) =>
+        await JS.InvokeVoidAsync("appDownload", nome, mime, Convert.ToBase64String(bytes));
+
+    // ---------- busca e paginação ----------
+
+    private List<LinhaBase> Filtradas => string.IsNullOrWhiteSpace(_busca)
+        ? _linhas
+        : _linhas.Where(l => l.Valores.Any(v => v.Contains(_busca, StringComparison.OrdinalIgnoreCase))).ToList();
+
+    private int _paginas => Math.Max(1, (int)Math.Ceiling(Filtradas.Count / (double)PorPagina));
+
+    private IEnumerable<LinhaBase> Pagina => Filtradas
+        .Skip((Math.Clamp(_pagina, 1, _paginas) - 1) * PorPagina)
+        .Take(PorPagina);
+
+    private void Aviso(string texto, bool erro = false)
+    {
+        _msg = texto;
+        _erro = erro;
+    }
+}

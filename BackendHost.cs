@@ -16,11 +16,19 @@ namespace HowdenAxiais.Poc;
 public static class BackendHost
 {
     /// <summary>
-    /// Monta o WebApplication completo (ainda não iniciado). Quando
-    /// <paramref name="urls"/> vem preenchido (modo desktop), ele manda;
-    /// senão vale a configuração/padrão http://localhost:5082.
+    /// Monta o WebApplication completo (ainda não iniciado).
+    ///
+    /// A porta NÃO é fixa: na abertura o sistema procura uma porta livre a
+    /// partir da preferida (chave "Porta" do appsettings, padrão 5082) — assim
+    /// abrir duas vezes, ou ter outro programa na 5082, não impede o sistema de
+    /// subir. Quem manda, em ordem: <paramref name="urls"/> (modo desktop) →
+    /// --urls / ASPNETCORE_URLS (servidor central) → a porta livre encontrada.
     /// </summary>
-    public static WebApplication CreateApp(string[] args, string[]? urls = null)
+    /// <param name="loopback">
+    /// Modo desktop: publica só em 127.0.0.1 (ninguém da rede alcança a janela
+    /// do usuário), deixando a escolha da porta com esta fábrica.
+    /// </param>
+    public static WebApplication CreateApp(string[] args, string[]? urls = null, bool loopback = false)
     {
         var builder = WebApplication.CreateBuilder(args);
 
@@ -30,16 +38,25 @@ public static class BackendHost
         // chamada não faz nada.
         builder.WebHost.UseStaticWebAssets();
 
+        // Endereço pedido de fora (servidor central): --urls http://0.0.0.0:5082
+        // ou a variável de ambiente ASPNETCORE_URLS. Se veio, respeita.
+        var enderecoExplicito =
+            !string.IsNullOrEmpty(builder.Configuration["urls"]) ||
+            !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ASPNETCORE_URLS"));
+
         if (urls is { Length: > 0 })
         {
             builder.WebHost.UseUrls(urls);
         }
-        // Porta padrão (modo por-usuário). Para "servidor central", rode com:
-        //   HowdenAxiais.Poc.exe --urls http://0.0.0.0:5082
-        else if (string.IsNullOrEmpty(builder.Configuration["urls"]) &&
-                 string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ASPNETCORE_URLS")))
+        else if (!enderecoExplicito)
         {
-            builder.WebHost.UseUrls("http://localhost:5082");
+            // Modo por-usuário (site ou desktop): procura a porta livre agora,
+            // na abertura. A preferida vem do appsettings ("Porta") e é sempre
+            // a primeira tentativa — é ela que preserva a sessão (login) do usuário.
+            var preferida = builder.Configuration.GetValue("Porta", Portas.Padrao);
+            var porta = Portas.PrimeiraLivre(preferida);
+            var host = loopback ? "127.0.0.1" : "localhost";
+            builder.WebHost.UseUrls($"http://{host}:{porta}");
         }
 
         // --- Blazor Server (componentes interativos no servidor) ---
@@ -61,24 +78,9 @@ public static class BackendHost
         // --- Dados: DuckDB (motor) sobre Parquet numa pasta de rede ---
         var dataFolder = builder.Configuration["Data:Folder"] ?? "data";
         builder.Services.AddSingleton(new ParquetStore(dataFolder));
-        builder.Services.AddScoped<PropostaRepository>();
-        builder.Services.AddScoped<ParametroRepository>();
-        builder.Services.AddScoped<FaturamentoRepository>();
-        builder.Services.AddScoped<BrandingRepository>();
-        builder.Services.AddScoped<RepresentanteRepository>();
-        builder.Services.AddScoped<VendedorRepository>();
-        builder.Services.AddScoped<ConfigRepository>();
-
-        // Rascunho da proposta: vive no circuito do usuário (Custo → Pricing → Proposta).
-        builder.Services.AddScoped<Rascunho>();
+        builder.Services.AddScoped<BaseRepository>();
 
         var app = builder.Build();
-
-        // Semeia a tabela de custos padrão na primeira execução.
-        using (var scope = app.Services.CreateScope())
-        {
-            DbInitializer.Initialize(scope.ServiceProvider.GetRequiredService<ParquetStore>());
-        }
 
         if (!app.Environment.IsDevelopment())
         {
@@ -136,30 +138,6 @@ public static class BackendHost
             await http.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
             return Results.Redirect("/login");
         }).DisableAntiforgery();
-
-        // Exporta as propostas gravadas em CSV (BOM UTF-8, separador ';' p/ Excel pt-BR).
-        app.MapGet("/axiais/propostas/export", (PropostaRepository repo) =>
-        {
-            static string C(string s) => s.Contains(';') || s.Contains('"') || s.Contains('\n')
-                ? $"\"{s.Replace("\"", "\"\"")}\"" : s;
-
-            var sb = new System.Text.StringBuilder();
-            sb.AppendLine("Número;Rev.;Data;Cliente;Cidade;Projeto;BU;Moeda;Custo total;Total c/ impostos;Status;Preparada por");
-            foreach (var p in repo.All())
-            {
-                sb.AppendLine(string.Join(';', new[]
-                {
-                    C(p.Numero), C(p.Revisao), Axiais.FmtData(p.Data), C(p.Cliente), C(p.Cidade),
-                    C(p.Projeto), C(p.Bu), C(p.Moeda),
-                    Pricing.Num(p.CustoTotal).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture),
-                    Pricing.Num(p.Total).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture),
-                    C(p.Status), C(p.PreparadaPor),
-                }));
-            }
-            var bytes = System.Text.Encoding.UTF8.GetPreamble()
-                .Concat(System.Text.Encoding.UTF8.GetBytes(sb.ToString())).ToArray();
-            return Results.File(bytes, "text/csv; charset=utf-8", "propostas-axiais.csv");
-        }).RequireAuthorization();
 
         app.MapRazorComponents<App>()
             .AddInteractiveServerRenderMode();

@@ -43,7 +43,7 @@ public sealed class SplashForm : Form
         var faixa = new Panel { Dock = DockStyle.Top, Height = 64, BackColor = Color.FromArgb(0, 71, 133) };
         faixa.Controls.Add(new Label
         {
-            Text = "VA · Propostas de Ventiladores Axiais",
+            Text = "VA · Ventiladores Axiais",
             ForeColor = Color.White,
             Font = new Font("Segoe UI", 14f, FontStyle.Bold),
             AutoSize = false,

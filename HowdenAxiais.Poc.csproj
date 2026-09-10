@@ -13,13 +13,8 @@
   <ItemGroup>
     <!-- Provider ADO.NET do DuckDB (inclui a lib nativa) — mesmo padrão do projeto Licenças. -->
     <PackageReference Include="DuckDB.NET.Data.Full" Version="1.1.3" />
-    <!-- Geração do Excel de registro da proposta (guias PROPOSTA/CUSTO/PRICING) -->
+    <!-- Leitura e geração das planilhas da aba Base (.xlsx/.xlsm) -->
     <PackageReference Include="ClosedXML" Version="0.102.2" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <!-- A planilha original (subir.xlsm) que o botão Excel devolve preenchida. -->
-    <Content Include="Recursos\planilha-modelo.xlsm" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

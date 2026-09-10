@@ -14,8 +14,9 @@ VA.exe (lançador, na rede \\BZVCPFIL003\proj_ramires$\VA)
  └─ 95% abre HowdenAxiais.exe local e se fecha
 
 HowdenAxiais.exe (o app)
- ├─  5% splash "VA · Propostas de Ventiladores Axiais" aparece
- ├─ 15% BackendHost.CreateApp → Kestrel em http://127.0.0.1:5082
+ ├─  5% splash "VA · Ventiladores Axiais" aparece
+ ├─ 15% BackendHost.CreateApp → Kestrel em http://127.0.0.1:<porta livre>
+ │       (5082 preferida; ocupada = 5083, 5084…)
  │       (porta ocupada = outra instância → o Windows escolhe uma livre)
  ├─ 55% janela criada (atrás do splash)
  ├─ 70% WebView2: Fixed Version (pasta WebView2Runtime ao lado do exe)

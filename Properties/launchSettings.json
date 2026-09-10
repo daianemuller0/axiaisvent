@@ -4,7 +4,7 @@
       "commandName": "Project",
       "dotnetRunMessages": true,
       "launchBrowser": false,
-      "applicationUrl": "http://localhost:5082",
+      "//": "sem applicationUrl de proposito: a porta e escolhida na abertura (Portas.PrimeiraLivre)",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       }

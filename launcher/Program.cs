@@ -44,7 +44,7 @@ public sealed class FormAtualizacao : Form
         var faixa = new Panel { Dock = DockStyle.Top, Height = 54, BackColor = Color.FromArgb(0, 71, 133) };
         faixa.Controls.Add(new Label
         {
-            Text = "VA · Propostas de Ventiladores Axiais",
+            Text = "VA · Ventiladores Axiais",
             ForeColor = Color.White,
             Font = new Font("Segoe UI", 13f, FontStyle.Bold),
             Dock = DockStyle.Fill,
@@ -195,7 +195,7 @@ public sealed class FormAtualizacao : Form
         dynamic atalho = shell.CreateShortcut(caminhoLnk);
         atalho.TargetPath = alvo;
         atalho.WorkingDirectory = pastaTrabalho;
-        atalho.Description = "VA · Propostas de Ventiladores Axiais — Howden";
+        atalho.Description = "VA · Ventiladores Axiais — Howden";
         atalho.Save();
     }
 

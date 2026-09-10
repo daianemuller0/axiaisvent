@@ -28,8 +28,6 @@ internal static class Program
 /// </summary>
 internal sealed class AppContexto : ApplicationContext
 {
-    private const int PortaPreferida = 5082;
-
     private readonly SplashForm _splash = new();
     private WebApplication? _backend;
     private MainForm? _janela;
@@ -49,7 +47,7 @@ internal sealed class AppContexto : ApplicationContext
             _splash.Reportar(15, "Subindo o servidor interno…");
 
             _backend = await Task.Run(() => SubirBackendAsync(args));
-            var url = (_backend.Urls.FirstOrDefault() ?? $"http://127.0.0.1:{PortaPreferida}")
+            var url = (_backend.Urls.FirstOrDefault() ?? $"http://127.0.0.1:{Portas.Padrao}")
                 .Replace("localhost", "127.0.0.1");
 
             _splash.Reportar(55, "Servidor pronto — abrindo a janela…");
@@ -69,13 +67,17 @@ internal sealed class AppContexto : ApplicationContext
     }
 
     /// <summary>
-    /// Sobe o Kestrel na porta preferida (mantém login e rascunhos do WebView2
-    /// entre aberturas, porque a origem não muda). Se estiver ocupada — outra
-    /// instância aberta —, deixa o Windows escolher uma porta livre.
+    /// Sobe o Kestrel em 127.0.0.1, na porta livre que o BackendHost escolhe na
+    /// abertura: a preferida primeiro (mantém a sessão do WebView2 entre
+    /// aberturas, porque a origem não muda) e, se ela estiver ocupada —
+    /// outra instância aberta —, a seguinte.
+    ///
+    /// O plano B com porta 0 (o Windows escolhe) cobre a corrida entre verificar
+    /// a porta e ocupá-la: alguém pode ter pegado a porta nesse meio-tempo.
     /// </summary>
     private static async Task<WebApplication> SubirBackendAsync(string[] args)
     {
-        var app = BackendHost.CreateApp(args, new[] { $"http://127.0.0.1:{PortaPreferida}" });
+        var app = BackendHost.CreateApp(args, loopback: true);
         try
         {
             await app.StartAsync();

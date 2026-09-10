@@ -21,7 +21,7 @@ public sealed class MainForm : Form
         _progresso = progresso;
         _pronto = pronto;
 
-        Text = "VA · Propostas de Ventiladores Axiais — Howden";
+        Text = "VA · Ventiladores Axiais — Howden";
         StartPosition = FormStartPosition.CenterScreen;
         Size = new Size(1440, 900);
         MinimumSize = new Size(1000, 640);

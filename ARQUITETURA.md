@@ -1,6 +1,6 @@
-# Guia Arquitetural — Ventiladores Axiais (propostas)
+# Guia Arquitetural — Ventiladores Axiais
 
-**Howden Ventiladores Axiais · Propostas**
+**Howden Ventiladores Axiais · Base**
 Aplicação em Blazor Server com persistência em DuckDB/Parquet, no mesmo padrão dos
 projetos **Serviços** e **Licencas_HSA**.
 
@@ -8,17 +8,19 @@ projetos **Serviços** e **Licencas_HSA**.
 
 ## 1. De onde veio
 
-O projeto nasceu do repositório **Serviços** (`daianemuller0/servicos`): copiamos a
-base inteira — inicialização, serviços do container, camada de dados, autenticação,
-layout, janela desktop e publicação na rede — e renomeamos para o domínio de axiais.
-O que muda em relação à origem:
+O projeto nasceu do repositório **Serviços** (`daianemuller0/servicos`): aproveitamos
+a estrutura de funcionamento — inicialização, serviços do container, camada de dados,
+autenticação, layout, janela desktop e publicação na rede — e trocamos o conteúdo: as
+telas de proposta e o motor de pricing de serviço saíram, e no lugar entrou a aba
+**Base**. O que muda em relação à origem:
 
 | | Serviços | Ventiladores Axiais |
 |---|---|---|
 | Namespace / assembly | `HowdenServicos.Poc` | `HowdenAxiais.Poc` |
-| Porta padrão | 5081 | **5082** (dá para rodar os dois lado a lado) |
+| Porta | 5081 fixa | **5082 preferida, ou a próxima livre** (dá para rodar os dois lado a lado, e abrir duas vezes) |
 | Pasta de dados | `…\DB\servicos` | **`\\BZVCPFIL003\proj_ramires$\DB\axiais`** |
 | Rotas | `/servicos/…` | `/axiais/…` |
+| Telas | proposta, pricing, cadastros | uma só: **Base** |
 | Lançador na rede | `…\SV\SV.exe` | `…\VA\VA.exe` |
 | Pasta local do app | `%LOCALAPPDATA%\HowdenSV` | `%LOCALAPPDATA%\HowdenVA` |
 
@@ -40,28 +42,24 @@ O que muda em relação à origem:
 ```
 axiaisvent/
 ├── Program.cs                     # modo navegador: sobe o BackendHost e abre o browser
-├── BackendHost.cs                 # ★ fábrica do servidor (DI, auth, endpoints, seed)
-├── appsettings.json               # pasta de dados, credencial, OpenBrowser
+├── BackendHost.cs                 # ★ fábrica do servidor (DI, auth, endpoints)
+├── Portas.cs                      # escolhe a porta livre na abertura (5082, 5083…)
+├── appsettings.json               # pasta de dados, credencial, porta, OpenBrowser
 ├── HowdenAxiais.Poc.csproj        # net8.0 + DuckDB.NET + ClosedXML
 ├── Components/
 │   ├── App.razor                  # documento HTML raiz
 │   ├── Routes.razor               # Router + AuthorizeRouteView (tudo exige login)
 │   ├── RedirectToLogin.razor
-│   ├── PaginaProposta.cs          # base das telas de proposta (rascunho + localStorage)
 │   ├── Layout/                    # MainLayout, NavMenu, EmptyLayout
-│   └── Pages/                     # Login, Home, Error + as telas do domínio
+│   └── Pages/
+│       ├── Home.razor             # "/" → /axiais/base
+│       ├── Login.razor
+│       ├── BasePage.razor         # ★ a aba Base (subir, ajustar linhas, exportar)
+│       └── Error.razor
 ├── Data/
 │   ├── ParquetStore.cs            # ★ núcleo da persistência (DuckDB sobre Parquet)
-│   ├── Repositorios.cs            # Proposta / Parametro / Representante / Vendedor /
-│   │                              #   Faturamento / Branding / Config
-│   ├── Seed.cs                    # valores padrão + DbInitializer
-│   ├── Rascunho.cs                # a proposta em edição (scoped no circuito)
-│   ├── Pricing.cs                 # motor de cálculo  ⟵ herdado de Serviços
-│   ├── Axiais.cs                  # listas, rótulos PT/EN/ES e o documento HTML
-│   ├── ExcelExport.cs             # Excel de registro da proposta
-│   └── PlanilhaExport.cs          # devolve a planilha-modelo preenchida
-├── Models/                        # Proposta, ItemMO, ItemDespesa, PricingParams, …
-├── Recursos/planilha-modelo.xlsm  # ⚠ ainda é a planilha de SERVIÇO (trocar)
+│   ├── BaseRepository.cs          # a base da planilha, com colunas dinâmicas
+│   └── PlanilhaIO.cs              # ler .xlsx/.xlsm/.csv e exportar Excel/CSV
 ├── desktop/                       # janela WinForms + WebView2 (mesmo processo)
 ├── launcher/                      # VA.exe da rede: compara versão, copia e abre
 ├── publicar.ps1                   # publica na rede em versão nova
@@ -76,8 +74,8 @@ Um único `BackendHost.CreateApp(args, urls?)` monta o servidor, e ele é usado 
 dois modos:
 
 **Modo navegador** (`Program.cs`) — `dotnet run`, servidor central ou testes.
-Sobe o Kestrel em `http://localhost:5082` e, se `OpenBrowser` for `true`, abre o
-navegador padrão quando a aplicação inicia.
+Sobe o Kestrel na primeira porta livre a partir da preferida e, se `OpenBrowser`
+for `true`, abre o navegador padrão nessa porta quando a aplicação inicia.
 
 **Modo desktop** (`desktop/Program.cs`) — um processo só faz três papéis: servidor
 (Kestrel), janela nativa (WinForms) e navegador embutido (WebView2):
@@ -89,25 +87,44 @@ VA.exe (lançador, na rede \\BZVCPFIL003\proj_ramires$\VA)
  └─ 95% abre HowdenAxiais.exe local e se fecha
 
 HowdenAxiais.exe
- ├─  5% splash "VA · Propostas de Ventiladores Axiais"
- ├─ 15% BackendHost.CreateApp → Kestrel em http://127.0.0.1:5082
+ ├─  5% splash "VA · Ventiladores Axiais"
+ ├─ 15% BackendHost.CreateApp → Kestrel em http://127.0.0.1:<porta livre>
  ├─ 55% janela criada (atrás do splash)
  ├─ 70% WebView2 (Fixed Version ao lado do exe, ou Evergreen do Windows/Edge)
  ├─ 85% Navigate → primeira tela do Blazor
  └─ 100% splash fecha, janela na frente
 ```
 
+### A porta (verificada na abertura)
+
+A porta não é fixa. `Portas.PrimeiraLivre` tenta abrir um socket na porta
+preferida (chave `Porta` do `appsettings.json`, padrão **5082**) e, se ela estiver
+ocupada, anda para a seguinte — 5083, 5084… até 20 tentativas; se todas
+estiverem ocupadas, entrega a escolha ao Windows (porta 0). Só o *bind* revela
+mesmo se a porta está livre, por isso o teste é abrir e soltar.
+
+A preferida é sempre a primeira tentativa de propósito: o login (cookie) e o
+a sessão do usuário (o cookie de login) mora na **origem** — `http://host:porta` —,
+então manter a mesma porta é o que faz o trabalho sobreviver a fechar e abrir.
+Quem manda, em ordem:
+
+1. `urls` passado por código (o plano B do desktop, com porta 0);
+2. `--urls` / `ASPNETCORE_URLS` — é assim que se roda o servidor central
+   (`--urls http://0.0.0.0:5082`), onde a porta precisa ser conhecida;
+3. a porta livre encontrada na abertura.
+
+Por isso o `Properties/launchSettings.json` **não** tem `applicationUrl`: ele
+definiria `ASPNETCORE_URLS` e o `dotnet run` voltaria a fixar a porta.
+
 O que o `BackendHost` registra, na ordem:
 
 1. `UseStaticWebAssets()` — sem isso o modo desktop abre sem CSS/JS.
 2. Blazor Server (`AddRazorComponents().AddInteractiveServerComponents()`).
 3. Autenticação por cookie (7 dias, expiração deslizante) + autorização.
-4. **Dados**: `ParquetStore` como *singleton* apontando para `Data:Folder`, e um
-   repositório *scoped* por entidade.
-5. `Rascunho` *scoped* — a proposta em edição vive no circuito do usuário.
-6. `DbInitializer.Initialize(...)` — semeia os padrões na primeira execução.
-7. Endpoints `/auth/login`, `/auth/logout` e `/axiais/propostas/export` (CSV).
-8. `MapRazorComponents<App>()` com render interativo no servidor.
+4. **Dados**: `ParquetStore` como *singleton* apontando para `Data:Folder`, e o
+   `BaseRepository` *scoped*.
+5. Endpoints `/auth/login` e `/auth/logout` (precisam do HttpContext para o cookie).
+6. `MapRazorComponents<App>()` com render interativo no servidor.
 
 ---
 
@@ -125,8 +142,8 @@ Igual ao Serviços/Licenças (`Data/ParquetStore.cs`, sem alteração de lógica
 - **Evolução de esquema**: colunas novas aparecem como `NULL` nos arquivos antigos,
   então dá para acrescentar campo sem migração.
 
-Entidades já existentes: `propostas`, `parametros`, `representantes`, `vendedores`,
-`faturamento`, `branding` e `config`.
+Entidades de hoje: `base` (as linhas da planilha) e `base_colunas` (o cabeçalho) —
+veja a seção 8.
 
 A pasta vem de `Data:Folder` no `appsettings.json`
 (`\\BZVCPFIL003\proj_ramires$\DB\axiais`); sem configuração, usa `data/`.
@@ -149,18 +166,9 @@ A pasta vem de `Data:Folder` no `appsettings.json`
 
 | Rota | Página | O que faz |
 |---|---|---|
-| `/` | Home | Redireciona para `/axiais/documento` |
+| `/` | Home | Redireciona para `/axiais/base` |
 | `/login` | Login | Formulário que posta em `/auth/login` |
-| `/axiais/documento` | Proposta | O documento comercial editável |
-| `/axiais/proposta` | Nova Proposta | Cadastro, margem, custos, composição do preço (`/axiais/custo` e `/axiais/pricing` são apelidos) |
-| `/axiais/propostas` | Propostas Enviadas | Lista, busca, reabre e exporta CSV |
-| `/axiais/representantes` | Representantes | Cadastro com % de comissão e contato |
-| `/axiais/vendedores` | Vendedores | Quem assina a proposta |
-| `/axiais/configuracoes` | E-mails e Padrões | Modelos de e-mail e padrões da proposta nova |
-| `/axiais/parametros` | Tabela de Custos | Custos padrão |
-| `/axiais/marca` | Identidade Visual | Logo do documento e do sistema |
-| `/axiais/faturamento` | Dados de Faturamento | Razão social, endereço e banco por BU |
-| `/axiais/propostas/export` | — | CSV das propostas (UTF-8 com BOM, separador `;`) |
+| `/axiais/base` | Base | A planilha da base: subir, ajustar linhas, procurar e exportar |
 
 ---
 
@@ -174,20 +182,38 @@ atualização ao fechar e abrir.
 
 ---
 
-## 8. O que falta moldar para axiais
+## 8. A aba Base
 
-Tudo abaixo veio de Serviços e continua funcionando como lá — é a próxima etapa:
+A tela `/axiais/base` é hoje o sistema inteiro. Ela guarda a planilha da equipe na
+mesma pasta de rede do resto — sem colunas fixas no código.
 
-| Arquivo | Hoje | Para axiais |
-|---|---|---|
-| `Data/Pricing.cs` | cadeia de preço de serviço (mão de obra + despesas → risco → margem → impostos PIS/COFINS/ISS) | pricing de equipamento: material, fabricação, ICMS/IPI por estado, frete |
-| `Data/Axiais.cs` | listas, rótulos PT/EN/ES e o HTML do documento de serviço | listas e documento do ventilador axial |
-| `Models/Proposta.cs` | `ItemMO` / `ItemDespesa` | itens do ventilador (modelo, diâmetro, vazão, pressão, rotor, motor…) |
-| `Components/Pages/GerarProposta.razor` | tela única de custo/pricing de serviço | seleção do ventilador e composição do preço |
-| `Components/Pages/PropostaComercial.razor` | documento comercial de serviço | documento do ventilador |
-| `Data/Seed.cs` | tabela de custos de serviço; representantes e vendedores (esses valem para axiais) | tabela de custos de axiais |
-| `Recursos/planilha-modelo.xlsm` | planilha de propostas de **serviço** | planilha de axiais (`PlanilhaExport.cs` mapeia célula a célula) |
-| `Data/ExcelExport.cs` | guias PROPOSTA/CUSTO/PRICING de serviço | guias equivalentes de axiais |
+### Como a base é guardada
 
-Nada disso bloqueia rodar o sistema: ele sobe, autentica, grava e lê da pasta
-`DB\axiais` e publica na rede desde já.
+As colunas são as da planilha que o usuário subir, então não dá para fixá-las.
+`BaseRepository` grava duas coisas no ParquetStore:
+
+| Entidade | O que guarda |
+|---|---|
+| `base_colunas` | o cabeçalho: os nomes das colunas, em ordem, como JSON |
+| `base` | as linhas: `id`, `ordem` e os valores em colunas `c0`, `c1`, `c2`… |
+
+Os nomes técnicos `c0, c1…` são de propósito: qualquer título de planilha — com
+acento, espaço, aspas ou repetido — funciona sem quebrar o Parquet/DuckDB. O nome
+que o usuário vê vem sempre do cabeçalho guardado à parte.
+
+A `ordem` é gravada com zeros à esquerda (`000007`) porque o Parquet guarda tudo como
+texto e a leitura ordena por texto — sem isso a linha 10 viria antes da 2.
+
+### O que a tela faz
+
+| Ação | Como funciona |
+|---|---|
+| **Subir planilha** | `.xlsx`, `.xlsm` ou `.csv`; a 1ª linha é o cabeçalho. Em *substituir*, a base é trocada inteira; em *acrescentar*, as colunas atuais são mantidas e as linhas entram no fim, encaixadas pela posição das colunas |
+| **Ajustar linhas** | cada célula grava sozinha ao sair do campo (um Parquet novo por alteração, como no resto do sistema); dá para adicionar, apagar e mover a linha (↑ ↓) |
+| **Procurar** | filtra em todas as colunas; a exportação respeita o filtro |
+| **Exportar** | Excel (ClosedXML, cabeçalho azul, filtro e primeira linha congelada) ou CSV com BOM e `;`, que o Excel pt-BR abre direto |
+
+A leitura preserva o valor **como o Excel mostra** (`GetFormattedString`), então data e
+número chegam formatados; a base é um retrato da planilha, sem adivinhar tipo.
+
+Paginação de 100 linhas por página — uma planilha grande não trava a tela.

@@ -11,7 +11,7 @@ if (app.Configuration.GetValue("OpenBrowser", true))
     {
         try
         {
-            var url = (app.Urls.FirstOrDefault() ?? "http://localhost:5082")
+            var url = (app.Urls.FirstOrDefault() ?? $"http://localhost:{Portas.Padrao}")
                 .Replace("0.0.0.0", "localhost").Replace("[::]", "localhost");
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
         }
