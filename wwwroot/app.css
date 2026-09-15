@@ -191,6 +191,7 @@ h1 { font-size: 24px; margin: 0 0 4px; color: var(--primary); letter-spacing: -.
 .aviso-ok { background: #dcfce7; color: #15803d; }
 .aviso-alerta { background: #fef9c3; color: #a16207; font-weight: 600; }
 .aviso-erro { background: #fde8e8; color: #b91c1c; font-weight: 600; }
+.aviso-neutro { background: #eef2f7; color: #55607a; }
 /* célula da matriz com combinação válida — o amarelo da planilha original */
 .combina { background: #fef9c3; }
 

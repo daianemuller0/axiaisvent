@@ -341,3 +341,46 @@ um frame do meio não deixa buraco na numeração.
 
 O nome faz parte do `id` (`{padrao}-{nome}`), então renomear apaga o registro antigo e
 grava o novo, mantendo a posição. Nome repetido dentro do mesmo padrão é recusado.
+
+---
+
+## 11. A regra do motor — o limite pelo cubo
+
+A faixa **verde** da planilha ("Maximum Internal Motor Frame") diz o maior motor que cabe
+dentro de cada cubo, em IEC e em NEMA. É o que liga as duas tabelas: os frames da aba
+Motores e os cubos da aba Dados.
+
+### O modelo (`Data/LimiteMotorRepository.cs`, entidade `limites_motor`)
+
+| Campo | O que é |
+|---|---|
+| `serie` | `VAX` ou `Joy` |
+| `cubo` | o mesmo rótulo de cubo usado nos equipamentos |
+| `padrao` | `IEC` ou `NEMA` |
+| `frame` | o maior frame que cabe, como está na planilha |
+
+Na planilha o valor é uma célula **mesclada sobre 60Hz e 50Hz** — o frame máximo é o
+mesmo nas duas frequências —, por isso o limite aqui não tem frequência. Se um dia
+diferir, vira um campo a mais.
+
+### A comparação é por posição, nunca por nome
+
+`RegraMotor.Verificar` acha a posição do frame escolhido e a do frame máximo na escada do
+padrão (a `Ordem` da aba Motores) e compara os dois números. Comparar texto não
+funcionaria: `315L` vem antes de `315M/L` no alfabeto e depois na escada de tamanho.
+
+O limite é **inclusivo**: no cubo 1800, `225S/M` passa e `250S/M` alerta.
+
+IEC e NEMA são escadas independentes — o mesmo cubo 1800 aceita até `225S/M` em IEC e até
+`364/5T` em NEMA, e um nunca se compara com o outro.
+
+### Quando o frame do limite não está no cadastro
+
+Vários rótulos da faixa verde não existem na lista de frames da equipe: `180M/L`, `286T`,
+`355S/M`, `315S/M/L`, `444/5TSC`, `504/5TSC`. Parecem designações combinadas ou com
+sufixo (`180M/L` = 180M ou 180L; `444/5TSC` = 444/5T com SC).
+
+O sistema **não adivinha** a correspondência: grava o rótulo como está na planilha e, na
+hora de comparar, diz que não consegue e pede para incluir o frame na aba Motores ou
+corrigir o limite. Na tabela de manutenção o valor aparece marcado como *(fora da lista)*.
+Esconder isso seria pior — daria um "pode" ou um "não pode" sem base.

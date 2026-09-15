@@ -16,8 +16,12 @@ A tabela técnica dos equipamentos — as linhas **VAX** e **Joy**, transcritas 
 - **Alerta de rotação** — cada combinação carrega o teto de rotação (coluna V-Belt).
   Pedindo uma rotação acima dele, o sistema avisa; pedindo uma combinação que não
   existe, ele diz quais cubos servem para aquele diâmetro.
+- **Limite de motor** — cada cubo tem um frame máximo em IEC e outro em NEMA (a faixa
+  verde da planilha). Escolhendo um motor maior que o que cabe no cubo, o sistema avisa.
+  A comparação é pela posição do frame na escada de tamanho da aba Motores.
 - **Manutenção** — a própria matriz é o editor: digitar um número numa célula vazia cria
-  a combinação, apagar o número tira.
+  a combinação, apagar o número tira. O motor máximo por cubo tem sua própria tabela
+  logo abaixo.
 
 Cada linha descreve as medidas do seu jeito, e o sistema guarda o rótulo como ele é na
 planilha: o VAX em milímetros (ventilador `2400`, cubo `1800`) e o Joy em polegadas com o

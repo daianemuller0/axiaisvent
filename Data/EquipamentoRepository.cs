@@ -74,6 +74,8 @@ public static class Medida
 public sealed class EquipamentoRepository
 {
     private const string Entidade = "equipamentos";
+    /// <summary>Marcas das correções já aplicadas, para não repetirem.</summary>
+    private const string EntidadeMigracoes = "equipamentos_migracoes";
 
     private readonly ParquetStore _store;
     public EquipamentoRepository(ParquetStore store) => _store = store;
@@ -114,8 +116,75 @@ public sealed class EquipamentoRepository
     /// (Apagar uma combinação isolada não a traz de volta; só apagar o bloco
     /// inteiro faria o bloco ser recarregado na próxima abertura.)
     /// </summary>
+    /// <summary>
+    /// Rótulos de cubo lidos errado numa transcrição e corrigidos depois.
+    /// O rótulo faz parte do id, então renomear é apagar e regravar — sem isso
+    /// a semeadura criaria um bloco novo e o cubo apareceria duas vezes.
+    /// </summary>
+    private static readonly (string Serie, string De, string Para)[] CorrecoesDeCubo =
+    {
+        // A foto sugeria "S2200"; a planilha do Joy diz S2000.
+        ("Joy", "21\", S2200", "21\", S2000"),
+    };
+
+    /// <summary>Aplica as correções de rótulo. Não faz nada quando já está certo.</summary>
+    public void CorrigirRotulos()
+    {
+        var todos = Todos();
+        foreach (var (serie, de, para) in CorrecoesDeCubo)
+        {
+            foreach (var e in todos.Where(x => x.Serie == serie && x.Cubo == de))
+            {
+                Apagar(e.Id);
+                Salvar(new Equipamento
+                {
+                    Serie = e.Serie, Diametro = e.Diametro, Cubo = para, RpmMax = e.RpmMax,
+                });
+            }
+        }
+    }
+
+    /// <summary>
+    /// Blocos cuja transcrição saiu errada (linhas deslocadas na leitura da foto)
+    /// e que precisam ser refeitos a partir da tabela de fábrica. Cada um roda
+    /// UMA vez — o id fica gravado, então um ajuste posterior da equipe naquele
+    /// bloco não é desfeito na abertura seguinte.
+    /// </summary>
+    private static readonly (string Id, string Serie, string Cubo)[] BlocosRefeitos =
+    {
+        ("joy-21-s2000-v2", "Joy", "21\", S2000"),
+        ("joy-26-s2000-v2", "Joy", "26\", S2000"),
+        ("joy-30-s2000-v2", "Joy", "30\", S2000"),
+    };
+
+    private HashSet<string> MigracoesAplicadas() => _store
+        .ReadLatest(EntidadeMigracoes, "id", r => r.IsDBNull(0) ? "" : r.GetString(0))
+        .ToHashSet();
+
+    private void RefazerBlocos()
+    {
+        var aplicadas = MigracoesAplicadas();
+
+        foreach (var (id, serie, cubo) in BlocosRefeitos)
+        {
+            if (aplicadas.Contains(id)) continue;
+
+            foreach (var e in Todos().Where(x => x.Serie == serie && x.Cubo == cubo))
+                Apagar(e.Id);
+
+            foreach (var e in EquipamentosSeed.Todas().Where(x => x.Serie == serie && x.Cubo == cubo))
+                Salvar(e);
+
+            _store.WriteRow(EntidadeMigracoes,
+                new KeyValuePair<string, object?>[] { new("id", id) });
+        }
+    }
+
     public void SemearSeVazio()
     {
+        CorrigirRotulos();
+        RefazerBlocos();
+
         var blocosExistentes = Todos()
             .Select(e => (e.Serie, e.Cubo))
             .ToHashSet();
@@ -243,11 +312,11 @@ public static class EquipamentosSeed
             ("29 1/4", 3000), ("32", 2800), ("34", 2600), ("36", 2400), ("38", 2200),
             ("42 1/4", 2000), ("45", 1800),
         }),
-        ("21\", S2200", new[]
+        ("21\", S2000", new[]
         {
-            ("25 1/4", 3600), ("27 1/7", 3600), ("29 1/4", 3600), ("32", 3200),
-            ("34", 3000), ("36", 2900), ("38", 2700), ("42 1/4", 2500), ("45", 2300),
-            ("48", 2100),
+            ("23 1/4", 3600), ("25 1/4", 3600), ("27 1/7", 3600), ("29 1/4", 3200),
+            ("32", 3000), ("34", 2900), ("36", 2700), ("38", 2500), ("42 1/4", 2300),
+            ("45", 2100),
         }),
         ("26\", S1000", new[]
         {
@@ -257,13 +326,13 @@ public static class EquipamentosSeed
         }),
         ("26\", S2000", new[]
         {
-            ("38", 2200), ("42 1/4", 2100), ("45", 2000), ("48", 1900), ("54", 1900),
-            ("60", 1800), ("66", 1800), ("72", 1500), ("78", 1300), ("85", 1200),
+            ("34", 2200), ("36", 2100), ("38", 2000), ("42 1/4", 1900), ("45", 1900),
+            ("48", 1800), ("54", 1800), ("60", 1500), ("66", 1300), ("72", 1200),
         }),
         ("30\", S2000", new[]
         {
-            ("45", 1800), ("48", 1800), ("54", 1800), ("60", 1800), ("66", 1800),
-            ("72", 1200), ("78", 1200), ("85", 1200),
+            ("42 1/4", 1800), ("45", 1800), ("48", 1800), ("54", 1800), ("60", 1800),
+            ("66", 1200), ("72", 1200), ("78", 1200),
         }),
     });
 
