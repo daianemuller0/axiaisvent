@@ -1,0 +1,210 @@
+@page "/axiais/motores"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject FrameRepository Repo
+
+<div class="page-head">
+    <div>
+        <h1>Motores</h1>
+        <p class="subtitle">
+            Os frames (carcaças) de motor, nos padrões <strong>IEC</strong> e <strong>NEMA</strong>.
+            A ordem da lista é a <strong>ordem de tamanho</strong>, do menor para o maior — é ela
+            que vai dizer, depois, se um frame passa do máximo que cabe no cubo.
+        </p>
+    </div>
+</div>
+
+<div class="tabs">
+    <button class="tab @(_filtro == "" ? "active" : "")" @onclick="@(() => _filtro = "")">
+        Todos <span class="tab-badge">@_todos.Count</span>
+    </button>
+    @foreach (var p in FrameRepository.Padroes)
+    {
+        var padrao = p;
+        <button class="tab @(_filtro == padrao ? "active" : "")" @onclick="@(() => _filtro = padrao)">
+            @padrao <span class="tab-badge">@_todos.Count(f => f.Padrao == padrao)</span>
+        </button>
+    }
+</div>
+
+<!-- ---------- incluir frame ---------- -->
+<div class="panel" style="margin-bottom:16px">
+    <div class="toolbar" style="margin-bottom:0; flex-wrap:wrap">
+        <strong>Incluir frame</strong>
+
+        <select class="cell" @bind="_novoPadrao">
+            @foreach (var p in FrameRepository.Padroes)
+            {
+                <option value="@p">@p</option>
+            }
+        </select>
+
+        <input class="cell" style="min-width:190px" placeholder="Nome do frame (ex.: 225S/M)"
+               @bind="_novoNome" @bind:event="oninput" @onkeydown="TeclaIncluir" />
+
+        <button class="btn-primary" @onclick="Incluir" disabled="@(_novoNome.Trim().Length == 0)">
+            + Incluir
+        </button>
+
+        <span class="subtitle" style="margin:0">entra no fim da lista do padrão escolhido</span>
+    </div>
+</div>
+
+@if (_msg is not null)
+{
+    <div class="@(_erro ? "aviso aviso-erro" : "aviso aviso-ok")" style="margin-bottom:14px">@_msg</div>
+}
+
+<div class="panel" style="padding:0; overflow-x:auto">
+    <table class="grid">
+        <thead>
+            <tr>
+                <th class="nowrap" style="width:70px">Ordem</th>
+                <th class="nowrap">Frame</th>
+                <th class="nowrap" style="width:120px">Padrão</th>
+                <th class="nowrap" style="width:140px"></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var f in Filtrados)
+            {
+                var frame = f;
+                <tr @key="frame.Id">
+                    <td class="center nowrap">@Posicao(frame)</td>
+                    <td>
+                        <input class="cell" style="max-width:220px" value="@frame.Nome"
+                               @onchange="e => Renomear(frame, e.Value?.ToString() ?? string.Empty)" />
+                    </td>
+                    <td class="nowrap"><span class="badge @(frame.Padrao == "IEC" ? "st-atencao" : "st-plan")">@frame.Padrao</span></td>
+                    <td class="nowrap center">
+                        <button class="btn-link" title="Subir (frame menor)" @onclick="() => Mover(frame, -1)">↑</button>
+                        <button class="btn-link" title="Descer (frame maior)" @onclick="() => Mover(frame, 1)">↓</button>
+                        <button class="btn-link" title="Apagar" @onclick="() => Apagar(frame)">✕</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<p class="subtitle" style="margin-top:12px">
+    As setas mudam o frame de lugar na escada de tamanho do seu padrão. Um frame IEC nunca
+    troca de posição com um NEMA — são duas escadas independentes.
+</p>
+
+@code {
+    private List<FrameMotor> _todos = new();
+    private string _filtro = "";
+
+    private string _novoPadrao = "IEC";
+    private string _novoNome = "";
+
+    private string? _msg;
+    private bool _erro;
+
+    protected override void OnInitialized()
+    {
+        Repo.SemearSeVazio();
+        _todos = Repo.Todos();
+    }
+
+    private List<FrameMotor> Filtrados => _filtro.Length == 0
+        ? _todos
+        : _todos.Where(f => f.Padrao == _filtro).ToList();
+
+    private List<FrameMotor> DoPadrao(string padrao) =>
+        _todos.Where(f => f.Padrao == padrao).OrderBy(f => f.Ordem).ToList();
+
+    /// <summary>
+    /// O número que aparece na tela é a POSIÇÃO na escada do padrão, não o campo
+    /// Ordem gravado — esse é só chave de ordenação e fica com buracos quando um
+    /// frame é apagado.
+    /// </summary>
+    private int Posicao(FrameMotor frame) =>
+        DoPadrao(frame.Padrao).FindIndex(f => f.Id == frame.Id) + 1;
+
+    private void Incluir()
+    {
+        var nome = _novoNome.Trim();
+        if (nome.Length == 0) return;
+
+        if (_todos.Any(f => f.Padrao == _novoPadrao &&
+                            f.Nome.Equals(nome, StringComparison.OrdinalIgnoreCase)))
+        {
+            Aviso($"O frame \"{nome}\" já existe no padrão {_novoPadrao}.", erro: true);
+            return;
+        }
+
+        var ultimos = DoPadrao(_novoPadrao);
+        Repo.Salvar(new FrameMotor
+        {
+            Padrao = _novoPadrao,
+            Nome = nome,
+            Ordem = ultimos.Count == 0 ? 1 : ultimos[^1].Ordem + 1,
+        });
+
+        _todos = Repo.Todos();
+        _novoNome = "";
+        Aviso($"Frame {nome} incluído no fim da lista {_novoPadrao}.");
+    }
+
+    private void TeclaIncluir(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") Incluir();
+    }
+
+    /// <summary>
+    /// O nome faz parte do id, então renomear é apagar o registro antigo e
+    /// gravar o novo — mantendo a posição na escada.
+    /// </summary>
+    private void Renomear(FrameMotor frame, string texto)
+    {
+        var nome = texto.Trim();
+        if (nome.Length == 0 || nome == frame.Nome) return;
+
+        if (_todos.Any(f => f.Padrao == frame.Padrao && f.Id != frame.Id &&
+                            f.Nome.Equals(nome, StringComparison.OrdinalIgnoreCase)))
+        {
+            Aviso($"O frame \"{nome}\" já existe no padrão {frame.Padrao}.", erro: true);
+            _todos = Repo.Todos();   // devolve o campo ao valor gravado
+            return;
+        }
+
+        var antigo = frame.Nome;
+        Repo.Apagar(frame.Id);
+        Repo.Salvar(new FrameMotor { Padrao = frame.Padrao, Nome = nome, Ordem = frame.Ordem });
+
+        _todos = Repo.Todos();
+        Aviso($"{antigo} passou a se chamar {nome}.");
+    }
+
+    private void Apagar(FrameMotor frame)
+    {
+        Repo.Apagar(frame.Id);
+        _todos = Repo.Todos();
+        Aviso($"Frame {frame.Nome} ({frame.Padrao}) apagado.");
+    }
+
+    /// <summary>Troca de lugar com o vizinho do MESMO padrão e regrava as duas posições.</summary>
+    private void Mover(FrameMotor frame, int direcao)
+    {
+        var lista = DoPadrao(frame.Padrao);
+        var i = lista.FindIndex(f => f.Id == frame.Id);
+        var j = i + direcao;
+        if (i < 0 || j < 0 || j >= lista.Count) return;
+
+        var vizinho = lista[j];
+        (frame.Ordem, vizinho.Ordem) = (vizinho.Ordem, frame.Ordem);
+        Repo.Salvar(frame);
+        Repo.Salvar(vizinho);
+
+        _todos = Repo.Todos();
+        _msg = null;
+    }
+
+    private void Aviso(string texto, bool erro = false)
+    {
+        _msg = texto;
+        _erro = erro;
+    }
+}

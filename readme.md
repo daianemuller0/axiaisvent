@@ -25,6 +25,19 @@ modelo do cubo (ventilador `18 1/4`, cubo `14", S1000`).
 
 > A tabela **Joy** ainda está parcial — faltam os cubos à direita do `21", S2200`.
 
+## A aba Motores
+
+O cadastro dos frames (carcaças) de motor, nos padrões **IEC** (19 frames) e **NEMA**
+(15 frames).
+
+A ordem da lista **não é alfabética, é ordem de tamanho** — do `< 112M` ao `355A/B` no
+IEC, do `254T` ao `588/9T` no NEMA. É essa escada que vai permitir responder "esse frame
+passa do máximo que cabe no cubo?", quando a linha *Maximum Internal Motor* da planilha
+entrar no sistema.
+
+Dá para incluir, renomear, apagar e mudar o frame de lugar na escada (↑ ↓). Um frame IEC
+nunca troca de posição com um NEMA: são duas escadas independentes.
+
 ## A aba Base
 
 Hoje o sistema tem uma aba, **Base**, com a planilha da equipe:

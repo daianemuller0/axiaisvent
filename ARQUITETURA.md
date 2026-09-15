@@ -170,6 +170,7 @@ A pasta vem de `Data:Folder` no `appsettings.json`
 | `/login` | Login | Formulário que posta em `/auth/login` |
 | `/axiais/base` | Base | A planilha da base: subir, ajustar linhas, procurar e exportar |
 | `/axiais/dados` | Dados | Equipamentos: relação diâmetro × cubo e o alerta de rotação |
+| `/axiais/motores` | Motores | Cadastro dos frames de motor (IEC e NEMA), na ordem de tamanho |
 
 ---
 
@@ -290,3 +291,36 @@ travados no teto de 3600 rpm. Então o alinhamento das linhas veio só da leitur
 > **A tabela Joy está PARCIAL.** A foto corta na coluna N: faltam os cubos à direita do
 > `21", S2200` e, com eles, os ventiladores de 54 a 85, que aparecem na primeira coluna
 > sem nenhum valor nos três blocos conhecidos.
+
+---
+
+## 10. A aba Motores — os frames
+
+`/axiais/motores` guarda os frames (carcaças) de motor (`Data/FrameRepository.cs`),
+na entidade `frames`.
+
+| Campo | O que é |
+|---|---|
+| `padrao` | `IEC` ou `NEMA` |
+| `nome` | o frame como a equipe escreve: `225S/M`, `364/5T` |
+| `ordem` | posição na escada de tamanho, **dentro do padrão** (1 = o menor) |
+
+### Por que a ordem é o campo que importa
+
+A lista da equipe não é alfabética — é uma **escada de tamanho**: `< 112M` → `112M` →
+`132S` → … → `355A/B` no IEC, e `254T` → … → `588/9T` no NEMA. Ordenar por texto
+embaralharia tudo (`112M` viria antes de `< 112M`, `315L` antes de `315M/L`).
+
+Guardar a posição é o que vai permitir, quando a linha *Maximum Internal Motor* da
+planilha entrar, responder à pergunta que interessa: **o frame escolhido passa do máximo
+que cabe nesse cubo?** — comparando posições, não nomes. São duas escadas independentes:
+um frame IEC nunca se compara com um NEMA.
+
+A `ordem` é gravada com zeros à esquerda (`0007`) porque o Parquet guarda texto. E o
+número que aparece na tela é a **posição na lista**, não o campo gravado — assim apagar
+um frame do meio não deixa buraco na numeração.
+
+### Renomear
+
+O nome faz parte do `id` (`{padrao}-{nome}`), então renomear apaga o registro antigo e
+grava o novo, mantendo a posição. Nome repetido dentro do mesmo padrão é recusado.
