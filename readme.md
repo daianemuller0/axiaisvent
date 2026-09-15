@@ -5,6 +5,22 @@ projeto **Serviços** (`daianemuller0/servicos`): .NET 8 com Blazor Server, dado
 Parquet numa pasta de rede consolidados pelo DuckDB, login por cookie, janela desktop
 (WebView2) e publicação dinâmica na rede.
 
+## A aba Dados
+
+A tabela técnica dos equipamentos — hoje a linha **VAX**, transcrita da planilha
+`Tabela VAX-JOY`:
+
+- **Relação diâmetro × cubo** — nem todo ventilador cabe em todo cubo. A matriz mostra
+  as combinações válidas (as células amarelas da planilha original): o 2400 só entra no
+  cubo 1800, o 3000 no 1800 e no 2100, o 4800 nos quatro.
+- **Alerta de rotação** — cada combinação carrega o teto de rotação (coluna V-Belt).
+  Pedindo uma rotação acima dele, o sistema avisa; pedindo uma combinação que não
+  existe, ele diz quais cubos servem para aquele diâmetro.
+- **Manutenção** — a própria matriz é o editor: digitar um número numa célula vazia cria
+  a combinação, apagar o número tira.
+
+A linha **Joy** entra na mesma estrutura quando a tabela dela chegar.
+
 ## A aba Base
 
 Hoje o sistema tem uma aba, **Base**, com a planilha da equipe:

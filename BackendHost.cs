@@ -79,8 +79,15 @@ public static class BackendHost
         var dataFolder = builder.Configuration["Data:Folder"] ?? "data";
         builder.Services.AddSingleton(new ParquetStore(dataFolder));
         builder.Services.AddScoped<BaseRepository>();
+        builder.Services.AddScoped<EquipamentoRepository>();
 
         var app = builder.Build();
+
+        // Tabela de equipamentos (diâmetro × cubo) na primeira execução.
+        using (var escopo = app.Services.CreateScope())
+        {
+            escopo.ServiceProvider.GetRequiredService<EquipamentoRepository>().SemearSeVazio();
+        }
 
         if (!app.Environment.IsDevelopment())
         {

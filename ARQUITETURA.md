@@ -169,6 +169,7 @@ A pasta vem de `Data:Folder` no `appsettings.json`
 | `/` | Home | Redireciona para `/axiais/base` |
 | `/login` | Login | Formulário que posta em `/auth/login` |
 | `/axiais/base` | Base | A planilha da base: subir, ajustar linhas, procurar e exportar |
+| `/axiais/dados` | Dados | Equipamentos: relação diâmetro × cubo e o alerta de rotação |
 
 ---
 
@@ -217,3 +218,44 @@ A leitura preserva o valor **como o Excel mostra** (`GetFormattedString`), entã
 número chegam formatados; a base é um retrato da planilha, sem adivinhar tipo.
 
 Paginação de 100 linhas por página — uma planilha grande não trava a tela.
+
+---
+
+## 9. A aba Dados — a regra de seleção
+
+`/axiais/dados` guarda a tabela técnica dos equipamentos (`Data/EquipamentoRepository.cs`),
+transcrita da planilha `Tabela VAX-JOY`.
+
+### O modelo
+
+Cada linha gravada é **uma combinação válida**: série (VAX/Joy), diâmetro do ventilador,
+diâmetro do cubo e a rotação máxima. Só o que é válido existe na entidade `equipamentos`
+— a ausência da linha É o "não cabe". É o que deixa a consulta trivial: achou, cabe.
+
+| Campo | O que é |
+|---|---|
+| `serie` | linha de equipamento: `VAX` ou `Joy` |
+| `diametro` | Fan Diameter, em mm |
+| `cubo` | Fan Hub Diameter, em mm |
+| `rpmMax` | rotação máxima da coluna V-Belt, em rpm |
+
+### As duas regras, nesta ordem (`RegraRotacao.Verificar`)
+
+1. **A combinação existe?** O ventilador de 2400 mm só entra no cubo de 1800; o de 3000,
+   no 1800 e no 2100; o de 8400, só no 3150. Quando não existe, a mensagem já diz quais
+   cubos servem para aquele diâmetro.
+2. **A rotação passa do teto?** Acima do valor de V-Belt daquela combinação, alerta.
+   O limite é inclusivo: 3565 rpm passa, 3566 não.
+
+### Sobre a transcrição da tabela VAX
+
+Dentro de um mesmo cubo, `rotação × diâmetro` é praticamente constante — 1800 ≈
+10.695.000; 2100 ≈ 11.459.000; 2700 e 3150 ≈ 10.314.000. Foi assim que o alinhamento das
+linhas foi conferido ao transcrever (o bloco 3150 começa no 4500, não no 4200).
+
+Os valores de 2700 e 3150 coincidem onde os dois blocos se sobrepõem, o que é coerente:
+nessa faixa o teto de rotação depende do diâmetro do ventilador, não do cubo.
+
+> As colunas **1STG** e **2STG** da planilha estão pintadas mas sem números, então hoje
+> o único teto guardado é o de V-Belt. Se elas tiverem limites próprios, viram colunas
+> novas na mesma entidade.

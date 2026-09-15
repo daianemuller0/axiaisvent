@@ -1,0 +1,220 @@
+@page "/axiais/dados"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject EquipamentoRepository Repo
+
+<div class="page-head">
+    <div>
+        <h1>Dados</h1>
+        <p class="subtitle">
+            Os equipamentos e a relação <strong>diâmetro do ventilador × diâmetro do cubo</strong>.
+            O número de cada célula é a rotação máxima (V-Belt) daquela combinação.
+        </p>
+    </div>
+</div>
+
+@if (_series.Count > 1)
+{
+    <div class="tabs">
+        @foreach (var s in _series)
+        {
+            <button class="tab @(s == _serie ? "active" : "")" @onclick="() => TrocarSerie(s)">@s</button>
+        }
+    </div>
+}
+
+<!-- ---------- verificador de rotação ---------- -->
+<div class="panel" style="margin-bottom:16px">
+    <div class="toolbar" style="margin-bottom:0; flex-wrap:wrap">
+        <strong>Verificar combinação</strong>
+
+        <label style="display:flex; align-items:center; gap:6px">
+            <span class="subtitle" style="margin:0">Ventilador</span>
+            <select class="cell" @bind="_vDiametro" @bind:after="Verificar">
+                @foreach (var d in _diametros)
+                {
+                    <option value="@d">@d mm</option>
+                }
+            </select>
+        </label>
+
+        <label style="display:flex; align-items:center; gap:6px">
+            <span class="subtitle" style="margin:0">Cubo</span>
+            <select class="cell" @bind="_vCubo" @bind:after="Verificar">
+                @foreach (var c in _cubos)
+                {
+                    <option value="@c">@c mm</option>
+                }
+            </select>
+        </label>
+
+        <label style="display:flex; align-items:center; gap:6px">
+            <span class="subtitle" style="margin:0">Rotação</span>
+            <input class="cell" style="width:110px" type="number" min="0"
+                   @bind="_vRpm" @bind:event="oninput" @bind:after="Verificar" />
+            <span class="subtitle" style="margin:0">rpm</span>
+        </label>
+    </div>
+
+    @if (_resultado is not null)
+    {
+        <div class="@Estilo(_resultado.Situacao)" style="margin-top:14px">
+            @Icone(_resultado.Situacao) @_resultado.Mensagem
+        </div>
+    }
+</div>
+
+<!-- ---------- a matriz ---------- -->
+<div class="toolbar" style="flex-wrap:wrap">
+    <span class="subtitle" style="margin:0">
+        @_daSerie.Count combinação(ões) · @_diametros.Count diâmetro(s) · @_cubos.Count cubo(s)
+    </span>
+    <span style="flex:1"></span>
+    @if (_msg is not null)
+    {
+        <span class="saved-flag">@_msg</span>
+    }
+</div>
+
+<div class="panel" style="padding:0; overflow-x:auto">
+    <table class="grid">
+        <thead>
+            <tr>
+                <th class="nowrap">Fan Diameter</th>
+                @foreach (var c in _cubos)
+                {
+                    <th class="nowrap center">Cubo @c</th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var d in _diametros)
+            {
+                <tr @key="d">
+                    <td class="nowrap"><strong>@d</strong></td>
+                    @foreach (var c in _cubos)
+                    {
+                        var diam = d;
+                        var cubo = c;
+                        var eq = Achar(diam, cubo);
+                        <td class="center @(eq is null ? "" : "combina")">
+                            <input class="cell" style="width:86px; text-align:center"
+                                   value="@(eq?.RpmMax.ToString() ?? "")"
+                                   title="@(eq is null ? "Não cabe" : $"Máx. {eq.RpmMax} rpm (V-Belt)")"
+                                   @onchange="e => Editar(diam, cubo, e.Value?.ToString() ?? string.Empty)" />
+                        </td>
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<p class="subtitle" style="margin-top:12px">
+    Célula preenchida (amarela) = o ventilador cabe naquele cubo, e o valor é o teto de rotação.
+    Célula vazia = combinação que não existe. Apagar o número tira a combinação; digitar um
+    número numa célula vazia cria a combinação.
+</p>
+
+@code {
+    private List<Equipamento> _todos = new();
+    private List<Equipamento> _daSerie = new();
+    private List<string> _series = new();
+    private List<int> _diametros = new();
+    private List<int> _cubos = new();
+
+    private string _serie = "VAX";
+    private int _vDiametro;
+    private int _vCubo;
+    private int _vRpm = 1800;
+
+    private RegraRotacao.Resultado? _resultado;
+    private string? _msg;
+
+    protected override void OnInitialized()
+    {
+        Repo.SemearSeVazio();
+        Recarregar();
+
+        _vDiametro = _diametros.FirstOrDefault();
+        _vCubo = _cubos.FirstOrDefault();
+        Verificar();
+    }
+
+    private void Recarregar()
+    {
+        _todos = Repo.Todos();
+        _series = _todos.Select(e => e.Serie).Distinct().OrderBy(s => s).ToList();
+        if (!_series.Contains(_serie) && _series.Count > 0) _serie = _series[0];
+
+        _daSerie = _todos.Where(e => e.Serie == _serie).ToList();
+        _diametros = _daSerie.Select(e => e.Diametro).Distinct().OrderBy(d => d).ToList();
+        _cubos = _daSerie.Select(e => e.Cubo).Distinct().OrderBy(c => c).ToList();
+    }
+
+    private void TrocarSerie(string serie)
+    {
+        _serie = serie;
+        Recarregar();
+        if (!_diametros.Contains(_vDiametro)) _vDiametro = _diametros.FirstOrDefault();
+        if (!_cubos.Contains(_vCubo)) _vCubo = _cubos.FirstOrDefault();
+        Verificar();
+    }
+
+    private Equipamento? Achar(int diametro, int cubo) =>
+        _daSerie.FirstOrDefault(e => e.Diametro == diametro && e.Cubo == cubo);
+
+    private void Verificar()
+    {
+        if (_vDiametro == 0 || _vCubo == 0) { _resultado = null; return; }
+        _resultado = RegraRotacao.Verificar(_todos, _serie, _vDiametro, _vCubo, _vRpm);
+    }
+
+    /// <summary>
+    /// A própria matriz é o editor: número na célula cria/atualiza a combinação,
+    /// célula apagada tira a combinação da tabela.
+    /// </summary>
+    private void Editar(int diametro, int cubo, string texto)
+    {
+        var existente = Achar(diametro, cubo);
+        texto = texto.Trim();
+
+        if (texto.Length == 0)
+        {
+            if (existente is not null)
+            {
+                Repo.Apagar(existente.Id);
+                _msg = $"{_serie} {diametro} no cubo {cubo}: combinação removida.";
+            }
+        }
+        else if (int.TryParse(texto, out var rpm) && rpm > 0)
+        {
+            Repo.Salvar(new Equipamento
+            {
+                Serie = _serie, Diametro = diametro, Cubo = cubo, RpmMax = rpm,
+            });
+            _msg = $"{_serie} {diametro} no cubo {cubo}: máx. {rpm} rpm.";
+        }
+        else
+        {
+            _msg = $"\"{texto}\" não é uma rotação válida.";
+        }
+
+        Recarregar();
+        Verificar();
+    }
+
+    private static string Estilo(RegraRotacao.Situacao s) => s switch
+    {
+        RegraRotacao.Situacao.Ok => "aviso aviso-ok",
+        RegraRotacao.Situacao.AcimaDaRotacao => "aviso aviso-alerta",
+        _ => "aviso aviso-erro",
+    };
+
+    private static string Icone(RegraRotacao.Situacao s) => s switch
+    {
+        RegraRotacao.Situacao.Ok => "✓",
+        RegraRotacao.Situacao.AcimaDaRotacao => "⚠",
+        _ => "✕",
+    };
+}
