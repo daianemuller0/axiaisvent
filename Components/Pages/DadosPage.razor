@@ -7,7 +7,7 @@
     <div>
         <h1>Dados</h1>
         <p class="subtitle">
-            Os equipamentos e a relação <strong>diâmetro do ventilador × diâmetro do cubo</strong>.
+            Os equipamentos e a relação <strong>ventilador × cubo</strong>, por linha de produto.
             O número de cada célula é a rotação máxima (V-Belt) daquela combinação.
         </p>
     </div>
@@ -33,7 +33,7 @@
             <select class="cell" @bind="_vDiametro" @bind:after="Verificar">
                 @foreach (var d in _diametros)
                 {
-                    <option value="@d">@d mm</option>
+                    <option value="@d">@d</option>
                 }
             </select>
         </label>
@@ -43,7 +43,7 @@
             <select class="cell" @bind="_vCubo" @bind:after="Verificar">
                 @foreach (var c in _cubos)
                 {
-                    <option value="@c">@c mm</option>
+                    <option value="@c">@c</option>
                 }
             </select>
         </label>
@@ -80,10 +80,13 @@
     <table class="grid">
         <thead>
             <tr>
-                <th class="nowrap">Fan Diameter</th>
+                <th class="nowrap" rowspan="2">Fan Diameter</th>
+                <th class="center" colspan="@_cubos.Count">Fan Hub Diameter</th>
+            </tr>
+            <tr>
                 @foreach (var c in _cubos)
                 {
-                    <th class="nowrap center">Cubo @c</th>
+                    <th class="nowrap center">@c</th>
                 }
             </tr>
         </thead>
@@ -120,12 +123,12 @@
     private List<Equipamento> _todos = new();
     private List<Equipamento> _daSerie = new();
     private List<string> _series = new();
-    private List<int> _diametros = new();
-    private List<int> _cubos = new();
+    private List<string> _diametros = new();
+    private List<string> _cubos = new();
 
     private string _serie = "VAX";
-    private int _vDiametro;
-    private int _vCubo;
+    private string _vDiametro = "";
+    private string _vCubo = "";
     private int _vRpm = 1800;
 
     private RegraRotacao.Resultado? _resultado;
@@ -136,37 +139,44 @@
         Repo.SemearSeVazio();
         Recarregar();
 
-        _vDiametro = _diametros.FirstOrDefault();
-        _vCubo = _cubos.FirstOrDefault();
+        _vDiametro = _diametros.FirstOrDefault() ?? "";
+        _vCubo = _cubos.FirstOrDefault() ?? "";
         Verificar();
     }
 
     private void Recarregar()
     {
         _todos = Repo.Todos();
-        _series = _todos.Select(e => e.Serie).Distinct().OrderBy(s => s).ToList();
+        // VAX primeiro, Joy depois, e qualquer linha nova em ordem alfabética.
+        var preferida = new[] { "VAX", "Joy" };
+        _series = _todos.Select(e => e.Serie).Distinct()
+            .OrderBy(s => Array.IndexOf(preferida, s) is var i && i >= 0 ? i : preferida.Length)
+            .ThenBy(s => s)
+            .ToList();
         if (!_series.Contains(_serie) && _series.Count > 0) _serie = _series[0];
 
         _daSerie = _todos.Where(e => e.Serie == _serie).ToList();
-        _diametros = _daSerie.Select(e => e.Diametro).Distinct().OrderBy(d => d).ToList();
-        _cubos = _daSerie.Select(e => e.Cubo).Distinct().OrderBy(c => c).ToList();
+        _diametros = _daSerie.Select(e => e.Diametro).Distinct()
+            .OrderBy(Medida.Numero).ThenBy(d => d).ToList();
+        _cubos = _daSerie.Select(e => e.Cubo).Distinct()
+            .OrderBy(Medida.Numero).ThenBy(c => c).ToList();
     }
 
     private void TrocarSerie(string serie)
     {
         _serie = serie;
         Recarregar();
-        if (!_diametros.Contains(_vDiametro)) _vDiametro = _diametros.FirstOrDefault();
-        if (!_cubos.Contains(_vCubo)) _vCubo = _cubos.FirstOrDefault();
+        if (!_diametros.Contains(_vDiametro)) _vDiametro = _diametros.FirstOrDefault() ?? "";
+        if (!_cubos.Contains(_vCubo)) _vCubo = _cubos.FirstOrDefault() ?? "";
         Verificar();
     }
 
-    private Equipamento? Achar(int diametro, int cubo) =>
+    private Equipamento? Achar(string diametro, string cubo) =>
         _daSerie.FirstOrDefault(e => e.Diametro == diametro && e.Cubo == cubo);
 
     private void Verificar()
     {
-        if (_vDiametro == 0 || _vCubo == 0) { _resultado = null; return; }
+        if (_vDiametro.Length == 0 || _vCubo.Length == 0) { _resultado = null; return; }
         _resultado = RegraRotacao.Verificar(_todos, _serie, _vDiametro, _vCubo, _vRpm);
     }
 
@@ -174,7 +184,7 @@
     /// A própria matriz é o editor: número na célula cria/atualiza a combinação,
     /// célula apagada tira a combinação da tabela.
     /// </summary>
-    private void Editar(int diametro, int cubo, string texto)
+    private void Editar(string diametro, string cubo, string texto)
     {
         var existente = Achar(diametro, cubo);
         texto = texto.Trim();
@@ -184,7 +194,7 @@
             if (existente is not null)
             {
                 Repo.Apagar(existente.Id);
-                _msg = $"{_serie} {diametro} no cubo {cubo}: combinação removida.";
+                _msg = $"{_serie} {diametro} / {cubo}: combinação removida.";
             }
         }
         else if (int.TryParse(texto, out var rpm) && rpm > 0)
@@ -193,7 +203,7 @@
             {
                 Serie = _serie, Diametro = diametro, Cubo = cubo, RpmMax = rpm,
             });
-            _msg = $"{_serie} {diametro} no cubo {cubo}: máx. {rpm} rpm.";
+            _msg = $"{_serie} {diametro} / {cubo}: máx. {rpm} rpm.";
         }
         else
         {

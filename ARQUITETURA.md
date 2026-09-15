@@ -228,22 +228,41 @@ transcrita da planilha `Tabela VAX-JOY`.
 
 ### O modelo
 
-Cada linha gravada é **uma combinação válida**: série (VAX/Joy), diâmetro do ventilador,
-diâmetro do cubo e a rotação máxima. Só o que é válido existe na entidade `equipamentos`
-— a ausência da linha É o "não cabe". É o que deixa a consulta trivial: achou, cabe.
+Cada linha gravada é **uma combinação válida**: série, ventilador, cubo e a rotação
+máxima. Só o que é válido existe na entidade `equipamentos` — a ausência da linha É o
+"não cabe". É o que deixa a consulta trivial: achou, cabe.
 
 | Campo | O que é |
 |---|---|
 | `serie` | linha de equipamento: `VAX` ou `Joy` |
-| `diametro` | Fan Diameter, em mm |
-| `cubo` | Fan Hub Diameter, em mm |
+| `diametro` | Fan Diameter, como aparece na tabela |
+| `cubo` | Fan Hub Diameter, como aparece na tabela |
 | `rpmMax` | rotação máxima da coluna V-Belt, em rpm |
+
+**Diâmetro e cubo são texto, não número** — as duas linhas descrevem de jeitos
+diferentes:
+
+| | VAX | Joy |
+|---|---|---|
+| Ventilador | `2400` (mm) | `18 1/4` (polegadas, com fração) |
+| Cubo | `1800` (mm) | `14", S1000` (polegadas + modelo do cubo) |
+
+Guardar o rótulo como ele é na planilha evita perder informação (o `S1000` do cubo Joy
+não cabe num inteiro). Para ordenar a tela, `Medida.Numero` extrai o valor numérico do
+rótulo: `2400` → 2400; `18 1/4` → 18,25; `17 1/2", S1000` → 17,5.
+
+### A semeadura é por série
+
+`SemearSeVazio` carrega a tabela de fábrica **de cada linha que ainda não existe** no
+banco, e não da entidade inteira. É o que deixa uma linha nova (o Joy) entrar num banco
+que já tem a outra (o VAX) sem tocar no que está gravado — inclusive nos ajustes que a
+equipe já tiver feito à mão.
 
 ### As duas regras, nesta ordem (`RegraRotacao.Verificar`)
 
-1. **A combinação existe?** O ventilador de 2400 mm só entra no cubo de 1800; o de 3000,
-   no 1800 e no 2100; o de 8400, só no 3150. Quando não existe, a mensagem já diz quais
-   cubos servem para aquele diâmetro.
+1. **A combinação existe?** No VAX, o ventilador de 2400 só entra no cubo 1800; o de
+   3000, no 1800 e no 2100; o de 8400, só no 3150. Quando não existe, a mensagem já diz
+   quais cubos servem para aquele ventilador.
 2. **A rotação passa do teto?** Acima do valor de V-Belt daquela combinação, alerta.
    O limite é inclusivo: 3565 rpm passa, 3566 não.
 
@@ -259,3 +278,15 @@ nessa faixa o teto de rotação depende do diâmetro do ventilador, não do cubo
 > As colunas **1STG** e **2STG** da planilha estão pintadas mas sem números, então hoje
 > o único teto guardado é o de V-Belt. Se elas tiverem limites próprios, viram colunas
 > novas na mesma entidade.
+
+### Sobre a transcrição da tabela Joy
+
+Mesma estrutura do VAX, mudando só a descrição do cubo e o modelo do equipamento.
+
+Aqui **não** dá para usar a conferência do produto constante: os valores do Joy são
+arredondados para números redondos (3600, 3200, 3000, 2800…), e nas bitolas menores ficam
+travados no teto de 3600 rpm. Então o alinhamento das linhas veio só da leitura.
+
+> **A tabela Joy está PARCIAL.** A foto corta na coluna N: faltam os cubos à direita do
+> `21", S2200` e, com eles, os ventiladores de 54 a 85, que aparecem na primeira coluna
+> sem nenhum valor nos três blocos conhecidos.

@@ -7,7 +7,7 @@ Parquet numa pasta de rede consolidados pelo DuckDB, login por cookie, janela de
 
 ## A aba Dados
 
-A tabela técnica dos equipamentos — hoje a linha **VAX**, transcrita da planilha
+A tabela técnica dos equipamentos — as linhas **VAX** e **Joy**, transcritas da planilha
 `Tabela VAX-JOY`:
 
 - **Relação diâmetro × cubo** — nem todo ventilador cabe em todo cubo. A matriz mostra
@@ -19,7 +19,11 @@ A tabela técnica dos equipamentos — hoje a linha **VAX**, transcrita da plani
 - **Manutenção** — a própria matriz é o editor: digitar um número numa célula vazia cria
   a combinação, apagar o número tira.
 
-A linha **Joy** entra na mesma estrutura quando a tabela dela chegar.
+Cada linha descreve as medidas do seu jeito, e o sistema guarda o rótulo como ele é na
+planilha: o VAX em milímetros (ventilador `2400`, cubo `1800`) e o Joy em polegadas com o
+modelo do cubo (ventilador `18 1/4`, cubo `14", S1000`).
+
+> A tabela **Joy** ainda está parcial — faltam os cubos à direita do `21", S2200`.
 
 ## A aba Base
 
