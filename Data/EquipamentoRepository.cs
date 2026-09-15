@@ -104,18 +104,26 @@ public sealed class EquipamentoRepository
         new KeyValuePair<string, object?>[] { new("id", id) }, deleted: true);
 
     /// <summary>
-    /// Carrega a tabela de fábrica de cada linha que ainda não existe no banco.
-    /// É por SÉRIE, e não pela entidade inteira: assim uma linha nova (o Joy)
-    /// entra num banco que já tem a outra (o VAX), sem tocar no que está lá.
+    /// Carrega a tabela de fábrica dos BLOCOS que ainda não existem no banco —
+    /// um bloco é uma coluna da planilha (série + cubo).
+    ///
+    /// Essa granularidade é de propósito: as tabelas chegam aos poucos, um bloco
+    /// de cubo por vez. Semeando por bloco, um cubo novo entra num banco que já
+    /// tem os outros sem encostar no que está gravado — nem na linha inteira,
+    /// nem nos ajustes que a equipe já tenha feito à mão nos blocos antigos.
+    /// (Apagar uma combinação isolada não a traz de volta; só apagar o bloco
+    /// inteiro faria o bloco ser recarregado na próxima abertura.)
     /// </summary>
     public void SemearSeVazio()
     {
-        var existentes = Todos().Select(e => e.Serie).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var blocosExistentes = Todos()
+            .Select(e => (e.Serie, e.Cubo))
+            .ToHashSet();
 
-        foreach (var (serie, tabela) in EquipamentosSeed.Todas())
+        foreach (var e in EquipamentosSeed.Todas())
         {
-            if (existentes.Contains(serie)) continue;
-            foreach (var e in tabela) Salvar(e);
+            if (blocosExistentes.Contains((e.Serie, e.Cubo))) continue;
+            Salvar(e);
         }
     }
 
@@ -179,11 +187,8 @@ public static class RegraRotacao
 /// </summary>
 public static class EquipamentosSeed
 {
-    public static IEnumerable<(string Serie, List<Equipamento> Tabela)> Todas()
-    {
-        yield return ("VAX", Vax());
-        yield return ("Joy", Joy());
-    }
+    /// <summary>Todas as combinações de fábrica, das duas linhas.</summary>
+    public static IEnumerable<Equipamento> Todas() => Vax().Concat(Joy());
 
     /// <summary>
     /// VAX — medidas em milímetros.
@@ -222,8 +227,8 @@ public static class EquipamentosSeed
     /// polegadas + modelo, ex.: 14", S1000) e o modelo do equipamento
     /// (polegadas com fração, ex.: 18 1/4).
     ///
-    /// PARCIAL: transcrito da foto, que corta na coluna N. Faltam os cubos à
-    /// direita do 21", S2200 e, com eles, os ventiladores de 54 a 85.
+    /// A ordem dos blocos é a da planilha: cubos crescentes, cada um cobrindo
+    /// ventiladores maiores que o anterior.
     /// </summary>
     public static List<Equipamento> Joy() => Montar("Joy", new (string, (string, int)[])[]
     {
@@ -243,6 +248,22 @@ public static class EquipamentosSeed
             ("25 1/4", 3600), ("27 1/7", 3600), ("29 1/4", 3600), ("32", 3200),
             ("34", 3000), ("36", 2900), ("38", 2700), ("42 1/4", 2500), ("45", 2300),
             ("48", 2100),
+        }),
+        ("26\", S1000", new[]
+        {
+            ("34", 2200), ("36", 2200), ("38", 2100), ("42 1/4", 2000), ("45", 2000),
+            ("48", 1900), ("54", 1800), ("60", 1800), ("66", 1500), ("72", 1400),
+            ("78", 1300), ("85", 1200),
+        }),
+        ("26\", S2000", new[]
+        {
+            ("38", 2200), ("42 1/4", 2100), ("45", 2000), ("48", 1900), ("54", 1900),
+            ("60", 1800), ("66", 1800), ("72", 1500), ("78", 1300), ("85", 1200),
+        }),
+        ("30\", S2000", new[]
+        {
+            ("45", 1800), ("48", 1800), ("54", 1800), ("60", 1800), ("66", 1800),
+            ("72", 1200), ("78", 1200), ("85", 1200),
         }),
     });
 

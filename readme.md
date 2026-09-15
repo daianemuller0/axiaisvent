@@ -23,7 +23,8 @@ Cada linha descreve as medidas do seu jeito, e o sistema guarda o rótulo como e
 planilha: o VAX em milímetros (ventilador `2400`, cubo `1800`) e o Joy em polegadas com o
 modelo do cubo (ventilador `18 1/4`, cubo `14", S1000`).
 
-> A tabela **Joy** ainda está parcial — faltam os cubos à direita do `21", S2200`.
+A semeadura é **por bloco de cubo**: um cubo novo entra num banco que já tem os outros
+sem encostar no que está gravado.
 
 ## A aba Motores
 

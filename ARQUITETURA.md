@@ -252,12 +252,16 @@ Guardar o rótulo como ele é na planilha evita perder informação (o `S1000` d
 não cabe num inteiro). Para ordenar a tela, `Medida.Numero` extrai o valor numérico do
 rótulo: `2400` → 2400; `18 1/4` → 18,25; `17 1/2", S1000` → 17,5.
 
-### A semeadura é por série
+### A semeadura é por bloco
 
-`SemearSeVazio` carrega a tabela de fábrica **de cada linha que ainda não existe** no
-banco, e não da entidade inteira. É o que deixa uma linha nova (o Joy) entrar num banco
-que já tem a outra (o VAX) sem tocar no que está gravado — inclusive nos ajustes que a
-equipe já tiver feito à mão.
+`SemearSeVazio` carrega a tabela de fábrica **dos blocos que ainda não existem** no
+banco, onde um bloco é uma coluna da planilha (série + cubo).
+
+Essa granularidade é de propósito: as tabelas chegam aos poucos, um bloco de cubo por
+vez. Semeando por bloco, um cubo novo entra num banco que já tem os outros sem encostar
+no que está gravado — nem na linha inteira, nem nos ajustes que a equipe já tenha feito
+à mão nos blocos antigos. Apagar uma combinação isolada não a traz de volta; só apagar o
+bloco inteiro faria ele ser recarregado na próxima abertura.
 
 ### As duas regras, nesta ordem (`RegraRotacao.Verificar`)
 
@@ -286,11 +290,24 @@ Mesma estrutura do VAX, mudando só a descrição do cubo e o modelo do equipame
 
 Aqui **não** dá para usar a conferência do produto constante: os valores do Joy são
 arredondados para números redondos (3600, 3200, 3000, 2800…), e nas bitolas menores ficam
-travados no teto de 3600 rpm. Então o alinhamento das linhas veio só da leitura.
+travados no teto de 3600 rpm.
 
-> **A tabela Joy está PARCIAL.** A foto corta na coluna N: faltam os cubos à direita do
-> `21", S2200` e, com eles, os ventiladores de 54 a 85, que aparecem na primeira coluna
-> sem nenhum valor nos três blocos conhecidos.
+A conferência possível é estrutural — a **escada tem de ser monotônica**. Nos seis blocos,
+tanto o primeiro quanto o último ventilador de cada cubo só crescem:
+
+| Cubo | Do ventilador | Até |
+|---|---|---|
+| `14", S1000` | 18 1/4 | 36 |
+| `17 1/2", S1000` | 21 1/4 | 45 |
+| `21", S2200` | 25 1/4 | 48 |
+| `26", S1000` | 34 | 85 |
+| `26", S2000` | 38 | 85 |
+| `30", S2000` | 45 | 85 |
+
+> Os três blocos maiores foram alinhados ancorando o **último valor no ventilador 85** (a
+> última linha da planilha) e contando de trás para frente — a foto é inclinada e a
+> leitura direta das linhas não é confiável. A monotonicidade acima é o que sustenta esse
+> alinhamento, mas ela é indício, não prova: vale conferir contra o arquivo.
 
 ---
 
