@@ -36,9 +36,11 @@ Uma aba só, com três vistas:
 
 - **Modelos** — a relação ventilador × cubo, o alerta de rotação e o motor máximo por cubo.
 - **Motores** — os frames IEC e NEMA, na ordem de tamanho, cada um com seu código.
-- **Características** — as 15 listas do equipamento (solidez, base, partidores,
-  instrumentação…), 99 itens, cada um com um código. Dá para **subir em massa** por
-  planilha (.xlsx/.csv com Grupo, Valor e Código), alterar, incluir, apagar e reordenar.
+- **Características** — **itens** (as listas: solidez, base, partidores, instrumentação…)
+  e seus **subitens** (as opções), cada subitem com um código. De fábrica são 15 itens e
+  99 subitens. Dá para criar item novo — inclusive vazio, para preencher depois —,
+  renomear, apagar e reordenar, nos dois níveis; e **subir em massa** por planilha
+  (.xlsx/.csv com Grupo, Valor e Código).
 
 Juntando os códigos escolhidos em cada lista monta-se o código do equipamento — por isso a
 ordem dos grupos e dos itens importa.

@@ -402,26 +402,33 @@ três vistas, e o menu lateral tem só **Base** e **Dados**:
 As rotas antigas (`/axiais/motores`) continuam valendo e abrem direto na vista certa — a
 casca lê o caminho e escolhe a vista, então nenhum link guardado quebra.
 
-### As listas de características (`Data/CaracteristicaRepository.cs`)
+### Itens e subitens (`Data/CaracteristicaRepository.cs`)
 
-15 listas, 99 itens, na ordem do documento da equipe: Solidez, # Estágios, Base,
-Lubrificação, Contrarrecuo, Polaridade e freq Motor, Potencia Motor CV [kW], Forn. Motor e
-Flange, Cone de entrada, Silenciador entrada, Silenciador descarga, Difusor, Conexao manga
-descarga, PARTIDORES e INSTRUMENTAÇÃO.
+No vocabulário da equipe, **item** é a lista (Solidez, Base, PARTIDORES…) e **subitem** é
+a opção dentro dela (FB, Com TRENÓ, VDF IP65…). De fábrica são 15 itens e 99 subitens, na
+ordem do documento.
 
-| Campo | O que é |
-|---|---|
-| `grupo` | o nome da lista |
-| `valor` | a opção, como a equipe escreve |
-| `codigo` | o pedaço que este item contribui ao código do equipamento |
-| `ordem` | posição dentro do grupo |
+São **duas entidades**:
 
-**A ordem dos grupos importa**: é a candidata natural à ordem dos pedaços no código do
-equipamento. Por isso `CaracteristicasSeed.Grupos` é a fonte da ordenação, e não a ordem
-alfabética.
+| Entidade | O que guarda | Campos |
+|---|---|---|
+| `caracteristica_grupos` | os itens (as listas) | `nome`, `ordem` |
+| `caracteristicas` | os subitens | `grupo`, `valor`, `codigo`, `ordem` |
 
-A semeadura é **por grupo**: uma lista nova entra sem tocar nas que a equipe já ajustou ou
-já codificou.
+O item ser entidade própria — e não só um campo dos subitens — resolve duas coisas: dá
+para **criar um item vazio** e preenchê-lo depois, e a **ordem dos itens** fica gravada.
+
+**A ordem importa nos dois níveis**: a dos itens é a candidata natural à ordem dos pedaços
+no código do equipamento, e a dos subitens é a ordem da lista. Por isso nada é ordenado
+alfabeticamente.
+
+Renomear um item leva os subitens junto: o nome do item faz parte do id deles, então cada
+um é apagado e regravado com o nome novo. Apagar um item pede confirmação e leva os
+subitens.
+
+A semeadura é **por item**: uma lista nova de fábrica entra sem tocar nas que a equipe já
+ajustou ou já codificou. Bancos anteriores, que guardavam o grupo só dentro dos subitens,
+ganham os itens correspondentes na primeira abertura.
 
 ### Subir em massa
 
@@ -433,7 +440,10 @@ O importador aceita `.xlsx`, `.xlsm` e `.csv` com as colunas **Grupo**, **Valor*
   refazer as listas, e é idempotente: subir o mesmo arquivo duas vezes não duplica nada.
 - **substituir as listas** — apaga tudo e carrega o arquivo.
 
-Linha sem grupo ou sem valor é ignorada e contada no resumo, em vez de virar item vazio.
+Linha sem grupo ou sem valor é ignorada e contada no resumo, em vez de virar subitem vazio.
+Grupo que ainda não existe é **criado pela própria importação**. Em *substituir*, só os
+subitens são apagados — os itens continuam, para não perder a ordem deles nem os que a
+equipe tenha criado à mão.
 
 > **Falta ainda** montar o **código do equipamento** juntando os códigos individuais — a
 > equipe vai subir os códigos primeiro. A estrutura já está pronta para isso: cada item

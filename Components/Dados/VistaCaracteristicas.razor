@@ -1,9 +1,10 @@
 @inject CaracteristicaRepository Repo
 
 <p class="subtitle">
-    As listas de características do equipamento. Cada item tem um <strong>código</strong> —
-    juntando os códigos escolhidos em cada lista monta-se o código do equipamento, e é por
-    isso que a ordem dos grupos e dos itens importa.
+    As características do equipamento. Cada <strong>item</strong> é uma lista (Solidez,
+    Base, PARTIDORES…) e cada <strong>subitem</strong> é uma opção dela, com seu
+    <strong>código</strong> — juntando os códigos escolhidos em cada item monta-se o código
+    do equipamento, e é por isso que a ordem dos itens e dos subitens importa.
 </p>
 
 <!-- ---------- subir em massa ---------- -->
@@ -42,10 +43,25 @@
     <div class="@(_erro ? "aviso aviso-erro" : "aviso aviso-ok")" style="margin-bottom:14px">@_msg</div>
 }
 
-<!-- ---------- incluir item ---------- -->
+<!-- ---------- incluir item (lista nova) ---------- -->
 <div class="panel" style="margin-bottom:16px">
     <div class="toolbar" style="margin-bottom:0; flex-wrap:wrap">
-        <strong>Incluir item</strong>
+        <strong>Novo item</strong>
+        <input class="cell" style="min-width:260px" placeholder="Nome do item (ex.: Revestimento)"
+               @bind="_novoItem" @bind:event="oninput" @onkeydown="TeclaNovoItem" />
+        <button class="btn-primary" @onclick="IncluirItem" disabled="@(_novoItem.Trim().Length == 0)">
+            + Criar item
+        </button>
+        <span class="subtitle" style="margin:0">
+            entra no fim da lista de itens, vazio — depois é só acrescentar os subitens
+        </span>
+    </div>
+</div>
+
+<!-- ---------- incluir subitem ---------- -->
+<div class="panel" style="margin-bottom:16px">
+    <div class="toolbar" style="margin-bottom:0; flex-wrap:wrap">
+        <strong>Novo subitem</strong>
 
         <select class="cell" @bind="_novoGrupo">
             @foreach (var g in _grupos)
@@ -59,7 +75,8 @@
         <input class="cell" style="width:130px" placeholder="Código"
                @bind="_novoCodigo" @bind:event="oninput" @onkeydown="TeclaIncluir" />
 
-        <button class="btn-primary" @onclick="Incluir" disabled="@(_novoValor.Trim().Length == 0)">
+        <button class="btn-primary" @onclick="Incluir"
+                disabled="@(_novoValor.Trim().Length == 0 || _grupos.Count == 0)">
             + Incluir
         </button>
     </div>
@@ -68,7 +85,7 @@
 <!-- ---------- as listas ---------- -->
 <div class="tabs">
     <button class="tab @(_grupoFiltro == "" ? "active" : "")" @onclick="@(() => _grupoFiltro = "")">
-        Todas <span class="tab-badge">@_todas.Count</span>
+        Todos <span class="tab-badge">@_grupos.Count</span>
     </button>
     @foreach (var g in _grupos)
     {
@@ -81,20 +98,51 @@
 
 <div class="toolbar" style="flex-wrap:wrap">
     <span class="subtitle" style="margin:0">
-        @_todas.Count item(ns) em @_grupos.Count lista(s) · @_todas.Count(c => c.Codigo.Length > 0) com código
+        @_grupos.Count item(ns) · @_todas.Count subitem(ns) · @_todas.Count(c => c.Codigo.Length > 0) com código
     </span>
     <span style="flex:1"></span>
     <input class="cell" style="min-width:240px" placeholder="Procurar valor ou código…"
            @bind="_busca" @bind:event="oninput" />
 </div>
 
-@foreach (var grupo in _grupos.Where(g => _grupoFiltro.Length == 0 || g == _grupoFiltro))
+@foreach (var g in _grupos.Where(g => _grupoFiltro.Length == 0 || g == _grupoFiltro))
 {
+    var grupo = g;
     var itens = Filtrados(grupo);
-    if (itens.Count == 0) { continue; }
+    var total = _todas.Count(c => c.Grupo == grupo);
 
-    <h3 style="margin:20px 0 8px">@grupo <span class="val-count">@itens.Count</span></h3>
-    <div class="panel" style="padding:0; overflow-x:auto">
+    // com busca ativa, some a lista que não tem nenhum subitem casando
+    if (_busca.Trim().Length > 0 && itens.Count == 0) { continue; }
+
+    <div class="toolbar" style="margin:22px 0 8px; flex-wrap:wrap">
+        <input class="cell" style="font-weight:600; min-width:280px" value="@grupo"
+               @onchange="e => RenomearItem(grupo, e.Value?.ToString() ?? string.Empty)" />
+        <span class="val-count">@total subitem(ns)</span>
+        <button class="btn-link" title="Subir o item" @onclick="() => MoverItem(grupo, -1)">↑</button>
+        <button class="btn-link" title="Descer o item" @onclick="() => MoverItem(grupo, 1)">↓</button>
+
+        @if (_apagarItem == grupo)
+        {
+            <span class="aviso aviso-alerta" style="padding:6px 10px">
+                Apagar o item "@grupo" e os @total subitem(ns)?
+            </span>
+            <button class="btn-link" @onclick="() => ApagarItem(grupo)">Sim, apagar</button>
+            <button class="btn-link" @onclick="@(() => _apagarItem = null)">Cancelar</button>
+        }
+        else
+        {
+            <button class="btn-link" title="Apagar o item inteiro"
+                    @onclick="@(() => _apagarItem = grupo)">✕ item</button>
+        }
+    </div>
+
+    @if (total == 0)
+    {
+        <div class="panel empty" style="padding:20px">
+            Item ainda sem subitens — inclua acima, escolhendo "@grupo".
+        </div>
+    }
+    <div class="panel" style="padding:0; overflow-x:auto; @(total == 0 ? "display:none" : "")">
         <table class="grid">
             <thead>
                 <tr>
@@ -144,9 +192,13 @@
     private string _grupoFiltro = "";
     private bool _lendo;
 
+    private string _novoItem = "";
     private string _novoGrupo = "";
     private string _novoValor = "";
     private string _novoCodigo = "";
+
+    /// <summary>Item aguardando confirmação para ser apagado.</summary>
+    private string? _apagarItem;
 
     private string? _msg;
     private bool _erro;
@@ -161,8 +213,13 @@
     private void Recarregar()
     {
         _todas = Repo.Todas();
-        _grupos = _todas.Select(c => c.Grupo).Distinct()
-            .OrderBy(CaracteristicasSeed.PosicaoDoGrupo).ThenBy(g => g).ToList();
+        // a lista de itens vem da entidade própria: assim um item recém-criado,
+        // ainda sem nenhum subitem, também aparece
+        _grupos = Repo.Grupos().Select(g => g.Nome).ToList();
+
+        // rede de segurança: subitem cujo item sumiu ainda assim é mostrado
+        foreach (var g in _todas.Select(c => c.Grupo).Distinct())
+            if (!_grupos.Contains(g)) _grupos.Add(g);
     }
 
     private List<Caracteristica> DoGrupo(string grupo) =>
@@ -219,6 +276,8 @@
 
             if (_modo == Modo.Substituir)
             {
+                // apaga os subitens; os itens (as listas) continuam, para não
+                // perder a ordem deles nem itens que a equipe tenha criado
                 foreach (var atual in _todas) Repo.Apagar(atual.Id);
                 _todas = new List<Caracteristica>();
             }
@@ -250,6 +309,9 @@
                     }
                     continue;
                 }
+
+                // item que ainda não existe é criado pela própria importação
+                Repo.GarantirGrupo(grupo);
 
                 var ordem = porGrupo.TryGetValue(grupo, out var ultima) ? ultima + 1 : 1;
                 porGrupo[grupo] = ordem;
@@ -294,6 +356,82 @@
 
     // ---------- edição ----------
 
+    // ---------- itens (as listas) ----------
+
+    private void IncluirItem()
+    {
+        var nome = _novoItem.Trim();
+        if (nome.Length == 0) return;
+
+        if (_grupos.Any(g => g.Equals(nome, StringComparison.OrdinalIgnoreCase)))
+        {
+            Aviso($"O item \"{nome}\" já existe.", erro: true);
+            return;
+        }
+
+        Repo.GarantirGrupo(nome);
+        Recarregar();
+        _novoGrupo = nome;
+        _novoItem = "";
+        Aviso($"Item \"{nome}\" criado. Agora inclua os subitens dele.");
+    }
+
+    private void TeclaNovoItem(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") IncluirItem();
+    }
+
+    private void RenomearItem(string de, string texto)
+    {
+        var para = texto.Trim();
+        if (para.Length == 0 || para == de) { Recarregar(); return; }
+
+        if (_grupos.Any(g => g != de && g.Equals(para, StringComparison.OrdinalIgnoreCase)))
+        {
+            Aviso($"O item \"{para}\" já existe.", erro: true);
+            Recarregar();
+            return;
+        }
+
+        Repo.RenomearGrupo(de, para);
+        Recarregar();
+        if (_grupoFiltro == de) _grupoFiltro = para;
+        if (_novoGrupo == de) _novoGrupo = para;
+        Aviso($"Item \"{de}\" passou a se chamar \"{para}\" — os subitens foram junto.");
+    }
+
+    private void ApagarItem(string nome)
+    {
+        var quantos = _todas.Count(c => c.Grupo == nome);
+        Repo.ApagarGrupo(nome);
+        _apagarItem = null;
+
+        Recarregar();
+        if (_grupoFiltro == nome) _grupoFiltro = "";
+        if (_novoGrupo == nome) _novoGrupo = _grupos.FirstOrDefault() ?? "";
+        Aviso($"Item \"{nome}\" apagado, com {quantos} subitem(ns).");
+    }
+
+    /// <summary>Troca o item de lugar com o vizinho e regrava as duas ordens.</summary>
+    private void MoverItem(string nome, int direcao)
+    {
+        var grupos = Repo.Grupos();
+        var i = grupos.FindIndex(g => g.Nome == nome);
+        var j = i + direcao;
+        if (i < 0 || j < 0 || j >= grupos.Count) return;
+
+        var atual = grupos[i];
+        var vizinho = grupos[j];
+        (atual.Ordem, vizinho.Ordem) = (vizinho.Ordem, atual.Ordem);
+        Repo.SalvarGrupo(atual);
+        Repo.SalvarGrupo(vizinho);
+
+        Recarregar();
+        _msg = null;
+    }
+
+    // ---------- subitens ----------
+
     private void Incluir()
     {
         var valor = _novoValor.Trim();
@@ -305,6 +443,8 @@
             Aviso($"\"{valor}\" já existe na lista {_novoGrupo}.", erro: true);
             return;
         }
+
+        Repo.GarantirGrupo(_novoGrupo);
 
         var doGrupo = DoGrupo(_novoGrupo);
         Repo.Salvar(new Caracteristica
