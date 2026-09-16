@@ -1,380 +1,60 @@
 @page "/axiais/dados"
+@page "/axiais/motores"
+@page "/axiais/caracteristicas"
 @attribute [Authorize]
 @rendermode InteractiveServer
-@inject EquipamentoRepository Repo
-@inject FrameRepository Frames
-@inject LimiteMotorRepository Limites
+@inject NavigationManager Nav
 
 <div class="page-head">
     <div>
         <h1>Dados</h1>
-        <p class="subtitle">
-            Os equipamentos e a relação <strong>ventilador × cubo</strong>, por linha de produto.
-            O número de cada célula é a rotação máxima (V-Belt) daquela combinação.
-        </p>
     </div>
 </div>
 
-@if (_series.Count > 1)
+<div class="views">
+    @foreach (var v in Vistas)
+    {
+        var vista = v;
+        <button class="view @(vista.Chave == _vista ? "active" : "")"
+                @onclick="() => _vista = vista.Chave">@vista.Titulo</button>
+    }
+</div>
+
+@switch (_vista)
 {
-    <div class="tabs">
-        @foreach (var s in _series)
-        {
-            <button class="tab @(s == _serie ? "active" : "")" @onclick="() => TrocarSerie(s)">@s</button>
-        }
-    </div>
+    case "motores":
+        <VistaMotores />
+        break;
+    case "caracteristicas":
+        <VistaCaracteristicas />
+        break;
+    default:
+        <VistaModelos />
+        break;
 }
 
-<!-- ---------- verificador ---------- -->
-<div class="panel" style="margin-bottom:16px">
-    <div class="toolbar" style="margin-bottom:0; flex-wrap:wrap">
-        <strong>Verificar combinação</strong>
-
-        <label style="display:flex; align-items:center; gap:6px">
-            <span class="subtitle" style="margin:0">Ventilador</span>
-            <select class="cell" @bind="_vDiametro" @bind:after="Verificar">
-                @foreach (var d in _diametros)
-                {
-                    <option value="@d">@d</option>
-                }
-            </select>
-        </label>
-
-        <label style="display:flex; align-items:center; gap:6px">
-            <span class="subtitle" style="margin:0">Cubo</span>
-            <select class="cell" @bind="_vCubo" @bind:after="Verificar">
-                @foreach (var c in _cubos)
-                {
-                    <option value="@c">@c</option>
-                }
-            </select>
-        </label>
-
-        <label style="display:flex; align-items:center; gap:6px">
-            <span class="subtitle" style="margin:0">Rotação</span>
-            <input class="cell" style="width:105px" type="number" min="0"
-                   @bind="_vRpm" @bind:event="oninput" @bind:after="Verificar" />
-            <span class="subtitle" style="margin:0">rpm</span>
-        </label>
-
-        <label style="display:flex; align-items:center; gap:6px">
-            <span class="subtitle" style="margin:0">Motor</span>
-            <select class="cell" @bind="_vPadrao" @bind:after="TrocarPadrao">
-                @foreach (var p in FrameRepository.Padroes)
-                {
-                    <option value="@p">@p</option>
-                }
-            </select>
-            <select class="cell" @bind="_vFrame" @bind:after="Verificar">
-                <option value="">—</option>
-                @foreach (var f in FramesDoPadrao)
-                {
-                    <option value="@f.Nome">@f.Nome</option>
-                }
-            </select>
-        </label>
-    </div>
-
-    @if (_rotacao is not null)
-    {
-        <div class="@EstiloRotacao(_rotacao.Situacao)" style="margin-top:14px">
-            @IconeRotacao(_rotacao.Situacao) @_rotacao.Mensagem
-        </div>
-    }
-    @if (_motor is not null)
-    {
-        <div class="@EstiloMotor(_motor.Situacao)" style="margin-top:10px">
-            @IconeMotor(_motor.Situacao) @_motor.Mensagem
-        </div>
-    }
-</div>
-
-<!-- ---------- a matriz ---------- -->
-<div class="toolbar" style="flex-wrap:wrap">
-    <span class="subtitle" style="margin:0">
-        @_daSerie.Count combinação(ões) · @_diametros.Count ventilador(es) · @_cubos.Count cubo(s)
-    </span>
-    <span style="flex:1"></span>
-    @if (_msg is not null)
-    {
-        <span class="saved-flag">@_msg</span>
-    }
-</div>
-
-<div class="panel" style="padding:0; overflow-x:auto">
-    <table class="grid">
-        <thead>
-            <tr>
-                <th class="nowrap" rowspan="2">Fan Diameter</th>
-                <th class="center" colspan="@_cubos.Count">Fan Hub Diameter</th>
-            </tr>
-            <tr>
-                @foreach (var c in _cubos)
-                {
-                    <th class="nowrap center">@c</th>
-                }
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var d in _diametros)
-            {
-                <tr @key="d">
-                    <td class="nowrap"><strong>@d</strong></td>
-                    @foreach (var c in _cubos)
-                    {
-                        var diam = d;
-                        var cubo = c;
-                        var eq = Achar(diam, cubo);
-                        <td class="center @(eq is null ? "" : "combina")">
-                            <input class="cell" style="width:86px; text-align:center"
-                                   value="@(eq?.RpmMax.ToString() ?? "")"
-                                   title="@(eq is null ? "Não cabe" : $"Máx. {eq.RpmMax} rpm (V-Belt)")"
-                                   @onchange="e => Editar(diam, cubo, e.Value?.ToString() ?? string.Empty)" />
-                        </td>
-                    }
-                </tr>
-            }
-        </tbody>
-    </table>
-</div>
-
-<p class="subtitle" style="margin-top:12px">
-    Célula preenchida (amarela) = o ventilador cabe naquele cubo, e o valor é o teto de rotação.
-    Célula vazia = combinação que não existe. Apagar o número tira a combinação; digitar um
-    número numa célula vazia cria a combinação.
-</p>
-
-<!-- ---------- motor máximo por cubo ---------- -->
-<h2 style="margin:26px 0 6px">Motor máximo por cubo</h2>
-<p class="subtitle">
-    O maior frame que cabe dentro de cada cubo (a linha <em>Maximum Internal Motor</em> da
-    planilha). A comparação é feita pela posição do frame na escada de tamanho da aba
-    <a href="/axiais/motores">Motores</a> — por isso a ordem de lá importa.
-</p>
-
-<div class="panel" style="padding:0; overflow-x:auto">
-    <table class="grid">
-        <thead>
-            <tr>
-                <th class="nowrap">Cubo</th>
-                @foreach (var p in FrameRepository.Padroes)
-                {
-                    <th class="nowrap">@p</th>
-                }
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var c in _cubos)
-            {
-                var cubo = c;
-                <tr @key="cubo">
-                    <td class="nowrap"><strong>@cubo</strong></td>
-                    @foreach (var p in FrameRepository.Padroes)
-                    {
-                        var padrao = p;
-                        var atual = FrameLimite(cubo, padrao);
-                        <td>
-                            <select class="cell" style="max-width:200px" value="@atual"
-                                    @onchange="e => DefinirLimite(cubo, padrao, e.Value?.ToString() ?? string.Empty)">
-                                <option value="">— não cadastrado —</option>
-                                @foreach (var f in _frames.Where(f => f.Padrao == padrao))
-                                {
-                                    <option value="@f.Nome" selected="@(f.Nome == atual)">@f.Nome</option>
-                                }
-                                @if (atual.Length > 0 && _frames.All(f => f.Padrao != padrao || f.Nome != atual))
-                                {
-                                    <option value="@atual" selected>@atual (fora da lista)</option>
-                                }
-                            </select>
-                        </td>
-                    }
-                </tr>
-            }
-        </tbody>
-    </table>
-</div>
-
 @code {
-    private List<Equipamento> _todos = new();
-    private List<Equipamento> _daSerie = new();
-    private List<FrameMotor> _frames = new();
-    private List<LimiteMotor> _limites = new();
-
-    private List<string> _series = new();
-    private List<string> _diametros = new();
-    private List<string> _cubos = new();
-
-    private string _serie = "VAX";
-    private string _vDiametro = "";
-    private string _vCubo = "";
-    private int _vRpm = 1800;
-    private string _vPadrao = "IEC";
-    private string _vFrame = "";
-
-    private RegraRotacao.Resultado? _rotacao;
-    private RegraMotor.Resultado? _motor;
-    private string? _msg;
-
-    protected override void OnInitialized()
+    private static readonly (string Chave, string Titulo)[] Vistas =
     {
-        Repo.SemearSeVazio();
-        Frames.SemearSeVazio();
-        Limites.SemearSeVazio();
-        Recarregar();
+        ("modelos", "Modelos"),
+        ("motores", "Motores"),
+        ("caracteristicas", "Características"),
+    };
 
-        _vDiametro = _diametros.FirstOrDefault() ?? "";
-        _vCubo = _cubos.FirstOrDefault() ?? "";
-        Verificar();
-    }
-
-    private void Recarregar()
-    {
-        _todos = Repo.Todos();
-        _frames = Frames.Todos();
-        _limites = Limites.Todos();
-
-        // VAX primeiro, Joy depois, e qualquer linha nova em ordem alfabética.
-        var preferida = new[] { "VAX", "Joy" };
-        _series = _todos.Select(e => e.Serie).Distinct()
-            .OrderBy(s => Array.IndexOf(preferida, s) is var i && i >= 0 ? i : preferida.Length)
-            .ThenBy(s => s)
-            .ToList();
-        if (!_series.Contains(_serie) && _series.Count > 0) _serie = _series[0];
-
-        _daSerie = _todos.Where(e => e.Serie == _serie).ToList();
-        _diametros = _daSerie.Select(e => e.Diametro).Distinct()
-            .OrderBy(Medida.Numero).ThenBy(d => d).ToList();
-        _cubos = _daSerie.Select(e => e.Cubo).Distinct()
-            .OrderBy(Medida.Numero).ThenBy(c => c).ToList();
-    }
-
-    private List<FrameMotor> FramesDoPadrao =>
-        _frames.Where(f => f.Padrao == _vPadrao).OrderBy(f => f.Ordem).ToList();
-
-    private void TrocarSerie(string serie)
-    {
-        _serie = serie;
-        Recarregar();
-        if (!_diametros.Contains(_vDiametro)) _vDiametro = _diametros.FirstOrDefault() ?? "";
-        if (!_cubos.Contains(_vCubo)) _vCubo = _cubos.FirstOrDefault() ?? "";
-        Verificar();
-    }
-
-    private void TrocarPadrao()
-    {
-        // trocar IEC ↔ NEMA muda a lista de frames: o escolhido antes não vale mais
-        _vFrame = "";
-        Verificar();
-    }
-
-    private Equipamento? Achar(string diametro, string cubo) =>
-        _daSerie.FirstOrDefault(e => e.Diametro == diametro && e.Cubo == cubo);
-
-    private string FrameLimite(string cubo, string padrao) => _limites
-        .FirstOrDefault(l => l.Serie == _serie && l.Cubo == cubo && l.Padrao == padrao)?.Frame ?? "";
-
-    private void Verificar()
-    {
-        if (_vDiametro.Length == 0 || _vCubo.Length == 0)
-        {
-            _rotacao = null;
-            _motor = null;
-            return;
-        }
-
-        _rotacao = RegraRotacao.Verificar(_todos, _serie, _vDiametro, _vCubo, _vRpm);
-        _motor = _vFrame.Length == 0
-            ? null
-            : RegraMotor.Verificar(_limites, _frames, _serie, _vCubo, _vPadrao, _vFrame);
-    }
+    private string _vista = "modelos";
 
     /// <summary>
-    /// A própria matriz é o editor: número na célula cria/atualiza a combinação,
-    /// célula apagada tira a combinação da tabela.
+    /// As três listas moram na MESMA aba, como a equipe pediu. As rotas antigas
+    /// (/axiais/motores) continuam valendo e abrem direto na vista certa.
     /// </summary>
-    private void Editar(string diametro, string cubo, string texto)
+    protected override void OnInitialized()
     {
-        var existente = Achar(diametro, cubo);
-        texto = texto.Trim();
-
-        if (texto.Length == 0)
+        var caminho = new Uri(Nav.Uri).AbsolutePath.TrimEnd('/');
+        _vista = caminho switch
         {
-            if (existente is not null)
-            {
-                Repo.Apagar(existente.Id);
-                _msg = $"{_serie} {diametro} / {cubo}: combinação removida.";
-            }
-        }
-        else if (int.TryParse(texto, out var rpm) && rpm > 0)
-        {
-            Repo.Salvar(new Equipamento
-            {
-                Serie = _serie, Diametro = diametro, Cubo = cubo, RpmMax = rpm,
-            });
-            _msg = $"{_serie} {diametro} / {cubo}: máx. {rpm} rpm.";
-        }
-        else
-        {
-            _msg = $"\"{texto}\" não é uma rotação válida.";
-        }
-
-        Recarregar();
-        Verificar();
+            "/axiais/motores" => "motores",
+            "/axiais/caracteristicas" => "caracteristicas",
+            _ => "modelos",
+        };
     }
-
-    private void DefinirLimite(string cubo, string padrao, string frame)
-    {
-        var existente = _limites.FirstOrDefault(l =>
-            l.Serie == _serie && l.Cubo == cubo && l.Padrao == padrao);
-
-        if (frame.Length == 0)
-        {
-            if (existente is not null)
-            {
-                Limites.Apagar(existente.Id);
-                _msg = $"{_serie} · cubo {cubo} · {padrao}: limite de motor removido.";
-            }
-        }
-        else
-        {
-            Limites.Salvar(new LimiteMotor
-            {
-                Serie = _serie, Cubo = cubo, Padrao = padrao, Frame = frame,
-            });
-            _msg = $"{_serie} · cubo {cubo} · {padrao}: motor máximo {frame}.";
-        }
-
-        Recarregar();
-        Verificar();
-    }
-
-    private static string EstiloRotacao(RegraRotacao.Situacao s) => s switch
-    {
-        RegraRotacao.Situacao.Ok => "aviso aviso-ok",
-        RegraRotacao.Situacao.AcimaDaRotacao => "aviso aviso-alerta",
-        _ => "aviso aviso-erro",
-    };
-
-    private static string IconeRotacao(RegraRotacao.Situacao s) => s switch
-    {
-        RegraRotacao.Situacao.Ok => "✓",
-        RegraRotacao.Situacao.AcimaDaRotacao => "⚠",
-        _ => "✕",
-    };
-
-    private static string EstiloMotor(RegraMotor.Situacao s) => s switch
-    {
-        RegraMotor.Situacao.Ok => "aviso aviso-ok",
-        RegraMotor.Situacao.AcimaDoLimite => "aviso aviso-alerta",
-        RegraMotor.Situacao.SemLimite => "aviso aviso-neutro",
-        _ => "aviso aviso-erro",
-    };
-
-    private static string IconeMotor(RegraMotor.Situacao s) => s switch
-    {
-        RegraMotor.Situacao.Ok => "✓",
-        RegraMotor.Situacao.AcimaDoLimite => "⚠",
-        RegraMotor.Situacao.SemLimite => "•",
-        _ => "✕",
-    };
 }

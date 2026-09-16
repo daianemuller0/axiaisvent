@@ -30,7 +30,20 @@ modelo do cubo (ventilador `18 1/4`, cubo `14", S1000`).
 A semeadura é **por bloco de cubo**: um cubo novo entra num banco que já tem os outros
 sem encostar no que está gravado.
 
-## A aba Motores
+## A aba Dados
+
+Uma aba só, com três vistas:
+
+- **Modelos** — a relação ventilador × cubo, o alerta de rotação e o motor máximo por cubo.
+- **Motores** — os frames IEC e NEMA, na ordem de tamanho, cada um com seu código.
+- **Características** — as 15 listas do equipamento (solidez, base, partidores,
+  instrumentação…), 99 itens, cada um com um código. Dá para **subir em massa** por
+  planilha (.xlsx/.csv com Grupo, Valor e Código), alterar, incluir, apagar e reordenar.
+
+Juntando os códigos escolhidos em cada lista monta-se o código do equipamento — por isso a
+ordem dos grupos e dos itens importa.
+
+## A aba Motores (antiga — hoje é uma vista dentro de Dados)
 
 O cadastro dos frames (carcaças) de motor, nos padrões **IEC** (19 frames) e **NEMA**
 (15 frames).

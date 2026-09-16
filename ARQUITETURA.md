@@ -169,8 +169,9 @@ A pasta vem de `Data:Folder` no `appsettings.json`
 | `/` | Home | Redireciona para `/axiais/base` |
 | `/login` | Login | Formulário que posta em `/auth/login` |
 | `/axiais/base` | Base | A planilha da base: subir, ajustar linhas, procurar e exportar |
-| `/axiais/dados` | Dados | Equipamentos: relação diâmetro × cubo e o alerta de rotação |
-| `/axiais/motores` | Motores | Cadastro dos frames de motor (IEC e NEMA), na ordem de tamanho |
+| `/axiais/dados` | Dados | Três vistas na mesma aba: Modelos, Motores e Características |
+| `/axiais/motores` | Dados › Motores | Abre a aba Dados já na vista dos frames (rota antiga, mantida) |
+| `/axiais/caracteristicas` | Dados › Características | Abre a aba Dados já na vista das listas de características |
 
 ---
 
@@ -384,3 +385,56 @@ O sistema **não adivinha** a correspondência: grava o rótulo como está na pl
 hora de comparar, diz que não consegue e pede para incluir o frame na aba Motores ou
 corrigir o limite. Na tabela de manutenção o valor aparece marcado como *(fora da lista)*.
 Esconder isso seria pior — daria um "pode" ou um "não pode" sem base.
+
+---
+
+## 12. Uma aba só: Modelos, Motores e Características
+
+A equipe pediu que **as listas fiquem na mesma aba**. `/axiais/dados` virou uma casca com
+três vistas, e o menu lateral tem só **Base** e **Dados**:
+
+| Vista | Componente | O que tem |
+|---|---|---|
+| Modelos | `Components/Dados/VistaModelos.razor` | matriz ventilador × cubo, verificador e motor máximo por cubo |
+| Motores | `Components/Dados/VistaMotores.razor` | os frames IEC/NEMA, agora com coluna de código |
+| Características | `Components/Dados/VistaCaracteristicas.razor` | as 15 listas de características |
+
+As rotas antigas (`/axiais/motores`) continuam valendo e abrem direto na vista certa — a
+casca lê o caminho e escolhe a vista, então nenhum link guardado quebra.
+
+### As listas de características (`Data/CaracteristicaRepository.cs`)
+
+15 listas, 99 itens, na ordem do documento da equipe: Solidez, # Estágios, Base,
+Lubrificação, Contrarrecuo, Polaridade e freq Motor, Potencia Motor CV [kW], Forn. Motor e
+Flange, Cone de entrada, Silenciador entrada, Silenciador descarga, Difusor, Conexao manga
+descarga, PARTIDORES e INSTRUMENTAÇÃO.
+
+| Campo | O que é |
+|---|---|
+| `grupo` | o nome da lista |
+| `valor` | a opção, como a equipe escreve |
+| `codigo` | o pedaço que este item contribui ao código do equipamento |
+| `ordem` | posição dentro do grupo |
+
+**A ordem dos grupos importa**: é a candidata natural à ordem dos pedaços no código do
+equipamento. Por isso `CaracteristicasSeed.Grupos` é a fonte da ordenação, e não a ordem
+alfabética.
+
+A semeadura é **por grupo**: uma lista nova entra sem tocar nas que a equipe já ajustou ou
+já codificou.
+
+### Subir em massa
+
+O importador aceita `.xlsx`, `.xlsm` e `.csv` com as colunas **Grupo**, **Valor** e
+**Código** (o cabeçalho é reconhecido por nome, com alguns sinônimos), em dois modos:
+
+- **atualizar e acrescentar** (padrão) — item que já existe tem só o **código**
+  atualizado; item novo entra no fim do grupo. É o modo de subir os códigos depois, sem
+  refazer as listas, e é idempotente: subir o mesmo arquivo duas vezes não duplica nada.
+- **substituir as listas** — apaga tudo e carrega o arquivo.
+
+Linha sem grupo ou sem valor é ignorada e contada no resumo, em vez de virar item vazio.
+
+> **Falta ainda** montar o **código do equipamento** juntando os códigos individuais — a
+> equipe vai subir os códigos primeiro. A estrutura já está pronta para isso: cada item
+> tem `codigo`, cada frame tem `codigo`, e a ordem dos grupos define a montagem.

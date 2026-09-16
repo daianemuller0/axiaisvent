@@ -17,6 +17,8 @@ public sealed class FrameMotor
     public string Nome { get; set; } = "";
     /// <summary>Posição na escada de tamanho, dentro do padrão (1 = o menor).</summary>
     public int Ordem { get; set; }
+    /// <summary>Código do frame, que entra na montagem do código do equipamento.</summary>
+    public string Codigo { get; set; } = "";
 
     public static string MontarId(string padrao, string nome) => $"{padrao}-{nome}";
 }
@@ -36,9 +38,10 @@ public sealed class FrameRepository
     public FrameRepository(ParquetStore store) => _store = store;
 
     public List<FrameMotor> Todos() => _store
-        .ReadLatest(Entidade, "id, padrao, nome, ordem", r => new FrameMotor
+        .ReadLatest(Entidade, "id, padrao, nome, ordem, codigo", r => new FrameMotor
         {
             Id = S(r, 0), Padrao = S(r, 1), Nome = S(r, 2), Ordem = Int(S(r, 3)),
+            Codigo = S(r, 4),
         })
         .OrderBy(f => PosicaoDoPadrao(f.Padrao))
         .ThenBy(f => f.Ordem)
@@ -59,6 +62,7 @@ public sealed class FrameRepository
             // ordem com zeros à esquerda: o Parquet guarda texto, e sem isso a
             // posição 10 viria antes da 2.
             new("ordem", f.Ordem.ToString("D4")),
+            new("codigo", f.Codigo),
         });
     }
 

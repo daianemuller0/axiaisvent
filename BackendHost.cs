@@ -82,6 +82,7 @@ public static class BackendHost
         builder.Services.AddScoped<EquipamentoRepository>();
         builder.Services.AddScoped<FrameRepository>();
         builder.Services.AddScoped<LimiteMotorRepository>();
+        builder.Services.AddScoped<CaracteristicaRepository>();
 
         var app = builder.Build();
 
@@ -91,6 +92,7 @@ public static class BackendHost
             escopo.ServiceProvider.GetRequiredService<EquipamentoRepository>().SemearSeVazio();
             escopo.ServiceProvider.GetRequiredService<FrameRepository>().SemearSeVazio();
             escopo.ServiceProvider.GetRequiredService<LimiteMotorRepository>().SemearSeVazio();
+            escopo.ServiceProvider.GetRequiredService<CaracteristicaRepository>().SemearSeVazio();
         }
 
         if (!app.Environment.IsDevelopment())
