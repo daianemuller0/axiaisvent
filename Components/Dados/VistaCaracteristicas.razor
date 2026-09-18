@@ -71,6 +71,19 @@
         @_todas.Count(c => c.Codigo.Length > 0) com código ·
         @_todas.Count(c => c.Preco.Length > 0) com preço
     </span>
+    @if (_limparTudo)
+    {
+        <span class="aviso aviso-alerta" style="margin:0; padding:5px 9px">
+            Apagar os @_grupos.Count item(ns) e os @_todas.Count subitem(ns)?
+        </span>
+        <button class="btn-link" @onclick="LimparTudo">Sim, limpar</button>
+        <button class="btn-link" @onclick="@(() => _limparTudo = false)">Cancelar</button>
+    }
+    else
+    {
+        <button class="btn-link" title="Esvaziar a aba inteira" disabled="@(_grupos.Count == 0)"
+                @onclick="@(() => _limparTudo = true)">🗑 Limpar tudo</button>
+    }
     <span style="flex:1"></span>
     <input class="cell" style="min-width:240px" placeholder="Procurar valor ou código…"
            @bind="_busca" @bind:event="oninput" />
@@ -92,7 +105,15 @@
         <button class="btn-link" title="Subir o item" @onclick="() => MoverItem(grupo, -1)">↑</button>
         <button class="btn-link" title="Descer o item" @onclick="() => MoverItem(grupo, 1)">↓</button>
 
-        @if (_apagarItem == grupo)
+        @if (_limparItem == grupo)
+        {
+            <span class="aviso aviso-alerta" style="padding:6px 10px">
+                Apagar os @total subitem(ns) de "@grupo"? O item continua, vazio.
+            </span>
+            <button class="btn-link" @onclick="() => LimparItem(grupo)">Sim, limpar</button>
+            <button class="btn-link" @onclick="@(() => _limparItem = null)">Cancelar</button>
+        }
+        else if (_apagarItem == grupo)
         {
             <span class="aviso aviso-alerta" style="padding:6px 10px">
                 Apagar o item "@grupo" e os @total subitem(ns)?
@@ -102,6 +123,9 @@
         }
         else
         {
+            <button class="btn-link" title="Apagar os subitens e deixar o item vazio"
+                    disabled="@(total == 0)"
+                    @onclick="@(() => _limparItem = grupo)">🗑 Limpar</button>
             <button class="btn-link" title="Apagar o item inteiro"
                     @onclick="@(() => _apagarItem = grupo)">✕ item</button>
         }
@@ -170,6 +194,10 @@
 
     /// <summary>Item aguardando confirmação para ser apagado.</summary>
     private string? _apagarItem;
+    /// <summary>Item aguardando confirmação para ser esvaziado (sem apagar o item).</summary>
+    private string? _limparItem;
+    /// <summary>Verdadeiro enquanto o "Limpar tudo" espera confirmação.</summary>
+    private bool _limparTudo;
 
     private string? _msg;
     private bool _erro;
@@ -265,6 +293,36 @@
         if (_grupoFiltro == nome) _grupoFiltro = "";
         if (_novoGrupo == nome) _novoGrupo = _grupos.FirstOrDefault() ?? "";
         Aviso($"Item \"{nome}\" apagado, com {quantos} subitem(ns).");
+    }
+
+    /// <summary>
+    /// Esvazia UM item: apaga os subitens e deixa a lista de pé, pronta para
+    /// receber os da equipe. O repositório grava junto a marca de "os de fábrica
+    /// já foram carregados", senão a próxima abertura os traria de volta.
+    /// </summary>
+    private void LimparItem(string nome)
+    {
+        var quantos = _todas.Count(c => c.Grupo == nome);
+        Repo.LimparGrupo(nome);
+        _limparItem = null;
+
+        Recarregar();
+        Aviso($"Item \"{nome}\" esvaziado: {quantos} subitem(ns) apagado(s). A lista continua lá.");
+    }
+
+    /// <summary>Apaga todas as listas e todos os subitens da aba.</summary>
+    private void LimparTudo()
+    {
+        var itens = _grupos.Count;
+        var subitens = _todas.Count;
+
+        Repo.Limpar();
+        _limparTudo = false;
+
+        Recarregar();
+        _grupoFiltro = "";
+        _novoGrupo = "";
+        Aviso($"Limpo: {itens} item(ns) e {subitens} subitem(ns).");
     }
 
     /// <summary>Troca o item de lugar com o vizinho e regrava as duas ordens.</summary>

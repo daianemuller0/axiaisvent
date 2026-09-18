@@ -509,9 +509,15 @@ que permite, por exemplo, ter uma lista de fábrica vazia de propósito.
 
 ### Limpar para subir a tabela da equipe
 
-A aba Dados tem um **Limpar** com três caixas — Modelos, Motores e Características —, cada
-uma mostrando quantos registros vai apagar, e uma confirmação em dois passos. É o caminho
-para a equipe trocar a nossa tabela pela dela, digitando ou pela planilha.
+**Cada lista tem o seu 🗑 Limpar**, na própria barra, com a contagem e a confirmação ali
+mesmo: ventiladores, cubos, combinações da matriz, limites de motor, frames (a aba ativa —
+IEC, NEMA ou tudo) e cada item de característica (esvazia os subitens e deixa a lista de
+pé). No alto da aba Dados fica o **Limpar** em atacado, com três caixas — Modelos, Motores
+e Características — para quando é tudo de uma vez.
+
+Limpar o cadastro de ventiladores (ou o de cubos) **leva as combinações junto**, e isso não
+é escolha de interface: a lista é semeada de volta a partir da matriz, então uma combinação
+órfã recriaria o rótulo recém-apagado. A confirmação diz isso antes de apagar.
 
 Limpar é `Limpar()` no repositório, e ele faz **duas** coisas: esvazia a entidade
 (`ParquetStore.Clear`) **e grava todas as marcas de já semeado**. A segunda parte é a que

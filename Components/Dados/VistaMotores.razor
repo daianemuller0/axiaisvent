@@ -39,6 +39,24 @@
         </button>
 
         <span class="subtitle" style="margin:0">entra no fim da lista do padrão escolhido</span>
+
+        <span style="flex:1"></span>
+
+        @if (_limpando)
+        {
+            <span class="aviso aviso-alerta" style="margin:0; padding:5px 9px">
+                Apagar @Filtrados.Count frame(s)@(_filtro.Length == 0 ? "" : " do padrão " + _filtro)?
+            </span>
+            <button class="btn-link" @onclick="Limpar">Sim, limpar</button>
+            <button class="btn-link" @onclick="@(() => _limpando = false)">Cancelar</button>
+        }
+        else
+        {
+            <button class="btn-link" title="Esvaziar a lista mostrada" disabled="@(Filtrados.Count == 0)"
+                    @onclick="@(() => _limpando = true)">
+                🗑 Limpar @(_filtro.Length == 0 ? "tudo" : _filtro)
+            </button>
+        }
     </div>
 </div>
 
@@ -100,6 +118,8 @@
 @code {
     private List<FrameMotor> _todos = new();
     private string _filtro = "";
+    /// <summary>Verdadeiro enquanto a limpeza espera confirmação.</summary>
+    private bool _limpando;
 
     private string _novoPadrao = "IEC";
     private string _novoNome = "";
@@ -242,6 +262,25 @@
 
         _todos = Repo.Todos();
         _msg = null;
+    }
+
+    /// <summary>
+    /// Esvazia a lista que está sendo mostrada: com uma aba de padrão ativa,
+    /// só aquele padrão; em "Todos", a escada inteira. O repositório grava
+    /// junto a marca de "a de fábrica já foi carregada", senão a próxima
+    /// abertura traria os 34 frames de volta.
+    /// </summary>
+    private void Limpar()
+    {
+        var quantos = Filtrados.Count;
+        var onde = _filtro.Length == 0 ? "" : " do padrão " + _filtro;
+
+        if (_filtro.Length == 0) Repo.Limpar();
+        else Repo.LimparPadrao(_filtro);
+
+        _limpando = false;
+        _todos = Repo.Todos();
+        Aviso($"Limpo: {quantos} frame(s){onde}.");
     }
 
     private void Aviso(string texto, bool erro = false)

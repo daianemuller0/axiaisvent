@@ -186,6 +186,12 @@ public sealed class ItemModeloRepository
     /// </summary>
     public void Limpar() => _store.Clear(Entidade);
 
+    /// <summary>Apaga só os ventiladores, ou só os cubos.</summary>
+    public void LimparTipo(string tipo)
+    {
+        foreach (var i in Lista(tipo)) Apagar(i.Id);
+    }
+
     private static string S(System.Data.IDataReader r, int i) => r.IsDBNull(i) ? "" : r.GetString(i);
 
     private static int Int(string s) => int.TryParse(s, out var v) ? v : 0;

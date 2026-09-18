@@ -89,6 +89,15 @@ public sealed class FrameRepository
             new KeyValuePair<string, object?>[] { new("id", "frames") });
     }
 
+    /// <summary>Apaga só os frames de um padrão (IEC ou NEMA).</summary>
+    public void LimparPadrao(string padrao)
+    {
+        foreach (var f in Todos().Where(f => f.Padrao == padrao)) Apagar(f.Id);
+
+        _store.WriteRow(EntidadeSemeados,
+            new KeyValuePair<string, object?>[] { new("id", "frames") });
+    }
+
     /// <summary>Apaga a lista inteira e marca a de fábrica como já carregada.</summary>
     public void Limpar()
     {

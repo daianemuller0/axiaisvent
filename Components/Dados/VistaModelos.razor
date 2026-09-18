@@ -104,6 +104,7 @@
                     disabled="@((ventilador ? _novoVentilador : _novoCubo).Trim().Length == 0)">
                 + Incluir
             </button>
+            @Limpeza(ventilador ? AlvoVentiladores : AlvoCubos)
         </div>
     }
 </div>
@@ -113,6 +114,7 @@
     <span class="subtitle" style="margin:0">
         @_todos.Count combinação(ões) · @_diametros.Count ventilador(es) · @_cubos.Count cubo(s)
     </span>
+    @Limpeza(AlvoCombinacoes)
     <span style="flex:1"></span>
     @if (_msg is not null)
     {
@@ -318,7 +320,10 @@ else
 </p>
 
 <!-- ---------- motor máximo por cubo ---------- -->
-<h3 style="margin:26px 0 6px">Motor máximo por cubo</h3>
+<div class="toolbar" style="margin:26px 0 6px; flex-wrap:wrap">
+    <h3 style="margin:0">Motor máximo por cubo</h3>
+    @Limpeza(AlvoLimites)
+</div>
 <p class="subtitle">
     O maior frame que cabe dentro de cada cubo (a linha <em>Maximum Internal Motor</em> da
     planilha). A comparação é feita pela posição do frame na escada de tamanho da aba
@@ -519,6 +524,71 @@ else
                 grupos.Add((c.Serie, 1));
         }
         return grupos;
+    }
+
+    // ---------- limpar uma lista ----------
+
+    /// <summary>
+    /// Uma lista que pode ser esvaziada: quantos registros tem hoje, o que a
+    /// limpeza leva junto (o texto da confirmação) e como limpar.
+    /// </summary>
+    private sealed record Alvo(string Chave, Func<int> Quantos, string Explica, Action Limpar);
+
+    /// <summary>Chave do alvo aguardando confirmação; nulo = ninguém perguntou nada.</summary>
+    private string? _limpando;
+
+    // Apagar o cadastro de ventiladores (ou de cubos) obriga a apagar também as
+    // combinações: toda combinação tem os dois lados, e a lista é semeada de
+    // volta a partir da matriz — sobrar combinação recriaria o rótulo apagado.
+    private Alvo AlvoVentiladores => new(
+        "ventiladores", () => _diametros.Count,
+        "ventilador(es) — e, com eles, todas as combinações da matriz",
+        () => { Repo.Limpar(); Itens.LimparTipo(ItemModelo.TipoVentilador); });
+
+    private Alvo AlvoCubos => new(
+        "cubos", () => _cubos.Count,
+        "cubo(s) — e, com eles, todas as combinações e os limites de motor",
+        () => { Repo.Limpar(); Limites.Limpar(); Itens.LimparTipo(ItemModelo.TipoCubo); });
+
+    private Alvo AlvoCombinacoes => new(
+        "combinacoes", () => _todos.Count,
+        "combinação(ões) da matriz — o cadastro de ventiladores e de cubos fica de pé",
+        () => Repo.Limpar());
+
+    private Alvo AlvoLimites => new(
+        "limites", () => _limites.Count,
+        "limite(s) de motor",
+        () => Limites.Limpar());
+
+    /// <summary>O botão 🗑 Limpar de uma lista, com a confirmação no lugar dele.</summary>
+    private RenderFragment Limpeza(Alvo alvo) => @<text>
+        @if (_limpando == alvo.Chave)
+        {
+            <span class="aviso aviso-alerta" style="margin:0; padding:5px 9px">
+                Apagar @alvo.Quantos() @alvo.Explica?
+            </span>
+            <button class="btn-link" @onclick="() => ExecutarLimpeza(alvo)">Sim, limpar</button>
+            <button class="btn-link" @onclick="@(() => _limpando = null)">Cancelar</button>
+        }
+        else
+        {
+            <button class="btn-link" title="Esvaziar esta lista" disabled="@(alvo.Quantos() == 0)"
+                    @onclick="@(() => _limpando = alvo.Chave)">🗑 Limpar</button>
+        }
+    </text>;
+
+    private void ExecutarLimpeza(Alvo alvo)
+    {
+        var quantos = alvo.Quantos();
+        alvo.Limpar();
+        _limpando = null;
+
+        Recarregar();
+        if (_diametros.All(d => d.Id != _vVentilador))
+            _vVentilador = _diametros.FirstOrDefault()?.Id ?? "";
+        TrocarVentilador();
+
+        _msg = $"Limpo: {quantos} {alvo.Explica}.";
     }
 
     /// <summary>

@@ -205,6 +205,18 @@ public sealed class CaracteristicaRepository
     }
 
     /// <summary>
+    /// Esvazia UMA lista: apaga os subitens dela e deixa o item de pé, pronto
+    /// para receber os da equipe. A marca impede que os de fábrica voltem.
+    /// </summary>
+    public void LimparGrupo(string grupo)
+    {
+        foreach (var c in Todas().Where(c => c.Grupo == grupo)) Apagar(c.Id);
+
+        _store.WriteRow(EntidadeSemeados,
+            new KeyValuePair<string, object?>[] { new("id", grupo) });
+    }
+
+    /// <summary>
     /// Apaga as listas e todos os subitens, e marca os de fábrica como já
     /// carregados — para a limpeza sobreviver à próxima abertura.
     /// </summary>
