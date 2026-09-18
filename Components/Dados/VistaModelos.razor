@@ -79,6 +79,35 @@
     }
 </div>
 
+<!-- ---------- incluir ventilador / cubo ---------- -->
+<div class="toolbar" style="flex-wrap:wrap; gap:18px">
+    @foreach (var tipo in new[] { ItemModelo.TipoVentilador, ItemModelo.TipoCubo })
+    {
+        var t = tipo;
+        var ventilador = t == ItemModelo.TipoVentilador;
+
+        <div class="toolbar" style="margin:0; flex-wrap:nowrap">
+            <strong>@(ventilador ? "Fan Diameter" : "Fan Hub Diameter")</strong>
+            <span class="val-count">@(ventilador ? _diametros.Count : _cubos.Count)</span>
+            <select class="cell" style="max-width:88px"
+                    value="@(ventilador ? _novaSerieVentilador : _novaSerieCubo)"
+                    @onchange="e => GuardarNovaSerie(t, e.Value?.ToString() ?? string.Empty)">
+                @foreach (var x in _series)
+                {
+                    <option value="@x" selected="@(x == (ventilador ? _novaSerieVentilador : _novaSerieCubo))">@x</option>
+                }
+            </select>
+            <input class="cell" style="width:130px" placeholder="@(ventilador ? "novo ventilador" : "novo cubo")"
+                   value="@(ventilador ? _novoVentilador : _novoCubo)"
+                   @onchange="e => GuardarNovo(t, e.Value?.ToString() ?? string.Empty)" />
+            <button class="btn-primary" @onclick="() => IncluirRotulo(t)"
+                    disabled="@((ventilador ? _novoVentilador : _novoCubo).Trim().Length == 0)">
+                + Incluir
+            </button>
+        </div>
+    }
+</div>
+
 <!-- ---------- a matriz ---------- -->
 <div class="toolbar" style="flex-wrap:wrap">
     <span class="subtitle" style="margin:0">
@@ -95,8 +124,7 @@
     <table class="grid">
         <thead>
             <tr>
-                <th class="nowrap" rowspan="3">Série</th>
-                <th class="nowrap" rowspan="3">Fan Diameter</th>
+                <th class="nowrap" rowspan="3" style="min-width:280px">Fan Diameter</th>
                 <th class="center" colspan="@_cubos.Count">Fan Hub Diameter</th>
             </tr>
             <tr>
@@ -108,7 +136,23 @@
             <tr>
                 @foreach (var c in _cubos)
                 {
-                    <th class="nowrap center">@c.Rotulo</th>
+                    var cubo = c;
+                    <th class="center" style="min-width:160px">
+                        <div style="display:flex; gap:4px; justify-content:center">
+                            <select class="cell" style="max-width:74px" value="@cubo.Serie"
+                                    @onchange="e => TrocarSerieItem(cubo, e.Value?.ToString() ?? string.Empty)">
+                                @foreach (var x in _series)
+                                {
+                                    <option value="@x" selected="@(x == cubo.Serie)">@x</option>
+                                }
+                            </select>
+                            <input class="cell" style="width:120px; font-weight:600" value="@cubo.Rotulo"
+                                   @onchange="e => RenomearRotulo(cubo, e.Value?.ToString() ?? string.Empty)" />
+                        </div>
+                        <div class="nowrap" style="margin-top:2px">
+                            @Controles(cubo)
+                        </div>
+                    </th>
                 }
             </tr>
         </thead>
@@ -117,8 +161,20 @@
             {
                 var vent = v;
                 <tr @key="vent.Id">
-                    <td class="nowrap"><span class="val-count">@vent.Serie</span></td>
-                    <td class="nowrap"><strong>@vent.Rotulo</strong></td>
+                    <td class="nowrap">
+                        <div style="display:flex; gap:4px; align-items:center">
+                            <select class="cell" style="max-width:74px" value="@vent.Serie"
+                                    @onchange="e => TrocarSerieItem(vent, e.Value?.ToString() ?? string.Empty)">
+                                @foreach (var x in _series)
+                                {
+                                    <option value="@x" selected="@(x == vent.Serie)">@x</option>
+                                }
+                            </select>
+                            <input class="cell" style="width:120px; font-weight:600" value="@vent.Rotulo"
+                                   @onchange="e => RenomearRotulo(vent, e.Value?.ToString() ?? string.Empty)" />
+                            @Controles(vent)
+                        </div>
+                    </td>
                     @foreach (var c in _cubos)
                     {
                         var cubo = c;
@@ -148,104 +204,105 @@
     Célula preenchida (amarela) = o ventilador cabe naquele cubo, e o valor é o teto de rotação.
     Célula vazia = combinação que não existe. Apagar o número tira a combinação; digitar um
     número numa célula vazia cria a combinação. O <strong>·</strong> apagado é cruzamento de
-    séries diferentes — um ventilador VAX não entra num cubo Joy.
+    séries diferentes — um ventilador VAX não entra num cubo Joy. A série, o nome e a posição
+    de cada ventilador e de cada cubo se editam no próprio cabeçalho.
 </p>
 
-<!-- ---------- código e preço do ventilador e do cubo ---------- -->
-<h3 style="margin:26px 0 6px">Ventiladores e cubos — código e preço</h3>
+<!-- ---------- a lista cruzada: código e preço ---------- -->
+<h3 style="margin:26px 0 6px">Equipamentos — código e preço</h3>
 <p class="subtitle">
-    Uma lista só para as duas linhas de produto. A <strong>série</strong> é uma coluna como
-    as outras: trocá-la move o rótulo (e o que ele tem na matriz) de linha de produto.
+    Uma lista só, <strong>cruzando ventilador e cubo</strong>: cada linha é uma célula amarela
+    da matriz, ou seja, um equipamento de verdade. É por isso que o código e o preço estão
+    aqui e não em duas listas soltas — o 3000 no cubo 1800 e o 3000 no cubo 2100 são dois
+    equipamentos diferentes.
 </p>
 
-<div class="prop-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start">
-    @foreach (var tipo in new[] { ItemModelo.TipoVentilador, ItemModelo.TipoCubo })
-    {
-        var t = tipo;
-        var ventilador = t == ItemModelo.TipoVentilador;
-        var lista = ventilador ? _diametros : _cubos;
+<div class="toolbar" style="flex-wrap:wrap">
+    <strong>Nova combinação</strong>
+    <select class="cell" style="max-width:88px" value="@_combSerie"
+            @onchange="e => TrocarSerieNova(e.Value?.ToString() ?? string.Empty)">
+        @foreach (var x in _series)
+        {
+            <option value="@x" selected="@(x == _combSerie)">@x</option>
+        }
+    </select>
+    <select class="cell" style="max-width:150px" @bind="_combVentilador">
+        @foreach (var d in _diametros.Where(i => i.Serie == _combSerie))
+        {
+            <option value="@d.Rotulo">@d.Rotulo</option>
+        }
+    </select>
+    <span class="subtitle" style="margin:0">no cubo</span>
+    <select class="cell" style="max-width:170px" @bind="_combCubo">
+        @foreach (var c in _cubos.Where(i => i.Serie == _combSerie))
+        {
+            <option value="@c.Rotulo">@c.Rotulo</option>
+        }
+    </select>
+    <input class="cell" style="width:100px" type="number" min="1" placeholder="rpm" @bind="_combRpm" />
+    <button class="btn-primary" @onclick="IncluirCombinacao">+ Incluir</button>
 
-        <div>
-            <div class="toolbar" style="margin-bottom:8px; flex-wrap:wrap">
-                <strong>@(ventilador ? "Fan Diameter" : "Fan Hub Diameter")</strong>
-                <span class="val-count">@lista.Count</span>
-                <select class="cell" style="max-width:92px"
-                        value="@(ventilador ? _novaSerieVentilador : _novaSerieCubo)"
-                        @onchange="e => GuardarNovaSerie(t, e.Value?.ToString() ?? string.Empty)">
-                    @foreach (var s in _series)
-                    {
-                        <option value="@s" selected="@(s == (ventilador ? _novaSerieVentilador : _novaSerieCubo))">@s</option>
-                    }
-                </select>
-                <input class="cell" style="min-width:130px" placeholder="@(ventilador ? "novo ventilador" : "novo cubo")"
-                       value="@(ventilador ? _novoVentilador : _novoCubo)"
-                       @onchange="e => GuardarNovo(t, e.Value?.ToString() ?? string.Empty)" />
-                <button class="btn-primary" @onclick="() => IncluirRotulo(t)"
-                        disabled="@((ventilador ? _novoVentilador : _novoCubo).Trim().Length == 0)">
-                    + Incluir
-                </button>
-            </div>
-            <div class="panel" style="padding:0; overflow-x:auto">
-                <table class="grid">
-                    <thead>
-                        <tr>
-                            <th class="nowrap" style="width:96px">Série</th>
-                            <th class="nowrap">@t</th>
-                            <th class="nowrap" style="width:120px">Código</th>
-                            <th class="nowrap" style="width:130px">Preço</th>
-                            <th class="nowrap" style="width:116px"></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach (var i in lista)
-                        {
-                            var item = i;
-                            <tr @key="item.Id">
-                                <td>
-                                    <select class="cell" style="max-width:88px" value="@item.Serie"
-                                            @onchange="e => TrocarSerieItem(item, e.Value?.ToString() ?? string.Empty)">
-                                        @foreach (var s in _series)
-                                        {
-                                            <option value="@s" selected="@(s == item.Serie)">@s</option>
-                                        }
-                                    </select>
-                                </td>
-                                <td>
-                                    <input class="cell" style="font-weight:600; max-width:160px" value="@item.Rotulo"
-                                           @onchange="e => RenomearRotulo(item, e.Value?.ToString() ?? string.Empty)" />
-                                </td>
-                                <td>
-                                    <input class="cell" style="max-width:105px" placeholder="—"
-                                           value="@item.Codigo"
-                                           @onchange="e => DefinirItem(item, e.Value?.ToString() ?? string.Empty, null)" />
-                                </td>
-                                <td>
-                                    <input class="cell" style="max-width:115px; text-align:right" placeholder="—"
-                                           value="@item.Preco"
-                                           @onchange="e => DefinirItem(item, null, e.Value?.ToString() ?? string.Empty)" />
-                                </td>
-                                <td class="nowrap center">
-                                    <button class="btn-link" title="Subir" @onclick="() => MoverRotulo(item, -1)">↑</button>
-                                    <button class="btn-link" title="Descer" @onclick="() => MoverRotulo(item, 1)">↓</button>
-                                    @if (_apagarRotulo == item.Id)
-                                    {
-                                        <button class="btn-link" @onclick="() => ApagarRotulo(item)">Sim</button>
-                                        <button class="btn-link" @onclick="@(() => _apagarRotulo = null)">Não</button>
-                                    }
-                                    else
-                                    {
-                                        <button class="btn-link" title="Apagar a linha inteira"
-                                                @onclick="@(() => _apagarRotulo = item.Id)">✕</button>
-                                    }
-                                </td>
-                            </tr>
-                        }
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    }
+    <span style="flex:1"></span>
+    <input class="cell" style="width:190px" placeholder="filtrar…" value="@_filtro"
+           @oninput="e => _filtro = e.Value?.ToString() ?? string.Empty" />
 </div>
+
+<div class="panel" style="padding:0; overflow-x:auto">
+    <table class="grid">
+        <thead>
+            <tr>
+                <th class="nowrap" style="width:90px">Série</th>
+                <th class="nowrap">Fan Diameter</th>
+                <th class="nowrap">Fan Hub Diameter</th>
+                <th class="nowrap" style="width:150px">Rotação máx (rpm)</th>
+                <th class="nowrap" style="width:150px">Código</th>
+                <th class="nowrap" style="width:150px">Preço</th>
+                <th class="nowrap" style="width:90px"></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var e in Combinacoes())
+            {
+                var eq = e;
+                <tr @key="eq.Id">
+                    <td class="nowrap"><span class="val-count">@eq.Serie</span></td>
+                    <td class="nowrap"><strong>@eq.Diametro</strong></td>
+                    <td class="nowrap"><strong>@eq.Cubo</strong></td>
+                    <td>
+                        <input class="cell" style="max-width:130px; text-align:right"
+                               value="@eq.RpmMax"
+                               @onchange="a => Editar(eq.Serie, eq.Diametro, eq.Cubo, a.Value?.ToString() ?? string.Empty)" />
+                    </td>
+                    <td>
+                        <input class="cell" style="max-width:130px" placeholder="—" value="@eq.Codigo"
+                               @onchange="a => DefinirCombinacao(eq, a.Value?.ToString() ?? string.Empty, null)" />
+                    </td>
+                    <td>
+                        <input class="cell" style="max-width:130px; text-align:right" placeholder="—" value="@eq.Preco"
+                               @onchange="a => DefinirCombinacao(eq, null, a.Value?.ToString() ?? string.Empty)" />
+                    </td>
+                    <td class="nowrap center">
+                        @if (_apagarComb == eq.Id)
+                        {
+                            <button class="btn-link" @onclick="() => ApagarCombinacao(eq)">Sim</button>
+                            <button class="btn-link" @onclick="@(() => _apagarComb = null)">Não</button>
+                        }
+                        else
+                        {
+                            <button class="btn-link" title="Apagar a combinação"
+                                    @onclick="@(() => _apagarComb = eq.Id)">✕</button>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<p class="subtitle" style="margin-top:12px">
+    A ordem é a do cadastro de ventiladores e, dentro dele, a dos cubos — a mesma da matriz.
+    Apagar aqui é o mesmo que apagar o número da célula lá em cima.
+</p>
 
 <!-- ---------- motor máximo por cubo ---------- -->
 <h3 style="margin:26px 0 6px">Motor máximo por cubo</h3>
@@ -306,6 +363,15 @@
     private List<ItemModelo> _itens = new();
 
     private string _novoVentilador = "";
+    /// <summary>A combinação que está sendo montada na barra "Nova combinação".</summary>
+    private string _combSerie = ItemModelo.Series[0];
+    private string _combVentilador = "";
+    private string _combCubo = "";
+    private int _combRpm = 1800;
+    /// <summary>Filtro de texto da lista cruzada.</summary>
+    private string _filtro = "";
+    /// <summary>Id da combinação aguardando confirmação para ser apagada.</summary>
+    private string? _apagarComb;
     private string _novoCubo = "";
     private string _novaSerieVentilador = ItemModelo.Series[0];
     private string _novaSerieCubo = ItemModelo.Series[0];
@@ -366,6 +432,8 @@
         // combinação, já aparecer para ser preenchido
         _diametros = _itens.Where(i => i.Tipo == ItemModelo.TipoVentilador).ToList();
         _cubos = _itens.Where(i => i.Tipo == ItemModelo.TipoCubo).ToList();
+
+        AjustarNovaCombinacao();
     }
 
     // ---------- o verificador ----------
@@ -441,6 +509,30 @@
     }
 
     /// <summary>
+    /// Os botões de posição e de exclusão de um ventilador ou de um cubo. Ficam
+    /// no cabeçalho da matriz — que é onde a lista de ventiladores (as linhas) e
+    /// a de cubos (as colunas) de fato moram. A seta acompanha o sentido: o
+    /// ventilador sobe e desce, o cubo anda para os lados.
+    /// </summary>
+    private RenderFragment Controles(ItemModelo item) => @<text>
+        @{ var linha = item.Tipo == ItemModelo.TipoVentilador; }
+        <button class="btn-link" title="@(linha ? "Subir" : "Mover para a esquerda")"
+                @onclick="() => MoverRotulo(item, -1)">@(linha ? "↑" : "←")</button>
+        <button class="btn-link" title="@(linha ? "Descer" : "Mover para a direita")"
+                @onclick="() => MoverRotulo(item, 1)">@(linha ? "↓" : "→")</button>
+        @if (_apagarRotulo == item.Id)
+        {
+            <button class="btn-link" @onclick="() => ApagarRotulo(item)">Sim</button>
+            <button class="btn-link" @onclick="@(() => _apagarRotulo = null)">Não</button>
+        }
+        else
+        {
+            <button class="btn-link" title="@(linha ? "Apagar a linha inteira" : "Apagar a coluna inteira")"
+                    @onclick="@(() => _apagarRotulo = item.Id)">✕</button>
+        }
+    </text>;
+
+    /// <summary>
     /// A própria matriz é o editor: número na célula cria/atualiza a combinação,
     /// célula apagada tira a combinação da tabela.
     /// </summary>
@@ -462,6 +554,8 @@
             Repo.Salvar(new Equipamento
             {
                 Serie = serie, Diametro = diametro, Cubo = cubo, RpmMax = rpm,
+                // mexer na rotação não pode apagar o que já foi codificado
+                Codigo = existente?.Codigo ?? "", Preco = existente?.Preco ?? "",
             });
             _msg = $"{serie} {diametro} / {cubo}: máx. {rpm} rpm.";
         }
@@ -578,8 +672,7 @@
         Itens.Apagar(item.Id);
         Itens.Salvar(new ItemModelo
         {
-            Serie = serie, Tipo = item.Tipo, Rotulo = rotulo,
-            Codigo = item.Codigo, Preco = item.Preco, Ordem = item.Ordem,
+            Serie = serie, Tipo = item.Tipo, Rotulo = rotulo, Ordem = item.Ordem,
         });
 
         var ventilador = item.Tipo == ItemModelo.TipoVentilador;
@@ -612,6 +705,7 @@
                 Diametro = ventilador ? rotulo : e.Diametro,
                 Cubo = ventilador ? e.Cubo : rotulo,
                 RpmMax = e.RpmMax,
+                Codigo = e.Codigo, Preco = e.Preco,
             });
             movidas++;
         }
@@ -681,16 +775,83 @@
         TrocarVentilador();
     }
 
-    // ---------- código e preço ----------
+    // ---------- a lista cruzada ----------
 
     /// <summary>
-    /// Grava código e/ou preço do ventilador ou do cubo. O parâmetro que vier
-    /// nulo não é mexido — é o mesmo registro alimentado por dois campos.
+    /// As combinações na ordem da tela: a do cadastro de ventiladores e, dentro
+    /// dele, a dos cubos. É a mesma leitura da matriz, linha por linha.
     /// </summary>
-    private void DefinirItem(ItemModelo item, string? codigo, string? preco)
+    private List<Equipamento> Combinacoes()
     {
-        var novoCodigo = (codigo ?? item.Codigo).Trim();
-        var novoPreco = (preco ?? item.Preco).Trim();
+        int Pos(string serie, string tipo, string rotulo) =>
+            _itens.FirstOrDefault(i => i.Serie == serie && i.Tipo == tipo && i.Rotulo == rotulo)
+                ?.Ordem ?? int.MaxValue;
+
+        var filtro = _filtro.Trim();
+
+        return _todos
+            .Where(e => filtro.Length == 0 || Casa(e, filtro))
+            .OrderBy(e => Pos(e.Serie, ItemModelo.TipoVentilador, e.Diametro))
+            .ThenBy(e => Pos(e.Serie, ItemModelo.TipoCubo, e.Cubo))
+            .ToList();
+    }
+
+    private static bool Casa(Equipamento e, string filtro) =>
+        new[] { e.Serie, e.Diametro, e.Cubo, e.Codigo, e.RpmMax.ToString() }
+            .Any(t => t.Contains(filtro, StringComparison.OrdinalIgnoreCase));
+
+    private void TrocarSerieNova(string serie)
+    {
+        _combSerie = serie;
+        // os ventiladores e os cubos oferecidos são os daquela série: o que
+        // estava escolhido não vale mais
+        AjustarNovaCombinacao();
+    }
+
+    /// <summary>Deixa os seletores da nova combinação apontando para algo que existe.</summary>
+    private void AjustarNovaCombinacao()
+    {
+        var vents = _diametros.Where(i => i.Serie == _combSerie).Select(i => i.Rotulo).ToList();
+        var cubos = _cubos.Where(i => i.Serie == _combSerie).Select(i => i.Rotulo).ToList();
+
+        if (!vents.Contains(_combVentilador)) _combVentilador = vents.FirstOrDefault() ?? "";
+        if (!cubos.Contains(_combCubo)) _combCubo = cubos.FirstOrDefault() ?? "";
+    }
+
+    private void IncluirCombinacao()
+    {
+        var vent = _combVentilador;
+        var cubo = _combCubo;
+
+        if (vent.Length == 0 || cubo.Length == 0)
+        {
+            _msg = $"A série {_combSerie} ainda não tem ventilador e cubo cadastrados.";
+            return;
+        }
+
+        if (Achar(_combSerie, vent, cubo) is not null)
+        {
+            _msg = $"{_combSerie} {vent} / {cubo} já está na lista.";
+            return;
+        }
+
+        if (_combRpm <= 0)
+        {
+            _msg = "A rotação máxima precisa ser maior que zero.";
+            return;
+        }
+
+        Editar(_combSerie, vent, cubo, _combRpm.ToString());
+    }
+
+    /// <summary>
+    /// Grava código e/ou preço da COMBINAÇÃO. O parâmetro que vier nulo não é
+    /// mexido — é o mesmo registro alimentado por dois campos.
+    /// </summary>
+    private void DefinirCombinacao(Equipamento eq, string? codigo, string? preco)
+    {
+        var novoCodigo = (codigo ?? eq.Codigo).Trim();
+        var novoPreco = (preco ?? eq.Preco).Trim();
 
         if (novoPreco.Length > 0 && DadosExcel.Numero(novoPreco) is null)
         {
@@ -699,19 +860,26 @@
             return;
         }
 
-        if (novoCodigo == item.Codigo && novoPreco == item.Preco) return;
+        if (novoCodigo == eq.Codigo && novoPreco == eq.Preco) return;
 
-        item.Codigo = novoCodigo;
-        item.Preco = novoPreco;
-        Itens.Salvar(item);
+        eq.Codigo = novoCodigo;
+        eq.Preco = novoPreco;
+        Repo.Salvar(eq);
 
-        _msg = novoCodigo.Length == 0 && novoPreco.Length == 0
-            ? $"{item.Tipo} {item.Rotulo}: código e preço apagados."
-            : $"{item.Tipo} {item.Rotulo}: " +
-              (novoCodigo.Length > 0 ? $"código {novoCodigo}" : "sem código") +
-              (novoPreco.Length > 0 ? $", preço {novoPreco}" : "");
+        _msg = $"{eq.Serie} {eq.Diametro} / {eq.Cubo}: " +
+               (novoCodigo.Length > 0 ? $"código {novoCodigo}" : "sem código") +
+               (novoPreco.Length > 0 ? $", preço {novoPreco}" : "");
 
         Recarregar();
+    }
+
+    private void ApagarCombinacao(Equipamento eq)
+    {
+        Repo.Apagar(eq.Id);
+        _apagarComb = null;
+        _msg = $"{eq.Serie} {eq.Diametro} / {eq.Cubo}: combinação removida.";
+        Recarregar();
+        Verificar();
     }
 
     // ---------- limite de motor ----------

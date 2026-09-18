@@ -34,9 +34,10 @@ sem encostar no que está gravado.
 
 Uma guia só, com tudo na mesma página:
 
-- **Modelos** — a lista de ventiladores e a de cubos (cada um com código, preço e posição),
-  a relação ventilador × cubo, o alerta de rotação e o motor máximo por cubo. **VAX e Joy
-  ficam na mesma lista**, com a série numa coluna — não há abas de linha de produto.
+- **Modelos** — a matriz ventilador × cubo (que é também o cadastro dos dois), a lista
+  cruzada dos equipamentos com código e preço, o alerta de rotação e o motor máximo por
+  cubo. **VAX e Joy ficam juntos**, com a série numa coluna — não há abas de linha de
+  produto.
 - **Motores** — os frames IEC e NEMA, na ordem de tamanho, cada um com seu código.
 - **Características** — **itens** (as listas: solidez, base, partidores, instrumentação…)
   e seus **subitens** (as opções), cada subitem com um código. De fábrica são 15 itens e
@@ -47,17 +48,22 @@ Uma guia só, com tudo na mesma página:
 Juntando os códigos escolhidos em cada lista monta-se o código do equipamento — por isso a
 ordem dos grupos e dos itens importa.
 
-Ventiladores, cubos, frames e subitens de característica têm **código e preço**, e em
-todas essas listas dá para **renomear, incluir, apagar e reordenar** (↑ ↓). Renomear um
-ventilador ou um cubo leva junto as combinações da matriz — e, no cubo, os limites de
-motor —, e apagar pede confirmação na própria linha. A matriz de modelos segue a lista:
-um ventilador recém-criado já aparece nela, vazio, esperando ser marcado.
+O **código e o preço são da combinação**: quem é vendido é o par ventilador + cubo, então
+o 3000 no cubo 1800 e o 3000 no cubo 2100 são dois equipamentos, cada um com o seu. Por
+isso a tela tem **uma lista só, cruzada** — uma linha por célula amarela da matriz, com
+série, ventilador, cubo, rotação máxima, código e preço, e um campo de filtro em cima.
 
-A **série** (VAX ou Joy) é uma coluna da lista, e pode ser trocada como qualquer outro
-campo: o rótulo muda de linha de produto levando junto o que faz sentido lá. Na matriz, o
-cruzamento de séries diferentes é uma célula apagada — um ventilador VAX não entra num
-cubo Joy. E o que a equipe apaga **fica apagado**: a tabela de fábrica marca o que já
-carregou, então um cubo removido não volta na abertura seguinte.
+A lista de ventiladores e a de cubos não são mais duas tabelas soltas: elas **são** as
+linhas e as colunas da matriz, e é no cabeçalho dela que cada uma tem a sua série, o seu
+nome, as setas de posição (↑ ↓ na linha, ← → na coluna) e o ✕. Renomear leva junto as
+combinações — e, no cubo, os limites de motor. Apagar pede confirmação ali mesmo. Um
+ventilador recém-incluído já aparece na matriz, vazio, esperando ser marcado.
+
+A **série** (VAX ou Joy) pode ser trocada como qualquer outro campo: o rótulo muda de
+linha de produto levando junto o que faz sentido lá. Na matriz, o cruzamento de séries
+diferentes é uma célula apagada — um ventilador VAX não entra num cubo Joy. E o que a
+equipe apaga **fica apagado**: a tabela de fábrica marca o que já carregou, então um cubo
+removido não volta na abertura seguinte.
 
 E há um **Excel do conjunto**: um botão exporta
 tudo o que está na guia (uma aba por tabela) e a importação traz de volta — é como a

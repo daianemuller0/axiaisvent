@@ -35,30 +35,39 @@ public static class DadosExcel
     {
         using var wb = new XLWorkbook();
 
-        Montar(wb, AbaModelos,
-            new[] { "Série", "Ventilador", "Cubo", "Rotação máx (rpm)" },
-            equipamentos.Select(e => new object?[]
-            {
-                e.Serie, e.Diametro, e.Cubo, e.RpmMax,
-            }));
+        // A aba Modelos é a LISTA CRUZADA: uma linha por combinação
+        // ventilador × cubo, que é o equipamento — e é nela que estão o código
+        // e o preço. A ordem é a do cadastro de ventiladores e, dentro dele, a
+        // do cadastro de cubos: a mesma da tela.
+        var posicao = itensModelo.ToDictionary(i => (i.Serie, i.Tipo, i.Rotulo), i => i.Ordem);
+        int Pos(string serie, string tipo, string rotulo) =>
+            posicao.TryGetValue((serie, tipo, rotulo), out var o) ? o : int.MaxValue;
 
-        // A lista mandante é o cadastro — é ela que forma as linhas e as colunas
-        // da matriz —, então é dela que sai a planilha, com a ordem junto.
+        Montar(wb, AbaModelos,
+            new[] { "Série", "Ventilador", "Cubo", "Rotação máx (rpm)", "Código", "Preço" },
+            equipamentos
+                .OrderBy(e => Pos(e.Serie, ItemModelo.TipoVentilador, e.Diametro))
+                .ThenBy(e => Pos(e.Serie, ItemModelo.TipoCubo, e.Cubo))
+                .Select(e => new object?[]
+                {
+                    e.Serie, e.Diametro, e.Cubo, e.RpmMax, e.Codigo, Numero(e.Preco),
+                }));
+
+        // O cadastro de ventiladores e de cubos — é ele que forma as linhas e as
+        // colunas da matriz. Aqui vai só o rótulo e a posição: código e preço
+        // estão na aba Modelos, na combinação.
         foreach (var (aba, tipo, titulo) in new[]
                  {
                      (AbaVentiladores, ItemModelo.TipoVentilador, "Ventilador"),
                      (AbaCubos, ItemModelo.TipoCubo, "Cubo"),
                  })
         {
-            Montar(wb, aba, new[] { "Ordem", "Série", titulo, "Código", "Preço" },
+            Montar(wb, aba, new[] { "Ordem", "Série", titulo },
                 itensModelo
                     .Where(i => i.Tipo == tipo)
                     .OrderBy(i => i.Ordem)
                     .ThenBy(i => ItemModelo.OrdemDaSerie(i.Serie))
-                    .Select(i => new object?[]
-                    {
-                        i.Ordem, i.Serie, i.Rotulo, i.Codigo, Numero(i.Preco),
-                    }));
+                    .Select(i => new object?[] { i.Ordem, i.Serie, i.Rotulo }));
         }
 
         Montar(wb, AbaLimites,
@@ -196,8 +205,6 @@ public static class DadosExcel
             var iSerie = Coluna(cab, "série", "serie");
             var iRotulo = Coluna(cab, titulo, "rótulo", "rotulo");
             var iOrdem = Coluna(cab, "ordem");
-            var iCodigo = Coluna(cab, "código", "codigo", "cod");
-            var iPreco = Coluna(cab, "preço", "preco");
 
             if (iSerie < 0 || iRotulo < 0)
             {
@@ -228,8 +235,6 @@ public static class DadosExcel
                 repo.Salvar(new ItemModelo
                 {
                     Serie = serie, Tipo = tipo, Rotulo = rotulo, Ordem = ordem,
-                    Codigo = iCodigo >= 0 ? T(l, iCodigo) : atual?.Codigo ?? "",
-                    Preco = iPreco >= 0 ? PrecoNormalizado(T(l, iPreco)) : atual?.Preco ?? "",
                 });
                 gravadas++;
             }
@@ -246,6 +251,8 @@ public static class DadosExcel
         var iVent = Coluna(cab, "ventilador", "diâmetro", "diametro", "fan diameter");
         var iCubo = Coluna(cab, "cubo", "fan hub diameter");
         var iRpm = Coluna(cab, "rotação máx (rpm)", "rotação", "rotacao", "rpm");
+        var iCodigo = Coluna(cab, "código", "codigo", "cod");
+        var iPreco = Coluna(cab, "preço", "preco");
 
         if (iSerie < 0 || iVent < 0 || iCubo < 0 || iRpm < 0)
         {
@@ -253,7 +260,9 @@ public static class DadosExcel
             return 0;
         }
 
+        var existentes = repo.Todos();
         var gravadas = 0;
+
         foreach (var l in linhas)
         {
             var serie = T(l, iSerie);
@@ -262,7 +271,16 @@ public static class DadosExcel
             if (serie.Length == 0 || vent.Length == 0 || cubo.Length == 0) continue;
             if (!int.TryParse(T(l, iRpm), out var rpm) || rpm <= 0) continue;
 
-            repo.Salvar(new Equipamento { Serie = serie, Diametro = vent, Cubo = cubo, RpmMax = rpm });
+            // coluna que não veio no arquivo não apaga o que já está gravado
+            var atual = existentes.FirstOrDefault(e =>
+                e.Serie == serie && e.Diametro == vent && e.Cubo == cubo);
+
+            repo.Salvar(new Equipamento
+            {
+                Serie = serie, Diametro = vent, Cubo = cubo, RpmMax = rpm,
+                Codigo = iCodigo >= 0 ? T(l, iCodigo) : atual?.Codigo ?? "",
+                Preco = iPreco >= 0 ? PrecoNormalizado(T(l, iPreco)) : atual?.Preco ?? "",
+            });
             gravadas++;
         }
         return gravadas;

@@ -434,10 +434,26 @@ ganham os itens correspondentes na primeira abertura.
 
 | O quê | Entidade | Campos |
 |---|---|---|
-| Ventilador (Fan Diameter) | `itens_modelo` | `codigo`, `preco` |
-| Cubo (Fan Hub Diameter) | `itens_modelo` | `codigo`, `preco` |
+| **Equipamento** (ventilador × cubo) | `equipamentos` | `codigo`, `preco` |
 | Frame de motor | `frames` | `codigo`, `preco` |
 | Subitem de característica | `caracteristicas` | `codigo`, `preco` |
+
+### O preço é da combinação, não das pontas
+
+Por um tempo o ventilador tinha um código/preço e o cubo tinha outro, em duas listas
+lado a lado. Estava errado: **quem é vendido é o par**. O 3000 no cubo 1800 e o 3000 no
+cubo 2100 são dois equipamentos diferentes, com código e preço próprios — e é exatamente
+isso que a tabela de referência da equipe diz, com uma célula amarela para cada par.
+
+Então o código e o preço vivem no `Equipamento`, que já era a combinação, e a tela mostra
+**uma lista só, cruzada**: uma linha por célula amarela, com série, ventilador, cubo,
+rotação máxima, código e preço. `itens_modelo` ficou sendo só o cadastro do rótulo e da
+posição.
+
+Onde isso deixou a edição dos rótulos: **no cabeçalho da própria matriz**. A linha é o
+ventilador e a coluna é o cubo, então é ali que cada um tem a sua série, o seu nome, as
+setas de posição (↑ ↓ na linha, ← → na coluna) e o ✕. Não há mais duas tabelas de rótulo
+soltas embaixo — era a separação que a equipe não queria ver.
 
 Ventiladores e cubos moram na mesma entidade, separados pelo campo `tipo`.
 
@@ -517,17 +533,20 @@ uma aba, com o mesmo nome nos dois sentidos — o que sai é exatamente o que en
 
 | Aba | Colunas |
 |---|---|
-| `Modelos` | Série · Ventilador · Cubo · Rotação máx (rpm) |
-| `Ventiladores` | Ordem · Série · Ventilador · Código · Preço |
-| `Cubos` | Ordem · Série · Cubo · Código · Preço |
+| `Modelos` | Série · Ventilador · Cubo · Rotação máx (rpm) · Código · Preço |
+| `Ventiladores` | Ordem · Série · Ventilador |
+| `Cubos` | Ordem · Série · Cubo |
 | `Limites de motor` | Série · Cubo · Padrão · Frame máximo |
 | `Motores` | Padrão · Ordem · Frame · Código · Preço |
 | `Características` | Item · Ordem · Subitem · Código · Preço |
 
-Nas abas `Ventiladores` e `Cubos` vai a lista mandante inteira, VAX e Joy juntos, com as
-colunas `Ordem` e `Série`: um rótulo que não exista ainda **é criado** pela importação, a
-série é a da coluna e a ordem da planilha é a ordem que fica na tela. É o caminho para
-subir muitos ventiladores de uma vez.
+`Modelos` é a **lista cruzada**: uma linha por combinação, e é ela que leva o código e o
+preço. Sai na mesma ordem da tela (a do cadastro de ventiladores e, dentro dele, a dos
+cubos). Coluna que não vier no arquivo não apaga o que já está gravado.
+
+`Ventiladores` e `Cubos` são o cadastro dos rótulos, VAX e Joy juntos, com `Ordem` e
+`Série`: um rótulo que não exista ainda **é criado** pela importação, e a ordem da planilha
+é a ordem que fica na tela. É o caminho para subir muitos ventiladores de uma vez.
 
 A importação é sempre **atualizar e acrescentar**: nada é apagado por ausência, aba que
 não vier no arquivo não é tocada, e linha que já existe tem os campos atualizados. É o que

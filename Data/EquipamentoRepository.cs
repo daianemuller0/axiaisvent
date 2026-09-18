@@ -28,6 +28,14 @@ public sealed class Equipamento
     public string Cubo { get; set; } = "";
     /// <summary>Rotação máxima (V-Belt), em rpm. Acima disso, alerta.</summary>
     public int RpmMax { get; set; }
+    /// <summary>
+    /// Código do equipamento — o da COMBINAÇÃO, não o do ventilador nem o do
+    /// cubo. Quem vende é o par: o 3000 no cubo 1800 e o 3000 no cubo 2100 são
+    /// dois equipamentos diferentes, com código e preço próprios.
+    /// </summary>
+    public string Codigo { get; set; } = "";
+    /// <summary>Preço da combinação, como a equipe digita. Vazio = sem preço.</summary>
+    public string Preco { get; set; } = "";
 
     public static string MontarId(string serie, string diametro, string cubo) =>
         $"{serie}-{diametro}-{cubo}";
@@ -82,10 +90,11 @@ public sealed class EquipamentoRepository
     public EquipamentoRepository(ParquetStore store) => _store = store;
 
     public List<Equipamento> Todos() => _store
-        .ReadLatest(Entidade, "id, serie, diametro, cubo, rpmMax", r => new Equipamento
+        .ReadLatest(Entidade, "id, serie, diametro, cubo, rpmMax, codigo, preco", r => new Equipamento
         {
             Id = S(r, 0), Serie = S(r, 1), Diametro = S(r, 2),
             Cubo = S(r, 3), RpmMax = Int(S(r, 4)),
+            Codigo = S(r, 5), Preco = S(r, 6),
         })
         .OrderBy(e => e.Serie)
         .ThenBy(e => Medida.Numero(e.Diametro))
@@ -100,6 +109,7 @@ public sealed class EquipamentoRepository
             new("id", e.Id), new("serie", e.Serie),
             new("diametro", e.Diametro), new("cubo", e.Cubo),
             new("rpmMax", e.RpmMax.ToString()),
+            new("codigo", e.Codigo), new("preco", e.Preco),
         });
     }
 
@@ -129,6 +139,7 @@ public sealed class EquipamentoRepository
                 Salvar(new Equipamento
                 {
                     Serie = e.Serie, Diametro = e.Diametro, Cubo = para, RpmMax = e.RpmMax,
+                    Codigo = e.Codigo, Preco = e.Preco,
                 });
             }
         }

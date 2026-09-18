@@ -1,8 +1,11 @@
 namespace HowdenAxiais.Poc.Data;
 
 /// <summary>
-/// Um <b>ventilador</b> (Fan Diameter) ou um <b>cubo</b> (Fan Hub Diameter),
-/// com seu código, preço e posição.
+/// Um <b>ventilador</b> (Fan Diameter) ou um <b>cubo</b> (Fan Hub Diameter):
+/// o cadastro do rótulo e da posição dele.
+///
+/// Código e preço NÃO moram aqui — moram na combinação (<see cref="Equipamento"/>),
+/// porque é o par ventilador+cubo que é o equipamento vendido.
 ///
 /// Esta é a LISTA MANDANTE: são estas linhas que formam as linhas e as colunas
 /// da matriz de equipamentos. Foi o que permitiu editar o rótulo, criar, apagar
@@ -34,10 +37,6 @@ public sealed class ItemModelo
     public string Tipo { get; set; } = "";
     /// <summary>O rótulo, igual ao da matriz: "2400", "18 1/4", "14\", S1000".</summary>
     public string Rotulo { get; set; } = "";
-    /// <summary>Código, que entra na montagem do código do equipamento.</summary>
-    public string Codigo { get; set; } = "";
-    /// <summary>Preço, como a equipe digita. Vazio = sem preço.</summary>
-    public string Preco { get; set; } = "";
     /// <summary>Posição na lista, dentro da série e do tipo (1 = primeiro).</summary>
     public int Ordem { get; set; }
 
@@ -46,8 +45,8 @@ public sealed class ItemModelo
 }
 
 /// <summary>
-/// Códigos e preços de ventiladores e cubos (entidade "itens_modelo"), sobre o
-/// mesmo ParquetStore do resto do sistema.
+/// O cadastro de ventiladores e cubos (entidade "itens_modelo"), sobre o mesmo
+/// ParquetStore do resto do sistema.
 /// </summary>
 public sealed class ItemModeloRepository
 {
@@ -57,10 +56,10 @@ public sealed class ItemModeloRepository
     public ItemModeloRepository(ParquetStore store) => _store = store;
 
     public List<ItemModelo> Todos() => _store
-        .ReadLatest(Entidade, "id, serie, tipo, rotulo, codigo, preco, ordem", r => new ItemModelo
+        .ReadLatest(Entidade, "id, serie, tipo, rotulo, ordem", r => new ItemModelo
         {
             Id = S(r, 0), Serie = S(r, 1), Tipo = S(r, 2), Rotulo = S(r, 3),
-            Codigo = S(r, 4), Preco = S(r, 5), Ordem = Int(S(r, 6)),
+            Ordem = Int(S(r, 4)),
         })
         .OrderBy(i => i.Tipo)
         .ThenBy(i => i.Ordem)
@@ -84,7 +83,7 @@ public sealed class ItemModeloRepository
         _store.WriteRow(Entidade, new KeyValuePair<string, object?>[]
         {
             new("id", i.Id), new("serie", i.Serie), new("tipo", i.Tipo),
-            new("rotulo", i.Rotulo), new("codigo", i.Codigo), new("preco", i.Preco),
+            new("rotulo", i.Rotulo),
             // zeros à esquerda: o Parquet guarda texto e sem isso a 10 viria antes da 2
             new("ordem", i.Ordem.ToString("D4")),
         });
