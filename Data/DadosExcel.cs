@@ -42,29 +42,22 @@ public static class DadosExcel
                 e.Serie, e.Diametro, e.Cubo, e.RpmMax,
             }));
 
-        // A lista sai da matriz (é ela que diz o que existe); o código e o preço
-        // vêm do cadastro, quando houver.
+        // A lista mandante é o cadastro — é ela que forma as linhas e as colunas
+        // da matriz —, então é dela que sai a planilha, com a ordem junto.
         foreach (var (aba, tipo, titulo) in new[]
                  {
                      (AbaVentiladores, ItemModelo.TipoVentilador, "Ventilador"),
                      (AbaCubos, ItemModelo.TipoCubo, "Cubo"),
                  })
         {
-            var rotulos = equipamentos
-                .Select(e => (e.Serie, Rotulo: tipo == ItemModelo.TipoVentilador ? e.Diametro : e.Cubo))
-                .Distinct()
-                .OrderBy(x => x.Serie)
-                .ThenBy(x => Medida.Numero(x.Rotulo))
-                .ThenBy(x => x.Rotulo)
-                .ToList();
-
-            Montar(wb, aba, new[] { "Série", titulo, "Código", "Preço" },
-                rotulos.Select(x =>
-                {
-                    var item = itensModelo.FirstOrDefault(i =>
-                        i.Serie == x.Serie && i.Tipo == tipo && i.Rotulo == x.Rotulo);
-                    return new object?[] { x.Serie, x.Rotulo, item?.Codigo, Numero(item?.Preco ?? "") };
-                }));
+            Montar(wb, aba, new[] { "Série", titulo, "Ordem", "Código", "Preço" },
+                itensModelo
+                    .Where(i => i.Tipo == tipo)
+                    .OrderBy(i => i.Serie).ThenBy(i => i.Ordem)
+                    .Select(i => new object?[]
+                    {
+                        i.Serie, i.Rotulo, i.Ordem, i.Codigo, Numero(i.Preco),
+                    }));
         }
 
         Montar(wb, AbaLimites,
@@ -182,10 +175,9 @@ public static class DadosExcel
     }
 
     /// <summary>
-    /// Código e preço de ventiladores e cubos. A lista de rótulos NÃO é criada
-    /// aqui — ela vem da matriz —, então uma linha cujo rótulo não exista na
-    /// matriz grava mesmo assim, mas só aparece na tela quando a matriz tiver
-    /// esse rótulo.
+    /// A lista de ventiladores e cubos: rótulo, ordem, código e preço. Rótulo
+    /// que ainda não existe é CRIADO — é como se acrescenta uma linha ou uma
+    /// coluna à matriz pela planilha.
     /// </summary>
     private static int ImportarItensModelo(XLWorkbook wb, ItemModeloRepository repo, List<string> avisos)
     {
@@ -202,6 +194,7 @@ public static class DadosExcel
             var (cab, linhas) = Ler(ws);
             var iSerie = Coluna(cab, "série", "serie");
             var iRotulo = Coluna(cab, titulo, "rótulo", "rotulo");
+            var iOrdem = Coluna(cab, "ordem");
             var iCodigo = Coluna(cab, "código", "codigo", "cod");
             var iPreco = Coluna(cab, "preço", "preco");
 
@@ -211,19 +204,36 @@ public static class DadosExcel
                 continue;
             }
 
+            var existentes = repo.Todos();
+            var proxima = existentes
+                .Where(i => i.Tipo == tipo)
+                .GroupBy(i => i.Serie)
+                .ToDictionary(g => g.Key, g => g.Max(i => i.Ordem));
+
             foreach (var l in linhas)
             {
                 var serie = T(l, iSerie);
                 var rotulo = T(l, iRotulo);
                 if (serie.Length == 0 || rotulo.Length == 0) continue;
 
-                var codigo = iCodigo >= 0 ? T(l, iCodigo) : "";
-                var preco = iPreco >= 0 ? PrecoNormalizado(T(l, iPreco)) : "";
-                if (codigo.Length == 0 && preco.Length == 0) continue;
+                var atual = existentes.FirstOrDefault(i =>
+                    i.Serie == serie && i.Tipo == tipo &&
+                    i.Rotulo.Equals(rotulo, StringComparison.OrdinalIgnoreCase));
+
+                int ordem;
+                if (iOrdem >= 0 && int.TryParse(T(l, iOrdem), out var lida) && lida > 0) ordem = lida;
+                else if (atual is not null) ordem = atual.Ordem;
+                else
+                {
+                    ordem = proxima.TryGetValue(serie, out var ultima) ? ultima + 1 : 1;
+                    proxima[serie] = ordem;
+                }
 
                 repo.Salvar(new ItemModelo
                 {
-                    Serie = serie, Tipo = tipo, Rotulo = rotulo, Codigo = codigo, Preco = preco,
+                    Serie = serie, Tipo = tipo, Rotulo = rotulo, Ordem = ordem,
+                    Codigo = iCodigo >= 0 ? T(l, iCodigo) : atual?.Codigo ?? "",
+                    Preco = iPreco >= 0 ? PrecoNormalizado(T(l, iPreco)) : atual?.Preco ?? "",
                 });
                 gravadas++;
             }

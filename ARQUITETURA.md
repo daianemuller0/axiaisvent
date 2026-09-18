@@ -439,10 +439,33 @@ ganham os itens correspondentes na primeira abertura.
 | Frame de motor | `frames` | `codigo`, `preco` |
 | Subitem de característica | `caracteristicas` | `codigo`, `preco` |
 
-Ventiladores e cubos moram na mesma entidade, separados pelo campo `tipo`. **A lista deles
-não é gravada**: sai da matriz de equipamentos, que é a fonte do que existe. Assim não há
-duas listas para manter em sincronia — um rótulo que saia da matriz some da tela de preço
-também.
+Ventiladores e cubos moram na mesma entidade, separados pelo campo `tipo`.
+
+### A lista de ventiladores e cubos é que manda
+
+No começo esta lista era **derivada da matriz**: os rótulos saíam das combinações
+gravadas. Era mais simples, mas não tinha onde guardar nada — e sem lugar para guardar não
+dá para renomear, criar ou reordenar. Foi a mesma lição dos grupos de característica:
+**uma lista que a equipe precisa editar precisa da própria entidade.**
+
+Hoje é o contrário: `itens_modelo` é a lista mandante, e são as linhas dela que formam as
+**linhas e as colunas da matriz**. É o que permite um ventilador novo, ainda sem nenhuma
+combinação marcada, já aparecer na matriz esperando ser preenchido.
+
+| Operação | O que acontece |
+|---|---|
+| **Renomear** | O rótulo muda na lista **e cascateia**: as combinações da matriz e, no caso do cubo, os limites de motor são regravados com o nome novo. A tela diz quantas foram junto. |
+| **Incluir** | Entra no fim da lista; a matriz ganha a linha (ou a coluna) vazia na hora. |
+| **Apagar** | Pede confirmação na própria linha (✕ → *Sim*) e leva junto as combinações daquele rótulo e, no cubo, os limites de motor. |
+| **Reordenar** | ↑ ↓ trocam o campo `ordem` com o vizinho. A matriz segue a lista. |
+
+Quem manda na ordem é o campo `ordem`, **não** o valor numérico do rótulo — senão um
+ventilador novo nunca poderia entrar no meio da sequência. O `ordem` é gravado com zeros à
+esquerda (`D4`) porque o Parquet guarda texto: sem isso a 10 viria antes da 2.
+
+A semeadura (`SemearDaMatriz`) cria só os rótulos que a matriz tem e a lista ainda não —
+é o que traz um banco antigo para cá e o que faz um rótulo novo vindo do Excel aparecer,
+sem encostar no que a equipe já ajustou.
 
 ### Lendo o preço (`DadosExcel.Numero`)
 
@@ -471,14 +494,15 @@ uma aba, com o mesmo nome nos dois sentidos — o que sai é exatamente o que en
 | Aba | Colunas |
 |---|---|
 | `Modelos` | Série · Ventilador · Cubo · Rotação máx (rpm) |
-| `Ventiladores` | Série · Ventilador · Código · Preço |
-| `Cubos` | Série · Cubo · Código · Preço |
+| `Ventiladores` | Série · Ordem · Ventilador · Código · Preço |
+| `Cubos` | Série · Ordem · Cubo · Código · Preço |
 | `Limites de motor` | Série · Cubo · Padrão · Frame máximo |
 | `Motores` | Padrão · Ordem · Frame · Código · Preço |
 | `Características` | Item · Ordem · Subitem · Código · Preço |
 
-Nas abas `Ventiladores` e `Cubos` a lista sai da matriz, como na tela: a importação só
-grava código e preço, não cria rótulo.
+Nas abas `Ventiladores` e `Cubos` vai a lista mandante, com a coluna `Ordem`: um rótulo
+que não exista ainda **é criado** pela importação, e a ordem da planilha é a ordem que
+fica na tela. É o caminho para subir muitos ventiladores de uma vez.
 
 A importação é sempre **atualizar e acrescentar**: nada é apagado por ausência, aba que
 não vier no arquivo não é tocada, e linha que já existe tem os campos atualizados. É o que

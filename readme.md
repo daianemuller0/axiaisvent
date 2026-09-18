@@ -34,7 +34,8 @@ sem encostar no que está gravado.
 
 Uma guia só, com tudo na mesma página:
 
-- **Modelos** — a relação ventilador × cubo, o alerta de rotação e o motor máximo por cubo.
+- **Modelos** — a lista de ventiladores e a de cubos (cada um com código, preço e posição),
+  a relação ventilador × cubo, o alerta de rotação e o motor máximo por cubo.
 - **Motores** — os frames IEC e NEMA, na ordem de tamanho, cada um com seu código.
 - **Características** — **itens** (as listas: solidez, base, partidores, instrumentação…)
   e seus **subitens** (as opções), cada subitem com um código. De fábrica são 15 itens e
@@ -45,9 +46,13 @@ Uma guia só, com tudo na mesma página:
 Juntando os códigos escolhidos em cada lista monta-se o código do equipamento — por isso a
 ordem dos grupos e dos itens importa.
 
-Ventiladores, cubos, frames e subitens de característica têm **código e preço** — a lista
-de ventiladores e cubos sai da própria matriz de modelos, então não há duas listas para
-manter. E há um **Excel do conjunto**: um botão exporta
+Ventiladores, cubos, frames e subitens de característica têm **código e preço**, e em
+todas essas listas dá para **renomear, incluir, apagar e reordenar** (↑ ↓). Renomear um
+ventilador ou um cubo leva junto as combinações da matriz — e, no cubo, os limites de
+motor —, e apagar pede confirmação na própria linha. A matriz de modelos segue a lista:
+um ventilador recém-criado já aparece nela, vazio, esperando ser marcado.
+
+E há um **Excel do conjunto**: um botão exporta
 tudo o que está na guia (uma aba por tabela) e a importação traz de volta — é como a
 equipe mexe em preços e códigos em massa. A importação sempre atualiza e acrescenta,
 nunca apaga por ausência.
