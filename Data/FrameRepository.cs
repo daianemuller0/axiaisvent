@@ -32,6 +32,7 @@ public sealed class FrameMotor
 public sealed class FrameRepository
 {
     private const string Entidade = "frames";
+    private const string EntidadeSemeados = "frames_semeados";
 
     /// <summary>Padrões conhecidos, na ordem em que aparecem na lista da equipe.</summary>
     public static readonly string[] Padroes = { "IEC", "NEMA" };
@@ -72,10 +73,28 @@ public sealed class FrameRepository
         new KeyValuePair<string, object?>[] { new("id", id) }, deleted: true);
 
     /// <summary>Carrega a lista de fábrica na primeira execução (entidade vazia).</summary>
+    /// <summary>
+    /// Carrega a escada de frames de fábrica uma única vez. A marca é o que
+    /// permite a equipe apagar a lista inteira e subir a dela: sem ela, o
+    /// critério seria "a tabela está vazia, então carrega", e a limpeza voltaria
+    /// atrás sozinha na abertura seguinte.
+    /// </summary>
     public void SemearSeVazio()
     {
-        if (!_store.IsEmpty(Entidade)) return;
-        foreach (var f in FramesSeed.Lista()) Salvar(f);
+        if (!_store.IsEmpty(EntidadeSemeados)) return;
+        if (_store.IsEmpty(Entidade))
+            foreach (var f in FramesSeed.Lista()) Salvar(f);
+
+        _store.WriteRow(EntidadeSemeados,
+            new KeyValuePair<string, object?>[] { new("id", "frames") });
+    }
+
+    /// <summary>Apaga a lista inteira e marca a de fábrica como já carregada.</summary>
+    public void Limpar()
+    {
+        _store.Clear(Entidade);
+        _store.WriteRow(EntidadeSemeados,
+            new KeyValuePair<string, object?>[] { new("id", "frames") });
     }
 
     private static string S(System.Data.IDataReader r, int i) => r.IsDBNull(i) ? "" : r.GetString(i);

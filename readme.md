@@ -65,6 +65,11 @@ diferentes é uma célula apagada — um ventilador VAX não entra num cubo Joy.
 equipe apaga **fica apagado**: a tabela de fábrica marca o que já carregou, então um cubo
 removido não volta na abertura seguinte.
 
+Há também um **Limpar**, com uma caixa para cada tabela (Modelos, Motores,
+Características), o número de registros que cada uma vai perder e uma confirmação — é como
+a equipe troca a nossa tabela de fábrica pela dela. A limpeza **fica gravada**: o que foi
+apagado não volta na abertura seguinte. A aba Base não é tocada.
+
 E há um **Excel do conjunto**: um botão exporta
 tudo o que está na guia (uma aba por tabela) e a importação traz de volta — é como a
 equipe mexe em preços e códigos em massa. A importação sempre atualiza e acrescenta,

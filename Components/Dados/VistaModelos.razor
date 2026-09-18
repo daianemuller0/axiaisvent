@@ -120,12 +120,24 @@
     }
 </div>
 
+@if (_diametros.Count == 0 && _cubos.Count == 0)
+{
+    <div class="panel">
+        <p class="subtitle" style="margin:0">
+            A tabela está vazia. Cadastre um <strong>Fan Diameter</strong> e um
+            <strong>Fan Hub Diameter</strong> na barra acima — ou suba a sua planilha pelo
+            <em>Importar Excel</em> — e a matriz aparece aqui.
+        </p>
+    </div>
+}
+else
+{
 <div class="panel" style="padding:0; overflow-x:auto">
     <table class="grid">
         <thead>
             <tr>
                 <th class="nowrap" rowspan="3" style="min-width:280px">Fan Diameter</th>
-                <th class="center" colspan="@_cubos.Count">Fan Hub Diameter</th>
+                <th class="center" colspan="@Math.Max(1, _cubos.Count)">Fan Hub Diameter</th>
             </tr>
             <tr>
                 @foreach (var g in GruposDeCubos())
@@ -199,6 +211,7 @@
         </tbody>
     </table>
 </div>
+}
 
 <p class="subtitle" style="margin-top:12px">
     Célula preenchida (amarela) = o ventilador cabe naquele cubo, e o valor é o teto de rotação.

@@ -179,6 +179,13 @@ public sealed class ItemModeloRepository
         }
     }
 
+    /// <summary>
+    /// Apaga o cadastro inteiro. Não precisa de marca: esta lista é semeada a
+    /// partir da matriz de equipamentos, então com a matriz limpa não há o que
+    /// recriar.
+    /// </summary>
+    public void Limpar() => _store.Clear(Entidade);
+
     private static string S(System.Data.IDataReader r, int i) => r.IsDBNull(i) ? "" : r.GetString(i);
 
     private static int Int(string s) => int.TryParse(s, out var v) ? v : 0;

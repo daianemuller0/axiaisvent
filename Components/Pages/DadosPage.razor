@@ -51,6 +51,56 @@
     </p>
 </div>
 
+<!-- ---------------- limpar ---------------- -->
+<div class="panel" style="margin-bottom:18px">
+    <div class="toolbar" style="margin-bottom:0; flex-wrap:wrap">
+        <strong>Limpar dados</strong>
+
+        <label style="display:flex; align-items:center; gap:6px">
+            <input type="checkbox" checked="@_limparModelos"
+                   @onchange="e => _limparModelos = (bool?)e.Value ?? false" />
+            <span>Modelos</span>
+            <span class="val-count">@_contaModelos</span>
+        </label>
+
+        <label style="display:flex; align-items:center; gap:6px">
+            <input type="checkbox" checked="@_limparMotores"
+                   @onchange="e => _limparMotores = (bool?)e.Value ?? false" />
+            <span>Motores</span>
+            <span class="val-count">@_contaMotores</span>
+        </label>
+
+        <label style="display:flex; align-items:center; gap:6px">
+            <input type="checkbox" checked="@_limparCaracteristicas"
+                   @onchange="e => _limparCaracteristicas = (bool?)e.Value ?? false" />
+            <span>Características</span>
+            <span class="val-count">@_contaCaracteristicas</span>
+        </label>
+
+        @if (_confirmandoLimpeza)
+        {
+            <span class="aviso aviso-alerta" style="margin:0; padding:6px 10px">
+                ⚠ Apaga @Alvos(). <strong>Não dá para desfazer.</strong>
+            </span>
+            <button class="btn-primary" @onclick="Limpar">Sim, limpar</button>
+            <button class="btn-ghost" @onclick="@(() => _confirmandoLimpeza = false)">Cancelar</button>
+        }
+        else
+        {
+            <button class="btn-ghost" disabled="@(!AlgoSelecionado)"
+                    @onclick="@(() => _confirmandoLimpeza = true)">
+                🗑 Limpar selecionados
+            </button>
+        }
+    </div>
+
+    <p class="subtitle" style="margin:10px 0 0">
+        Esvazia as tabelas marcadas para a equipe subir as dela — pela planilha ou digitando.
+        A tabela de fábrica <strong>não volta</strong> na próxima abertura: a limpeza fica
+        gravada. A aba <a href="/axiais/base">Base</a> não é tocada.
+    </p>
+</div>
+
 <!-- ---------------- modelos ---------------- -->
 <h2 style="margin:28px 0 4px">Modelos</h2>
 <VistaModelos @key="@("modelos-" + _versao)" />
@@ -75,6 +125,66 @@
     private bool _lendo;
     private string? _msg;
     private bool _erro;
+
+    private bool _limparModelos = true;
+    private bool _limparMotores;
+    private bool _limparCaracteristicas;
+    private bool _confirmandoLimpeza;
+
+    private int _contaModelos;
+    private int _contaMotores;
+    private int _contaCaracteristicas;
+
+    private bool AlgoSelecionado => _limparModelos || _limparMotores || _limparCaracteristicas;
+
+    protected override void OnInitialized() => Contar();
+
+    private void Contar()
+    {
+        _contaModelos = Equipamentos.Todos().Count;
+        _contaMotores = Frames.Todos().Count;
+        _contaCaracteristicas = Caracteristicas.Todas().Count;
+    }
+
+    private string Alvos()
+    {
+        var partes = new List<string>();
+        if (_limparModelos)
+            partes.Add($"{_contaModelos} combinação(ões), com os ventiladores, os cubos e os limites de motor");
+        if (_limparMotores) partes.Add($"{_contaMotores} frame(s)");
+        if (_limparCaracteristicas) partes.Add($"{_contaCaracteristicas} subitem(ns) e as listas deles");
+
+        return partes.Count switch
+        {
+            0 => "nada",
+            1 => partes[0],
+            _ => string.Join(", ", partes.Take(partes.Count - 1)) + " e " + partes[^1],
+        };
+    }
+
+    /// <summary>
+    /// Esvazia as tabelas marcadas. Cada repositório, além de apagar, grava a
+    /// marca de "a tabela de fábrica já foi carregada" — senão a semeadura da
+    /// próxima abertura desfaria a limpeza.
+    /// </summary>
+    private void Limpar()
+    {
+        var apagado = Alvos();
+
+        if (_limparModelos)
+        {
+            Equipamentos.Limpar();
+            ItensModelo.Limpar();
+            Limites.Limpar();
+        }
+        if (_limparMotores) Frames.Limpar();
+        if (_limparCaracteristicas) Caracteristicas.Limpar();
+
+        _confirmandoLimpeza = false;
+        _versao++;   // recria as vistas, agora vazias
+        Contar();
+        Aviso($"Limpo: {apagado}. Agora é subir a sua tabela — pela planilha ou digitando.");
+    }
 
     private async Task Exportar()
     {
@@ -126,6 +236,7 @@
             if (resumo.Avisos.Count > 0) texto += " " + string.Join(" ", resumo.Avisos);
 
             _versao++;   // recria as três vistas com o conteúdo novo
+            Contar();
             Aviso(texto, erro: resumo.Total == 0);
         }
         catch (Exception ex)

@@ -85,6 +85,16 @@ public sealed class LimiteMotorRepository
         }
     }
 
+    /// <summary>Apaga todos os limites e marca os de fábrica como já carregados.</summary>
+    public void Limpar()
+    {
+        _store.Clear(Entidade);
+
+        foreach (var l in LimitesSeed.Lista())
+            _store.WriteRow(EntidadeSemeados,
+                new KeyValuePair<string, object?>[] { new("id", l.Id) });
+    }
+
     private static string S(System.Data.IDataReader r, int i) => r.IsDBNull(i) ? "" : r.GetString(i);
 }
 

@@ -224,6 +224,29 @@ public sealed class EquipamentoRepository
         }
     }
 
+    /// <summary>
+    /// Apaga TODAS as combinações e deixa a tabela de fábrica marcada como já
+    /// carregada — sem isso, a próxima abertura traria tudo de volta e a
+    /// limpeza não teria servido para nada. É o que a equipe usa para subir a
+    /// tabela dela no lugar da nossa.
+    /// </summary>
+    public void Limpar()
+    {
+        _store.Clear(Entidade);
+
+        foreach (var bloco in EquipamentosSeed.Todas()
+                     .Select(e => e.Serie + "|" + e.Cubo).Distinct())
+        {
+            _store.WriteRow(EntidadeBlocos,
+                new KeyValuePair<string, object?>[] { new("id", bloco) });
+        }
+
+        // as correções de rótulo e os blocos refeitos não têm mais o que corrigir
+        foreach (var (id, _, _) in BlocosRefeitos)
+            _store.WriteRow(EntidadeMigracoes,
+                new KeyValuePair<string, object?>[] { new("id", id) });
+    }
+
     private static string S(System.Data.IDataReader r, int i) => r.IsDBNull(i) ? "" : r.GetString(i);
 
     private static int Int(string s) => int.TryParse(s, out var v) ? v : 0;

@@ -53,6 +53,8 @@ public sealed class CaracteristicaRepository
     private const string Entidade = "caracteristicas";
     private const string EntidadeGrupos = "caracteristica_grupos";
     private const string EntidadeSemeados = "caracteristica_grupos_semeados";
+    /// <summary>Id reservado, dentro das marcas, para "as listas já foram criadas".</summary>
+    private const string MarcaDasListas = "(listas)";
 
     private readonly ParquetStore _store;
     public CaracteristicaRepository(ParquetStore store) => _store = store;
@@ -161,9 +163,13 @@ public sealed class CaracteristicaRepository
     /// </summary>
     public void SemearSeVazio()
     {
-        // 1) as listas. Bancos anteriores guardavam o grupo só dentro dos
-        //    subitens — então qualquer grupo que já exista lá também vira lista.
-        if (Grupos().Count == 0)
+        // 1) as listas, uma única vez. A marca (e não "está vazio, então
+        //    carrega") é o que permite apagar todas as listas e subir as suas.
+        var listasSemeadas = _store
+            .ReadLatest(EntidadeSemeados, "id", r => r.IsDBNull(0) ? "" : r.GetString(0))
+            .Contains(MarcaDasListas);
+
+        if (!listasSemeadas && Grupos().Count == 0)
         {
             var nomes = CaracteristicasSeed.Grupos.ToList();
             foreach (var g in Todas().Select(c => c.Grupo).Distinct())
@@ -172,6 +178,10 @@ public sealed class CaracteristicaRepository
             for (var i = 0; i < nomes.Count; i++)
                 SalvarGrupo(new GrupoCaracteristica { Nome = nomes[i], Ordem = i + 1 });
         }
+
+        if (!listasSemeadas)
+            _store.WriteRow(EntidadeSemeados,
+                new KeyValuePair<string, object?>[] { new("id", MarcaDasListas) });
 
         // 2) os subitens de fábrica das listas que ainda não foram semeadas.
         //    A marca por lista é o que permite ter uma lista de fábrica VAZIA:
@@ -192,6 +202,23 @@ public sealed class CaracteristicaRepository
             _store.WriteRow(EntidadeSemeados,
                 new KeyValuePair<string, object?>[] { new("id", lista.Key) });
         }
+    }
+
+    /// <summary>
+    /// Apaga as listas e todos os subitens, e marca os de fábrica como já
+    /// carregados — para a limpeza sobreviver à próxima abertura.
+    /// </summary>
+    public void Limpar()
+    {
+        _store.Clear(Entidade);
+        _store.Clear(EntidadeGrupos);
+
+        _store.WriteRow(EntidadeSemeados,
+            new KeyValuePair<string, object?>[] { new("id", MarcaDasListas) });
+
+        foreach (var grupo in CaracteristicasSeed.Grupos)
+            _store.WriteRow(EntidadeSemeados,
+                new KeyValuePair<string, object?>[] { new("id", grupo) });
     }
 
     private static string S(System.Data.IDataReader r, int i) => r.IsDBNull(i) ? "" : r.GetString(i);

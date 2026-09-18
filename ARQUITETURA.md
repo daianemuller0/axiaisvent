@@ -500,12 +500,27 @@ está no banco, então carrega"*, a abertura seguinte trazia o bloco de volta e 
 que a equipe tinha feito — o mesmo valia para um limite de motor apagado e para uma lista
 de característica esvaziada.
 
-Agora cada bloco, cada limite e cada lista de característica de fábrica carrega uma
-**marca de já semeado**, gravada numa entidade à parte (`equipamentos_blocos`,
-`limites_motor_semeados`, `caracteristica_grupos_semeados`). Cada um entra uma única vez,
-para sempre. Num banco anterior a esta marcação o que já está lá é apenas marcado, sem
-regravar nada — e é isso que permite, por exemplo, ter uma lista de fábrica vazia de
-propósito.
+Agora cada bloco, cada limite, a escada de frames e cada lista de característica de
+fábrica carregam uma **marca de já semeado**, gravada numa entidade à parte
+(`equipamentos_blocos`, `limites_motor_semeados`, `frames_semeados`,
+`caracteristica_grupos_semeados`). Cada um entra uma única vez, para sempre. Num banco
+anterior a esta marcação o que já está lá é apenas marcado, sem regravar nada — e é isso
+que permite, por exemplo, ter uma lista de fábrica vazia de propósito.
+
+### Limpar para subir a tabela da equipe
+
+A aba Dados tem um **Limpar** com três caixas — Modelos, Motores e Características —, cada
+uma mostrando quantos registros vai apagar, e uma confirmação em dois passos. É o caminho
+para a equipe trocar a nossa tabela pela dela, digitando ou pela planilha.
+
+Limpar é `Limpar()` no repositório, e ele faz **duas** coisas: esvazia a entidade
+(`ParquetStore.Clear`) **e grava todas as marcas de já semeado**. A segunda parte é a que
+faz a limpeza durar: sem ela, a semeadura da abertura seguinte veria as tabelas vazias e
+recarregaria tudo. Limpar "Modelos" leva junto os ventiladores, os cubos e os limites de
+motor, porque os três descrevem a mesma tabela; a aba Base fica de fora.
+
+Com a tabela vazia, a matriz mostra um convite em vez de uma grade sem linhas nem colunas,
+e o cadastro recomeça pelos campos *novo ventilador* / *novo cubo*.
 
 ### Lendo o preço (`DadosExcel.Numero`)
 
