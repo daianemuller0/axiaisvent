@@ -452,9 +452,18 @@ Hoje é o contrário: `itens_modelo` é a lista mandante, e são as linhas dela 
 **linhas e as colunas da matriz**. É o que permite um ventilador novo, ainda sem nenhuma
 combinação marcada, já aparecer na matriz esperando ser preenchido.
 
+**VAX e Joy ficam na mesma lista**, com a série como uma coluna. Não há mais abas de série:
+as duas linhas de produto aparecem juntas, uma embaixo da outra, e a matriz mostra as duas
+— um cruzamento de séries diferentes (ventilador VAX × cubo Joy) é uma célula apagada, com
+um `·`, que não aceita valor. Como a lista é uma só, a `ordem` passou a ser **única por
+tipo**, não por série; `NormalizarOrdem()` desfaz, uma única vez e sem desfazer trocas da
+equipe, os empates que as duas listas separadas deixaram (havia um ventilador nº 1 no VAX e
+outro no Joy).
+
 | Operação | O que acontece |
 |---|---|
 | **Renomear** | O rótulo muda na lista **e cascateia**: as combinações da matriz e, no caso do cubo, os limites de motor são regravados com o nome novo. A tela diz quantas foram junto. |
+| **Trocar de série** | Mesma cascata, mas atravessando a linha de produto: as combinações só sobrevivem se o par delas também existir na série de destino — as outras são descartadas, e a mensagem diz quantas. |
 | **Incluir** | Entra no fim da lista; a matriz ganha a linha (ou a coluna) vazia na hora. |
 | **Apagar** | Pede confirmação na própria linha (✕ → *Sim*) e leva junto as combinações daquele rótulo e, no cubo, os limites de motor. |
 | **Reordenar** | ↑ ↓ trocam o campo `ordem` com o vizinho. A matriz segue a lista. |
@@ -466,6 +475,21 @@ esquerda (`D4`) porque o Parquet guarda texto: sem isso a 10 viria antes da 2.
 A semeadura (`SemearDaMatriz`) cria só os rótulos que a matriz tem e a lista ainda não —
 é o que traz um banco antigo para cá e o que faz um rótulo novo vindo do Excel aparecer,
 sem encostar no que a equipe já ajustou.
+
+### O que é apagado fica apagado
+
+Apagar um cubo, ou movê-lo de série, esvazia um **bloco** inteiro da tabela de fábrica
+(uma coluna da planilha: série + cubo). Enquanto o critério da semeadura era *"o bloco não
+está no banco, então carrega"*, a abertura seguinte trazia o bloco de volta e desfazia o
+que a equipe tinha feito — o mesmo valia para um limite de motor apagado e para uma lista
+de característica esvaziada.
+
+Agora cada bloco, cada limite e cada lista de característica de fábrica carrega uma
+**marca de já semeado**, gravada numa entidade à parte (`equipamentos_blocos`,
+`limites_motor_semeados`, `caracteristica_grupos_semeados`). Cada um entra uma única vez,
+para sempre. Num banco anterior a esta marcação o que já está lá é apenas marcado, sem
+regravar nada — e é isso que permite, por exemplo, ter uma lista de fábrica vazia de
+propósito.
 
 ### Lendo o preço (`DadosExcel.Numero`)
 
@@ -494,15 +518,16 @@ uma aba, com o mesmo nome nos dois sentidos — o que sai é exatamente o que en
 | Aba | Colunas |
 |---|---|
 | `Modelos` | Série · Ventilador · Cubo · Rotação máx (rpm) |
-| `Ventiladores` | Série · Ordem · Ventilador · Código · Preço |
-| `Cubos` | Série · Ordem · Cubo · Código · Preço |
+| `Ventiladores` | Ordem · Série · Ventilador · Código · Preço |
+| `Cubos` | Ordem · Série · Cubo · Código · Preço |
 | `Limites de motor` | Série · Cubo · Padrão · Frame máximo |
 | `Motores` | Padrão · Ordem · Frame · Código · Preço |
 | `Características` | Item · Ordem · Subitem · Código · Preço |
 
-Nas abas `Ventiladores` e `Cubos` vai a lista mandante, com a coluna `Ordem`: um rótulo
-que não exista ainda **é criado** pela importação, e a ordem da planilha é a ordem que
-fica na tela. É o caminho para subir muitos ventiladores de uma vez.
+Nas abas `Ventiladores` e `Cubos` vai a lista mandante inteira, VAX e Joy juntos, com as
+colunas `Ordem` e `Série`: um rótulo que não exista ainda **é criado** pela importação, a
+série é a da coluna e a ordem da planilha é a ordem que fica na tela. É o caminho para
+subir muitos ventiladores de uma vez.
 
 A importação é sempre **atualizar e acrescentar**: nada é apagado por ausência, aba que
 não vier no arquivo não é tocada, e linha que já existe tem os campos atualizados. É o que

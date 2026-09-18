@@ -35,7 +35,8 @@ sem encostar no que está gravado.
 Uma guia só, com tudo na mesma página:
 
 - **Modelos** — a lista de ventiladores e a de cubos (cada um com código, preço e posição),
-  a relação ventilador × cubo, o alerta de rotação e o motor máximo por cubo.
+  a relação ventilador × cubo, o alerta de rotação e o motor máximo por cubo. **VAX e Joy
+  ficam na mesma lista**, com a série numa coluna — não há abas de linha de produto.
 - **Motores** — os frames IEC e NEMA, na ordem de tamanho, cada um com seu código.
 - **Características** — **itens** (as listas: solidez, base, partidores, instrumentação…)
   e seus **subitens** (as opções), cada subitem com um código. De fábrica são 15 itens e
@@ -51,6 +52,12 @@ todas essas listas dá para **renomear, incluir, apagar e reordenar** (↑ ↓).
 ventilador ou um cubo leva junto as combinações da matriz — e, no cubo, os limites de
 motor —, e apagar pede confirmação na própria linha. A matriz de modelos segue a lista:
 um ventilador recém-criado já aparece nela, vazio, esperando ser marcado.
+
+A **série** (VAX ou Joy) é uma coluna da lista, e pode ser trocada como qualquer outro
+campo: o rótulo muda de linha de produto levando junto o que faz sentido lá. Na matriz, o
+cruzamento de séries diferentes é uma célula apagada — um ventilador VAX não entra num
+cubo Joy. E o que a equipe apaga **fica apagado**: a tabela de fábrica marca o que já
+carregou, então um cubo removido não volta na abertura seguinte.
 
 E há um **Excel do conjunto**: um botão exporta
 tudo o que está na guia (uma aba por tabela) e a importação traz de volta — é como a

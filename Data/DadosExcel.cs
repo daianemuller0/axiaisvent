@@ -50,13 +50,14 @@ public static class DadosExcel
                      (AbaCubos, ItemModelo.TipoCubo, "Cubo"),
                  })
         {
-            Montar(wb, aba, new[] { "Série", titulo, "Ordem", "Código", "Preço" },
+            Montar(wb, aba, new[] { "Ordem", "Série", titulo, "Código", "Preço" },
                 itensModelo
                     .Where(i => i.Tipo == tipo)
-                    .OrderBy(i => i.Serie).ThenBy(i => i.Ordem)
+                    .OrderBy(i => i.Ordem)
+                    .ThenBy(i => ItemModelo.OrdemDaSerie(i.Serie))
                     .Select(i => new object?[]
                     {
-                        i.Serie, i.Rotulo, i.Ordem, i.Codigo, Numero(i.Preco),
+                        i.Ordem, i.Serie, i.Rotulo, i.Codigo, Numero(i.Preco),
                     }));
         }
 
@@ -205,10 +206,9 @@ public static class DadosExcel
             }
 
             var existentes = repo.Todos();
-            var proxima = existentes
-                .Where(i => i.Tipo == tipo)
-                .GroupBy(i => i.Serie)
-                .ToDictionary(g => g.Key, g => g.Max(i => i.Ordem));
+            // uma lista só para as duas séries: a ordem corre no tipo inteiro
+            var proxima = existentes.Where(i => i.Tipo == tipo)
+                .Select(i => i.Ordem).DefaultIfEmpty(0).Max();
 
             foreach (var l in linhas)
             {
@@ -223,11 +223,7 @@ public static class DadosExcel
                 int ordem;
                 if (iOrdem >= 0 && int.TryParse(T(l, iOrdem), out var lida) && lida > 0) ordem = lida;
                 else if (atual is not null) ordem = atual.Ordem;
-                else
-                {
-                    ordem = proxima.TryGetValue(serie, out var ultima) ? ultima + 1 : 1;
-                    proxima[serie] = ordem;
-                }
+                else ordem = ++proxima;
 
                 repo.Salvar(new ItemModelo
                 {

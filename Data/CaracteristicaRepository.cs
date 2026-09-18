@@ -52,6 +52,7 @@ public sealed class CaracteristicaRepository
 {
     private const string Entidade = "caracteristicas";
     private const string EntidadeGrupos = "caracteristica_grupos";
+    private const string EntidadeSemeados = "caracteristica_grupos_semeados";
 
     private readonly ParquetStore _store;
     public CaracteristicaRepository(ParquetStore store) => _store = store;
@@ -172,12 +173,24 @@ public sealed class CaracteristicaRepository
                 SalvarGrupo(new GrupoCaracteristica { Nome = nomes[i], Ordem = i + 1 });
         }
 
-        // 2) os subitens de fábrica das listas que ainda estão vazias
+        // 2) os subitens de fábrica das listas que ainda não foram semeadas.
+        //    A marca por lista é o que permite ter uma lista de fábrica VAZIA:
+        //    sem ela, apagar o último subitem faria a abertura seguinte trazer
+        //    os de fábrica de volta.
+        var jaSemeadas = _store
+            .ReadLatest(EntidadeSemeados, "id", r => r.IsDBNull(0) ? "" : r.GetString(0))
+            .ToHashSet();
         var comSubitens = Todas().Select(c => c.Grupo).ToHashSet();
-        foreach (var c in CaracteristicasSeed.Lista())
+
+        foreach (var lista in CaracteristicasSeed.Lista().GroupBy(c => c.Grupo))
         {
-            if (comSubitens.Contains(c.Grupo)) continue;
-            Salvar(c);
+            if (jaSemeadas.Contains(lista.Key)) continue;
+
+            if (!comSubitens.Contains(lista.Key))
+                foreach (var c in lista) Salvar(c);
+
+            _store.WriteRow(EntidadeSemeados,
+                new KeyValuePair<string, object?>[] { new("id", lista.Key) });
         }
     }
 

@@ -29,6 +29,7 @@ public sealed class LimiteMotor
 public sealed class LimiteMotorRepository
 {
     private const string Entidade = "limites_motor";
+    private const string EntidadeSemeados = "limites_motor_semeados";
 
     private readonly ParquetStore _store;
     public LimiteMotorRepository(ParquetStore store) => _store = store;
@@ -58,13 +59,29 @@ public sealed class LimiteMotorRepository
     /// ideia da semeadura por bloco dos equipamentos: o que a equipe ajustar
     /// à mão não é sobrescrito, e um limite novo entra sem tocar nos outros.
     /// </summary>
+    /// <summary>
+    /// Carrega os limites de fábrica que ainda não entraram neste banco, cada um
+    /// <b>uma única vez</b> — a marca de que já entrou fica gravada.
+    ///
+    /// Sem a marca, o critério seria "não está no banco, então carrega", e aí
+    /// apagar um limite (ou mudar o cubo de série, que move os limites junto)
+    /// faria a abertura seguinte trazê-lo de volta.
+    /// </summary>
     public void SemearSeVazio()
     {
+        var jaSemeados = _store
+            .ReadLatest(EntidadeSemeados, "id", r => r.IsDBNull(0) ? "" : r.GetString(0))
+            .ToHashSet();
+
         var existentes = Todos().Select(l => l.Id).ToHashSet();
+
         foreach (var l in LimitesSeed.Lista())
         {
-            if (existentes.Contains(l.Id)) continue;
-            Salvar(l);
+            if (jaSemeados.Contains(l.Id)) continue;
+            if (!existentes.Contains(l.Id)) Salvar(l);
+
+            _store.WriteRow(EntidadeSemeados,
+                new KeyValuePair<string, object?>[] { new("id", l.Id) });
         }
     }
 

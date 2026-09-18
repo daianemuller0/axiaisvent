@@ -76,6 +76,7 @@ public sealed class EquipamentoRepository
     private const string Entidade = "equipamentos";
     /// <summary>Marcas das correções já aplicadas, para não repetirem.</summary>
     private const string EntidadeMigracoes = "equipamentos_migracoes";
+    private const string EntidadeBlocos = "equipamentos_blocos";
 
     private readonly ParquetStore _store;
     public EquipamentoRepository(ParquetStore store) => _store = store;
@@ -105,17 +106,6 @@ public sealed class EquipamentoRepository
     public void Apagar(string id) => _store.WriteRow(Entidade,
         new KeyValuePair<string, object?>[] { new("id", id) }, deleted: true);
 
-    /// <summary>
-    /// Carrega a tabela de fábrica dos BLOCOS que ainda não existem no banco —
-    /// um bloco é uma coluna da planilha (série + cubo).
-    ///
-    /// Essa granularidade é de propósito: as tabelas chegam aos poucos, um bloco
-    /// de cubo por vez. Semeando por bloco, um cubo novo entra num banco que já
-    /// tem os outros sem encostar no que está gravado — nem na linha inteira,
-    /// nem nos ajustes que a equipe já tenha feito à mão nos blocos antigos.
-    /// (Apagar uma combinação isolada não a traz de volta; só apagar o bloco
-    /// inteiro faria o bloco ser recarregado na próxima abertura.)
-    /// </summary>
     /// <summary>
     /// Rótulos de cubo lidos errado numa transcrição e corrigidos depois.
     /// O rótulo faz parte do id, então renomear é apagar e regravar — sem isso
@@ -180,19 +170,46 @@ public sealed class EquipamentoRepository
         }
     }
 
+    /// <summary>
+    /// Carrega a tabela de fábrica dos BLOCOS que ainda não entraram neste banco
+    /// — um bloco é uma coluna da planilha (série + cubo).
+    ///
+    /// Essa granularidade é de propósito: as tabelas chegam aos poucos, um bloco
+    /// de cubo por vez. Semeando por bloco, um cubo novo entra num banco que já
+    /// tem os outros sem encostar no que está gravado.
+    ///
+    /// Cada bloco é semeado <b>uma única vez</b>, e a marca disso fica gravada.
+    /// Antes o critério era "o bloco não está no banco, então carrega" — e aí
+    /// apagar um cubo, ou mudá-lo de série, esvaziava o bloco e a abertura
+    /// seguinte o trazia de volta, desfazendo o que a equipe tinha feito. Com a
+    /// marca, o que foi apagado fica apagado.
+    ///
+    /// Num banco anterior a esta marcação os blocos que já estão lá são apenas
+    /// marcados, sem regravar nada.
+    /// </summary>
     public void SemearSeVazio()
     {
         CorrigirRotulos();
         RefazerBlocos();
 
+        var jaSemeados = _store
+            .ReadLatest(EntidadeBlocos, "id", r => r.IsDBNull(0) ? "" : r.GetString(0))
+            .ToHashSet();
+
         var blocosExistentes = Todos()
             .Select(e => (e.Serie, e.Cubo))
             .ToHashSet();
 
-        foreach (var e in EquipamentosSeed.Todas())
+        foreach (var bloco in EquipamentosSeed.Todas().GroupBy(e => (e.Serie, e.Cubo)))
         {
-            if (blocosExistentes.Contains((e.Serie, e.Cubo))) continue;
-            Salvar(e);
+            var marca = bloco.Key.Serie + "|" + bloco.Key.Cubo;
+            if (jaSemeados.Contains(marca)) continue;
+
+            if (!blocosExistentes.Contains(bloco.Key))
+                foreach (var e in bloco) Salvar(e);
+
+            _store.WriteRow(EntidadeBlocos,
+                new KeyValuePair<string, object?>[] { new("id", marca) });
         }
     }
 

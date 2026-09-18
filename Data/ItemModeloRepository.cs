@@ -10,15 +10,25 @@ namespace HowdenAxiais.Poc.Data;
 /// guardar nada disso.
 ///
 /// Quem manda na ORDEM é o campo <see cref="Ordem"/>, não o valor numérico do
-/// rótulo: um ventilador novo pode entrar em qualquer lugar da sequência.
+/// rótulo: um ventilador novo pode entrar em qualquer lugar da sequência. A
+/// ordem é <b>única por tipo</b>, não por série — VAX e Joy convivem na mesma
+/// lista, cada linha dizendo na coluna <see cref="Serie"/> de qual linha de
+/// produto ela é.
 /// </summary>
 public sealed class ItemModelo
 {
     public const string TipoVentilador = "Ventilador";
     public const string TipoCubo = "Cubo";
 
+    /// <summary>As linhas de produto conhecidas, na ordem em que aparecem.</summary>
+    public static readonly string[] Series = { "VAX", "Joy" };
+
+    /// <summary>Posição da série na ordem preferida; desconhecida vai para o fim.</summary>
+    public static int OrdemDaSerie(string serie) =>
+        Array.IndexOf(Series, serie) is var i && i >= 0 ? i : Series.Length;
+
     public string Id { get; set; } = "";
-    /// <summary>Linha de equipamento: VAX ou Joy.</summary>
+    /// <summary>Linha de equipamento: VAX ou Joy. É a coluna da lista.</summary>
     public string Serie { get; set; } = "";
     /// <summary><see cref="TipoVentilador"/> ou <see cref="TipoCubo"/>.</summary>
     public string Tipo { get; set; } = "";
@@ -52,12 +62,21 @@ public sealed class ItemModeloRepository
             Id = S(r, 0), Serie = S(r, 1), Tipo = S(r, 2), Rotulo = S(r, 3),
             Codigo = S(r, 4), Preco = S(r, 5), Ordem = Int(S(r, 6)),
         })
-        .OrderBy(i => i.Serie).ThenBy(i => i.Tipo).ThenBy(i => i.Ordem)
+        .OrderBy(i => i.Tipo)
+        .ThenBy(i => i.Ordem)
+        .ThenBy(i => ItemModelo.OrdemDaSerie(i.Serie))
         .ToList();
 
-    /// <summary>Os ventiladores (ou cubos) de uma série, na ordem gravada.</summary>
+    /// <summary>
+    /// Todos os ventiladores (ou todos os cubos), das duas séries, na ordem
+    /// gravada — é esta a lista que a tela mostra.
+    /// </summary>
+    public List<ItemModelo> Lista(string tipo) =>
+        Todos().Where(i => i.Tipo == tipo).ToList();
+
+    /// <summary>Os ventiladores (ou cubos) de uma série só, na ordem gravada.</summary>
     public List<ItemModelo> Lista(string serie, string tipo) =>
-        Todos().Where(i => i.Serie == serie && i.Tipo == tipo).ToList();
+        Lista(tipo).Where(i => i.Serie == serie).ToList();
 
     public void Salvar(ItemModelo i)
     {
@@ -84,7 +103,10 @@ public sealed class ItemModeloRepository
     {
         var existentes = Todos();
 
-        foreach (var serie in equipamentos.Select(e => e.Serie).Distinct())
+        // na ordem preferida das séries: é ela que decide quem entra primeiro na
+        // lista única quando o banco nasce do zero
+        foreach (var serie in equipamentos.Select(e => e.Serie).Distinct()
+                     .OrderBy(ItemModelo.OrdemDaSerie).ThenBy(s => s))
         {
             foreach (var (tipo, rotulos) in new[]
                      {
@@ -104,19 +126,56 @@ public sealed class ItemModeloRepository
                     .ToList();
                 if (faltando.Count == 0) continue;
 
+                // a ordem é única no tipo inteiro (as duas séries na mesma lista),
+                // por isso o próximo número olha todos os itens daquele tipo
                 var proxima = existentes
-                    .Where(i => i.Serie == serie && i.Tipo == tipo)
+                    .Where(i => i.Tipo == tipo)
                     .Select(i => i.Ordem)
                     .DefaultIfEmpty(0)
                     .Max();
 
                 foreach (var rotulo in faltando)
                 {
-                    Salvar(new ItemModelo
+                    var novo = new ItemModelo
                     {
                         Serie = serie, Tipo = tipo, Rotulo = rotulo, Ordem = ++proxima,
-                    });
+                    };
+                    Salvar(novo);
+                    existentes.Add(novo);
                 }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Deixa a ordem de cada tipo numa sequência 1..n <b>sem repetição</b>.
+    ///
+    /// Enquanto VAX e Joy eram duas listas separadas, a ordem era contada dentro
+    /// de cada série — havia um ventilador nº 1 no VAX e outro no Joy. Juntando
+    /// tudo numa lista só esses empates teriam que ser desempatados na hora de
+    /// mostrar, e o ↑ ↓ ficaria imprevisível. Esta passagem os desfaz uma única
+    /// vez: o critério de desempate é a série (VAX antes de Joy), que é como as
+    /// duas listas apareciam antes.
+    ///
+    /// É idempotente: depois da primeira vez a ordem já é única, nada é regravado
+    /// e nenhuma troca feita pela equipe é desfeita.
+    /// </summary>
+    public void NormalizarOrdem()
+    {
+        foreach (var grupo in Todos().GroupBy(i => i.Tipo))
+        {
+            var fila = grupo
+                .OrderBy(i => i.Ordem)
+                .ThenBy(i => ItemModelo.OrdemDaSerie(i.Serie))
+                .ThenBy(i => Medida.Numero(i.Rotulo))
+                .ThenBy(i => i.Rotulo)
+                .ToList();
+
+            for (var posicao = 0; posicao < fila.Count; posicao++)
+            {
+                if (fila[posicao].Ordem == posicao + 1) continue;
+                fila[posicao].Ordem = posicao + 1;
+                Salvar(fila[posicao]);
             }
         }
     }
