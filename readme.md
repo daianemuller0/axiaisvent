@@ -66,9 +66,10 @@ equipe apaga **fica apagado**: a tabela de fábrica marca o que já carregou, en
 removido não volta na abertura seguinte.
 
 **Cada lista tem o seu 🗑 Limpar**, na barra dela, com a contagem e a confirmação no
-lugar: ventiladores, cubos, combinações da matriz, limites de motor, frames (só o padrão
-aberto, ou tudo) e cada item de característica — esse esvazia os subitens e deixa a lista
-de pé para receber os seus. No alto da aba ainda há o Limpar em atacado, com uma caixa para
+lugar: ventiladores, cubos, combinações da matriz, a lista cruzada de equipamentos, limites
+de motor, frames (só o padrão aberto, ou tudo) e cada item de característica — esse esvazia
+os subitens e deixa a lista de pé para receber os seus. Na lista cruzada o Limpar respeita
+o filtro: com algo escrito nele, apaga só as linhas que estão à vista. No alto da aba ainda há o Limpar em atacado, com uma caixa para
 Modelos, Motores e Características.
 
 Em qualquer um deles a limpeza **fica gravada**: o que foi apagado não volta na abertura

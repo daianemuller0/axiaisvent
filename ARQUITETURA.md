@@ -510,9 +510,13 @@ que permite, por exemplo, ter uma lista de fábrica vazia de propósito.
 ### Limpar para subir a tabela da equipe
 
 **Cada lista tem o seu 🗑 Limpar**, na própria barra, com a contagem e a confirmação ali
-mesmo: ventiladores, cubos, combinações da matriz, limites de motor, frames (a aba ativa —
-IEC, NEMA ou tudo) e cada item de característica (esvazia os subitens e deixa a lista de
-pé). No alto da aba Dados fica o **Limpar** em atacado, com três caixas — Modelos, Motores
+mesmo: ventiladores, cubos, combinações da matriz, a lista cruzada de equipamentos, limites
+de motor, frames (a aba ativa — IEC, NEMA ou tudo) e cada item de característica (esvazia os
+subitens e deixa a lista de pé).
+
+Onde há um recorte na tela, o Limpar o respeita: nos frames é a aba de padrão; na lista
+cruzada é o campo de filtro — com algo escrito nele, apaga só as linhas mostradas, o que
+permite tirar uma série inteira, ou um cubo, sem encostar no resto. No alto da aba Dados fica o **Limpar** em atacado, com três caixas — Modelos, Motores
 e Características — para quando é tudo de uma vez.
 
 Limpar o cadastro de ventiladores (ou o de cubos) **leva as combinações junto**, e isso não

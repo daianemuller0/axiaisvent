@@ -260,6 +260,7 @@ else
     <span style="flex:1"></span>
     <input class="cell" style="width:190px" placeholder="filtrar…" value="@_filtro"
            @oninput="e => _filtro = e.Value?.ToString() ?? string.Empty" />
+    @Limpeza(AlvoListaCruzada)
 </div>
 
 <div class="panel" style="padding:0; overflow-x:auto">
@@ -554,6 +555,19 @@ else
         "combinacoes", () => _todos.Count,
         "combinação(ões) da matriz — o cadastro de ventiladores e de cubos fica de pé",
         () => Repo.Limpar());
+
+    /// <summary>
+    /// Limpar a lista cruzada é limpar as combinações — são a mesma coisa. Com
+    /// um filtro escrito, apaga só o que ele está mostrando: é o que permite
+    /// tirar uma série, ou um cubo, sem mexer no resto.
+    /// </summary>
+    private Alvo AlvoListaCruzada => _filtro.Trim().Length == 0
+        ? new("lista", () => _todos.Count,
+            "combinação(ões) — a lista inteira; o cadastro de ventiladores e de cubos fica de pé",
+            () => Repo.Limpar())
+        : new("lista", () => Combinacoes().Count,
+            $"combinação(ões) — só as que o filtro \"{_filtro.Trim()}\" está mostrando",
+            () => { foreach (var e in Combinacoes()) Repo.Apagar(e.Id); });
 
     private Alvo AlvoLimites => new(
         "limites", () => _limites.Count,
