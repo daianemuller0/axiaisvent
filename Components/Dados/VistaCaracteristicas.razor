@@ -7,37 +7,6 @@
     do equipamento, e é por isso que a ordem dos itens e dos subitens importa.
 </p>
 
-<!-- ---------- subir em massa ---------- -->
-<div class="panel" style="margin-bottom:16px">
-    <div class="toolbar" style="margin-bottom:0; flex-wrap:wrap">
-        <strong>Subir em massa</strong>
-        <InputFile OnChange="Importar" accept=".xlsx,.xlsm,.csv,.txt" class="cell" />
-
-        <label style="display:flex; align-items:center; gap:6px">
-            <input type="radio" name="modoImp" checked="@(_modo == Modo.Atualizar)"
-                   @onchange="@(() => _modo = Modo.Atualizar)" />
-            <span>atualizar e acrescentar</span>
-        </label>
-        <label style="display:flex; align-items:center; gap:6px">
-            <input type="radio" name="modoImp" checked="@(_modo == Modo.Substituir)"
-                   @onchange="@(() => _modo = Modo.Substituir)" />
-            <span>substituir as listas</span>
-        </label>
-
-        @if (_lendo)
-        {
-            <span class="saved-flag">lendo o arquivo…</span>
-        }
-    </div>
-    <p class="subtitle" style="margin:10px 0 0">
-        Arquivo <strong>.xlsx</strong>, <strong>.xlsm</strong> ou <strong>.csv</strong> com as
-        colunas <strong>Grupo</strong>, <strong>Valor</strong> e <strong>Código</strong>
-        (código opcional). Em <em>atualizar e acrescentar</em>, item que já existe tem só o
-        código atualizado e item novo entra no fim do grupo — é o modo de subir os códigos
-        depois, sem refazer as listas.
-    </p>
-</div>
-
 @if (_msg is not null)
 {
     <div class="@(_erro ? "aviso aviso-erro" : "aviso aviso-ok")" style="margin-bottom:14px">@_msg</div>
@@ -98,7 +67,9 @@
 
 <div class="toolbar" style="flex-wrap:wrap">
     <span class="subtitle" style="margin:0">
-        @_grupos.Count item(ns) · @_todas.Count subitem(ns) · @_todas.Count(c => c.Codigo.Length > 0) com código
+        @_grupos.Count item(ns) · @_todas.Count subitem(ns) ·
+        @_todas.Count(c => c.Codigo.Length > 0) com código ·
+        @_todas.Count(c => c.Preco.Length > 0) com preço
     </span>
     <span style="flex:1"></span>
     <input class="cell" style="min-width:240px" placeholder="Procurar valor ou código…"
@@ -149,6 +120,7 @@
                     <th class="nowrap" style="width:70px">Ordem</th>
                     <th class="nowrap">Valor</th>
                     <th class="nowrap" style="width:160px">Código</th>
+                    <th class="nowrap" style="width:160px">Preço</th>
                     <th class="nowrap" style="width:130px"></th>
                 </tr>
             </thead>
@@ -166,6 +138,11 @@
                             <input class="cell" style="max-width:140px" value="@item.Codigo" placeholder="—"
                                    @onchange="e => DefinirCodigo(item, e.Value?.ToString() ?? string.Empty)" />
                         </td>
+                        <td>
+                            <input class="cell" style="max-width:140px; text-align:right" value="@item.Preco"
+                                   placeholder="—"
+                                   @onchange="e => DefinirPreco(item, e.Value?.ToString() ?? string.Empty)" />
+                        </td>
                         <td class="nowrap center">
                             <button class="btn-link" title="Subir" @onclick="() => Mover(item, -1)">↑</button>
                             <button class="btn-link" title="Descer" @onclick="() => Mover(item, 1)">↓</button>
@@ -179,18 +156,12 @@
 }
 
 @code {
-    private enum Modo { Atualizar, Substituir }
-
-    private const long TamanhoMaximo = 20L * 1024 * 1024;
-
     private List<Caracteristica> _todas = new();
     private List<string> _grupos = new();
 
-    private Modo _modo = Modo.Atualizar;
     private string _busca = "";
     /// <summary>Lista em foco; vazio mostra todas.</summary>
     private string _grupoFiltro = "";
-    private bool _lendo;
 
     private string _novoItem = "";
     private string _novoGrupo = "";
@@ -239,122 +210,6 @@
     /// <summary>O número na tela é a posição na lista, não o campo Ordem gravado.</summary>
     private int Posicao(Caracteristica item) =>
         DoGrupo(item.Grupo).FindIndex(c => c.Id == item.Id) + 1;
-
-    // ---------- importação ----------
-
-    private async Task Importar(InputFileChangeEventArgs e)
-    {
-        var arquivo = e.File;
-        _msg = null;
-        _erro = false;
-
-        if (!PlanilhaIO.ExtensaoAceita(arquivo.Name))
-        {
-            Aviso($"\"{arquivo.Name}\" não é um arquivo aceito. Use .xlsx, .xlsm ou .csv.", erro: true);
-            return;
-        }
-
-        _lendo = true;
-        try
-        {
-            using var memoria = new MemoryStream();
-            await arquivo.OpenReadStream(TamanhoMaximo).CopyToAsync(memoria);
-            memoria.Position = 0;
-
-            var lido = PlanilhaIO.Ler(memoria, arquivo.Name);
-
-            var iGrupo = Coluna(lido.Colunas, "grupo", "lista");
-            var iValor = Coluna(lido.Colunas, "valor", "item", "descrição", "descricao");
-            var iCodigo = Coluna(lido.Colunas, "código", "codigo", "cod");
-
-            if (iGrupo < 0 || iValor < 0)
-            {
-                Aviso("O arquivo precisa ter as colunas \"Grupo\" e \"Valor\" no cabeçalho. " +
-                      $"Encontrei: {string.Join(", ", lido.Colunas)}.", erro: true);
-                return;
-            }
-
-            if (_modo == Modo.Substituir)
-            {
-                // apaga os subitens; os itens (as listas) continuam, para não
-                // perder a ordem deles nem itens que a equipe tenha criado
-                foreach (var atual in _todas) Repo.Apagar(atual.Id);
-                _todas = new List<Caracteristica>();
-            }
-
-            int novos = 0, atualizados = 0, ignorados = 0;
-            var porGrupo = _todas.GroupBy(c => c.Grupo)
-                .ToDictionary(g => g.Key, g => g.Max(c => c.Ordem));
-
-            foreach (var linha in lido.Linhas)
-            {
-                var grupo = linha.Valor(iGrupo).Trim();
-                var valor = linha.Valor(iValor).Trim();
-                var codigo = iCodigo >= 0 ? linha.Valor(iCodigo).Trim() : "";
-
-                if (grupo.Length == 0 || valor.Length == 0) { ignorados++; continue; }
-
-                var existente = _todas.FirstOrDefault(c =>
-                    c.Grupo == grupo && c.Valor.Equals(valor, StringComparison.OrdinalIgnoreCase));
-
-                if (existente is not null)
-                {
-                    // já existe: a importação só traz o código (é o caso de subir
-                    // os códigos depois, sem refazer as listas)
-                    if (codigo.Length > 0 && codigo != existente.Codigo)
-                    {
-                        existente.Codigo = codigo;
-                        Repo.Salvar(existente);
-                        atualizados++;
-                    }
-                    continue;
-                }
-
-                // item que ainda não existe é criado pela própria importação
-                Repo.GarantirGrupo(grupo);
-
-                var ordem = porGrupo.TryGetValue(grupo, out var ultima) ? ultima + 1 : 1;
-                porGrupo[grupo] = ordem;
-
-                var novo = new Caracteristica
-                {
-                    Grupo = grupo, Valor = valor, Codigo = codigo, Ordem = ordem,
-                };
-                Repo.Salvar(novo);
-                _todas.Add(novo);
-                novos++;
-            }
-
-            Recarregar();
-            if (!_grupos.Contains(_novoGrupo)) _novoGrupo = _grupos.FirstOrDefault() ?? "";
-            if (_grupoFiltro.Length > 0 && !_grupos.Contains(_grupoFiltro)) _grupoFiltro = "";
-
-            var resumo = $"\"{arquivo.Name}\": {novos} item(ns) novo(s), {atualizados} código(s) atualizado(s)";
-            if (ignorados > 0) resumo += $", {ignorados} linha(s) ignorada(s) por falta de grupo ou valor";
-            Aviso(resumo + ".");
-        }
-        catch (Exception ex)
-        {
-            Aviso("Não consegui ler o arquivo: " + ex.Message, erro: true);
-        }
-        finally
-        {
-            _lendo = false;
-        }
-    }
-
-    /// <summary>Acha a coluna pelo cabeçalho, aceitando alguns sinônimos.</summary>
-    private static int Coluna(List<string> colunas, params string[] nomes)
-    {
-        for (var i = 0; i < colunas.Count; i++)
-        {
-            var c = colunas[i].Trim();
-            if (nomes.Any(n => c.Equals(n, StringComparison.OrdinalIgnoreCase))) return i;
-        }
-        return -1;
-    }
-
-    // ---------- edição ----------
 
     // ---------- itens (as listas) ----------
 
@@ -484,7 +339,8 @@
         Repo.Apagar(item.Id);
         Repo.Salvar(new Caracteristica
         {
-            Grupo = item.Grupo, Valor = valor, Codigo = item.Codigo, Ordem = item.Ordem,
+            Grupo = item.Grupo, Valor = valor, Codigo = item.Codigo,
+            Preco = item.Preco, Ordem = item.Ordem,
         });
 
         Recarregar();
@@ -502,6 +358,26 @@
         Aviso(codigo.Length == 0
             ? $"Código de \"{item.Valor}\" apagado."
             : $"\"{item.Valor}\": código {codigo}.");
+    }
+
+    private void DefinirPreco(Caracteristica item, string texto)
+    {
+        var preco = texto.Trim();
+        if (preco == item.Preco) return;
+
+        if (preco.Length > 0 && DadosExcel.Numero(preco) is null)
+        {
+            Aviso($"\"{preco}\" não parece um preço. Use 1234,56 ou 1234.56.", erro: true);
+            Recarregar();
+            return;
+        }
+
+        item.Preco = preco;
+        Repo.Salvar(item);
+        Recarregar();
+        Aviso(preco.Length == 0
+            ? $"Preço de \"{item.Valor}\" apagado."
+            : $"\"{item.Valor}\": preço {preco}.");
     }
 
     private void Apagar(Caracteristica item)

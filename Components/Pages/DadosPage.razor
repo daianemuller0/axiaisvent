@@ -3,58 +3,140 @@
 @page "/axiais/caracteristicas"
 @attribute [Authorize]
 @rendermode InteractiveServer
-@inject NavigationManager Nav
+@inject EquipamentoRepository Equipamentos
+@inject LimiteMotorRepository Limites
+@inject FrameRepository Frames
+@inject CaracteristicaRepository Caracteristicas
+@inject IJSRuntime JS
 
 <div class="page-head">
     <div>
         <h1>Dados</h1>
+        <p class="subtitle">
+            Modelos, motores e características — tudo numa guia só. O Excel leva e traz de
+            volta o conteúdo inteiro desta página.
+        </p>
+    </div>
+    <div class="page-actions">
+        <button class="btn-ghost" @onclick="Exportar">⬇ Exportar Excel</button>
     </div>
 </div>
 
-<div class="views">
-    @foreach (var v in Vistas)
+<div class="panel" style="margin-bottom:18px">
+    <div class="toolbar" style="margin-bottom:0; flex-wrap:wrap">
+        <strong>Importar Excel</strong>
+        <InputFile OnChange="Importar" accept=".xlsx,.xlsm" class="cell" />
+        @if (_lendo)
+        {
+            <span class="saved-flag">lendo o arquivo…</span>
+        }
+        <span class="subtitle" style="margin:0">
+            o mesmo arquivo que o botão <em>Exportar Excel</em> gera
+        </span>
+    </div>
+
+    @if (_msg is not null)
     {
-        var vista = v;
-        <button class="view @(vista.Chave == _vista ? "active" : "")"
-                @onclick="() => _vista = vista.Chave">@vista.Titulo</button>
+        <div class="@(_erro ? "aviso aviso-erro" : "aviso aviso-ok")" style="margin-top:12px">@_msg</div>
     }
+
+    <p class="subtitle" style="margin:10px 0 0">
+        Uma aba por tabela: <strong>Modelos</strong>, <strong>Limites de motor</strong>,
+        <strong>Motores</strong> e <strong>Características</strong>. A importação sempre
+        <em>atualiza e acrescenta</em> — nada é apagado por ausência, e aba que não vier no
+        arquivo não é tocada. Também aceita uma planilha de uma aba só com Item/Subitem
+        (ou Grupo/Valor) e Código.
+    </p>
 </div>
 
-@switch (_vista)
-{
-    case "motores":
-        <VistaMotores />
-        break;
-    case "caracteristicas":
-        <VistaCaracteristicas />
-        break;
-    default:
-        <VistaModelos />
-        break;
-}
+<!-- ---------------- modelos ---------------- -->
+<h2 style="margin:28px 0 4px">Modelos</h2>
+<VistaModelos @key="@("modelos-" + _versao)" />
+
+<!-- ---------------- motores ---------------- -->
+<h2 style="margin:34px 0 4px">Motores</h2>
+<VistaMotores @key="@("motores-" + _versao)" />
+
+<!-- ---------------- características ---------------- -->
+<h2 style="margin:34px 0 4px">Características</h2>
+<VistaCaracteristicas @key="@("caract-" + _versao)" />
 
 @code {
-    private static readonly (string Chave, string Titulo)[] Vistas =
-    {
-        ("modelos", "Modelos"),
-        ("motores", "Motores"),
-        ("caracteristicas", "Características"),
-    };
-
-    private string _vista = "modelos";
+    private const long TamanhoMaximo = 30L * 1024 * 1024;
 
     /// <summary>
-    /// As três listas moram na MESMA aba, como a equipe pediu. As rotas antigas
-    /// (/axiais/motores) continuam valendo e abrem direto na vista certa.
+    /// Muda depois de uma importação: como as vistas levam esta versão na @key,
+    /// trocá-la recria as três e cada uma relê o que gravou.
     /// </summary>
-    protected override void OnInitialized()
+    private int _versao;
+
+    private bool _lendo;
+    private string? _msg;
+    private bool _erro;
+
+    private async Task Exportar()
     {
-        var caminho = new Uri(Nav.Uri).AbsolutePath.TrimEnd('/');
-        _vista = caminho switch
+        var bytes = DadosExcel.Exportar(
+            Equipamentos.Todos(), Limites.Todos(), Frames.Todos(),
+            Caracteristicas.Grupos(), Caracteristicas.Todas());
+
+        await JS.InvokeVoidAsync("appDownload",
+            $"dados-axiais-{DateTime.Now:yyyy-MM-dd}.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            Convert.ToBase64String(bytes));
+    }
+
+    private async Task Importar(InputFileChangeEventArgs e)
+    {
+        var arquivo = e.File;
+        _msg = null;
+        _erro = false;
+
+        var ext = Path.GetExtension(arquivo.Name).ToLowerInvariant();
+        if (ext is not (".xlsx" or ".xlsm"))
         {
-            "/axiais/motores" => "motores",
-            "/axiais/caracteristicas" => "caracteristicas",
-            _ => "modelos",
-        };
+            Aviso($"\"{arquivo.Name}\" não é uma planilha do Excel. Use .xlsx ou .xlsm.", erro: true);
+            return;
+        }
+
+        _lendo = true;
+        try
+        {
+            // o ClosedXML precisa de um stream posicionável; o do navegador é sequencial
+            using var memoria = new MemoryStream();
+            await arquivo.OpenReadStream(TamanhoMaximo).CopyToAsync(memoria);
+            memoria.Position = 0;
+
+            var resumo = DadosExcel.Importar(memoria, Equipamentos, Limites, Frames, Caracteristicas);
+
+            var partes = new List<string>();
+            if (resumo.Modelos > 0) partes.Add($"{resumo.Modelos} modelo(s)");
+            if (resumo.Limites > 0) partes.Add($"{resumo.Limites} limite(s) de motor");
+            if (resumo.Motores > 0) partes.Add($"{resumo.Motores} frame(s)");
+            if (resumo.Caracteristicas > 0) partes.Add($"{resumo.Caracteristicas} subitem(ns)");
+
+            var texto = partes.Count == 0
+                ? $"\"{arquivo.Name}\": nada foi gravado."
+                : $"\"{arquivo.Name}\": {string.Join(", ", partes)} gravado(s).";
+
+            if (resumo.Avisos.Count > 0) texto += " " + string.Join(" ", resumo.Avisos);
+
+            _versao++;   // recria as três vistas com o conteúdo novo
+            Aviso(texto, erro: resumo.Total == 0);
+        }
+        catch (Exception ex)
+        {
+            Aviso("Não consegui ler a planilha: " + ex.Message, erro: true);
+        }
+        finally
+        {
+            _lendo = false;
+        }
+    }
+
+    private void Aviso(string texto, bool erro = false)
+    {
+        _msg = texto;
+        _erro = erro;
     }
 }

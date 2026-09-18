@@ -54,6 +54,7 @@
                 <th class="nowrap" style="width:70px">Ordem</th>
                 <th class="nowrap">Frame</th>
                 <th class="nowrap" style="width:150px">Código</th>
+                <th class="nowrap" style="width:150px">Preço</th>
                 <th class="nowrap" style="width:120px">Padrão</th>
                 <th class="nowrap" style="width:140px"></th>
             </tr>
@@ -72,6 +73,11 @@
                         <input class="cell" style="max-width:130px" value="@frame.Codigo"
                                placeholder="—"
                                @onchange="e => DefinirCodigo(frame, e.Value?.ToString() ?? string.Empty)" />
+                    </td>
+                    <td>
+                        <input class="cell" style="max-width:130px; text-align:right" value="@frame.Preco"
+                               placeholder="—"
+                               @onchange="e => DefinirPreco(frame, e.Value?.ToString() ?? string.Empty)" />
                     </td>
                     <td class="nowrap"><span class="badge @(frame.Padrao == "IEC" ? "st-atencao" : "st-plan")">@frame.Padrao</span></td>
                     <td class="nowrap center">
@@ -173,7 +179,8 @@
         Repo.Apagar(frame.Id);
         Repo.Salvar(new FrameMotor
         {
-            Padrao = frame.Padrao, Nome = nome, Ordem = frame.Ordem, Codigo = frame.Codigo,
+            Padrao = frame.Padrao, Nome = nome, Ordem = frame.Ordem,
+            Codigo = frame.Codigo, Preco = frame.Preco,
         });
 
         _todos = Repo.Todos();
@@ -191,6 +198,26 @@
         Aviso(codigo.Length == 0
             ? $"Código do frame {frame.Nome} apagado."
             : $"Frame {frame.Nome}: código {codigo}.");
+    }
+
+    private void DefinirPreco(FrameMotor frame, string texto)
+    {
+        var preco = texto.Trim();
+        if (preco == frame.Preco) return;
+
+        if (preco.Length > 0 && DadosExcel.Numero(preco) is null)
+        {
+            Aviso($"\"{preco}\" não parece um preço. Use 1234,56 ou 1234.56.", erro: true);
+            _todos = Repo.Todos();
+            return;
+        }
+
+        frame.Preco = preco;
+        Repo.Salvar(frame);
+        _todos = Repo.Todos();
+        Aviso(preco.Length == 0
+            ? $"Preço do frame {frame.Nome} apagado."
+            : $"Frame {frame.Nome}: preço {preco}.");
     }
 
     private void Apagar(FrameMotor frame)

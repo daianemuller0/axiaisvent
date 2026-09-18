@@ -388,19 +388,19 @@ Esconder isso seria pior — daria um "pode" ou um "não pode" sem base.
 
 ---
 
-## 12. Uma aba só: Modelos, Motores e Características
+## 12. Uma guia só: Modelos, Motores e Características
 
-A equipe pediu que **as listas fiquem na mesma aba**. `/axiais/dados` virou uma casca com
-três vistas, e o menu lateral tem só **Base** e **Dados**:
+`/axiais/dados` é **uma página só**, sem seletor de vistas: as três seções aparecem uma
+embaixo da outra. O menu lateral tem só **Base** e **Dados**.
 
-| Vista | Componente | O que tem |
+| Seção | Componente | O que tem |
 |---|---|---|
 | Modelos | `Components/Dados/VistaModelos.razor` | matriz ventilador × cubo, verificador e motor máximo por cubo |
-| Motores | `Components/Dados/VistaMotores.razor` | os frames IEC/NEMA, agora com coluna de código |
-| Características | `Components/Dados/VistaCaracteristicas.razor` | as 15 listas de características |
+| Motores | `Components/Dados/VistaMotores.razor` | os frames IEC/NEMA, com código e preço |
+| Características | `Components/Dados/VistaCaracteristicas.razor` | os itens e subitens, com código e preço |
 
-As rotas antigas (`/axiais/motores`) continuam valendo e abrem direto na vista certa — a
-casca lê o caminho e escolhe a vista, então nenhum link guardado quebra.
+As rotas antigas (`/axiais/motores`, `/axiais/caracteristicas`) continuam valendo e caem
+na mesma página, então nenhum link guardado quebra.
 
 ### Itens e subitens (`Data/CaracteristicaRepository.cs`)
 
@@ -430,20 +430,38 @@ A semeadura é **por item**: uma lista nova de fábrica entra sem tocar nas que 
 ajustou ou já codificou. Bancos anteriores, que guardavam o grupo só dentro dos subitens,
 ganham os itens correspondentes na primeira abertura.
 
-### Subir em massa
+### Preço
 
-O importador aceita `.xlsx`, `.xlsm` e `.csv` com as colunas **Grupo**, **Valor** e
-**Código** (o cabeçalho é reconhecido por nome, com alguns sinônimos), em dois modos:
+Subitens e frames têm um campo **`preco`**, ao lado do `codigo`. Fica gravado como a
+equipe digita; `DadosExcel.Numero` lê tanto `1.234,56` quanto `1234.56`, e o campo recusa
+o que não for número.
 
-- **atualizar e acrescentar** (padrão) — item que já existe tem só o **código**
-  atualizado; item novo entra no fim do grupo. É o modo de subir os códigos depois, sem
-  refazer as listas, e é idempotente: subir o mesmo arquivo duas vezes não duplica nada.
-- **substituir as listas** — apaga tudo e carrega o arquivo.
+### O Excel do conjunto (`Data/DadosExcel.cs`)
 
-Linha sem grupo ou sem valor é ignorada e contada no resumo, em vez de virar subitem vazio.
-Grupo que ainda não existe é **criado pela própria importação**. Em *substituir*, só os
-subitens são apagados — os itens continuam, para não perder a ordem deles nem os que a
-equipe tenha criado à mão.
+Um botão exporta **tudo o que está na guia** e a importação traz de volta. Cada tabela é
+uma aba, com o mesmo nome nos dois sentidos — o que sai é exatamente o que entra:
+
+| Aba | Colunas |
+|---|---|
+| `Modelos` | Série · Ventilador · Cubo · Rotação máx (rpm) |
+| `Limites de motor` | Série · Cubo · Padrão · Frame máximo |
+| `Motores` | Padrão · Ordem · Frame · Código · Preço |
+| `Características` | Item · Ordem · Subitem · Código · Preço |
+
+A importação é sempre **atualizar e acrescentar**: nada é apagado por ausência, aba que
+não vier no arquivo não é tocada, e linha que já existe tem os campos atualizados. É o que
+a torna segura de repetir — subir o mesmo arquivo duas vezes não duplica nada.
+
+Um item novo pode nascer na própria planilha (basta a linha ter o Item), inclusive vazio.
+O cabeçalho é reconhecido por nome, com sinônimos, e uma planilha de **uma aba só** com
+Item/Subitem (ou Grupo/Valor) e Código também é aceita — é o formato simples de subir
+códigos.
+
+Preço sai como **número** quando dá para converter, então o Excel soma e filtra.
+
+> É também por aqui que se resolve a divergência dos frames da faixa verde: corrigindo o
+> `Frame máximo` na aba `Limites de motor` para um frame que existe na lista, a regra do
+> motor volta a comparar.
 
 > **Falta ainda** montar o **código do equipamento** juntando os códigos individuais — a
 > equipe vai subir os códigos primeiro. A estrutura já está pronta para isso: cada item

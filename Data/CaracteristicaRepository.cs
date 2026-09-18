@@ -18,6 +18,8 @@ public sealed class Caracteristica
     public string Valor { get; set; } = "";
     /// <summary>Código do item. Vazio enquanto a equipe não subir os códigos.</summary>
     public string Codigo { get; set; } = "";
+    /// <summary>Preço do subitem, como a equipe digita. Vazio = sem preço.</summary>
+    public string Preco { get; set; } = "";
     /// <summary>Posição dentro do grupo (1 = primeiro da lista).</summary>
     public int Ordem { get; set; }
 
@@ -55,9 +57,10 @@ public sealed class CaracteristicaRepository
     public CaracteristicaRepository(ParquetStore store) => _store = store;
 
     public List<Caracteristica> Todas() => _store
-        .ReadLatest(Entidade, "id, grupo, valor, codigo, ordem", r => new Caracteristica
+        .ReadLatest(Entidade, "id, grupo, valor, codigo, ordem, preco", r => new Caracteristica
         {
             Id = S(r, 0), Grupo = S(r, 1), Valor = S(r, 2), Codigo = S(r, 3), Ordem = Int(S(r, 4)),
+            Preco = S(r, 5),
         })
         .OrderBy(c => c.Grupo)
         .ThenBy(c => c.Ordem)
@@ -69,7 +72,7 @@ public sealed class CaracteristicaRepository
         _store.WriteRow(Entidade, new KeyValuePair<string, object?>[]
         {
             new("id", c.Id), new("grupo", c.Grupo), new("valor", c.Valor),
-            new("codigo", c.Codigo),
+            new("codigo", c.Codigo), new("preco", c.Preco),
             // zeros à esquerda: o Parquet guarda texto e sem isso a 10 viria antes da 2
             new("ordem", c.Ordem.ToString("D4")),
         });
@@ -139,7 +142,7 @@ public sealed class CaracteristicaRepository
             Apagar(c.Id);
             Salvar(new Caracteristica
             {
-                Grupo = para, Valor = c.Valor, Codigo = c.Codigo, Ordem = c.Ordem,
+                Grupo = para, Valor = c.Valor, Codigo = c.Codigo, Preco = c.Preco, Ordem = c.Ordem,
             });
         }
 

@@ -32,7 +32,7 @@ sem encostar no que está gravado.
 
 ## A aba Dados
 
-Uma aba só, com três vistas:
+Uma guia só, com tudo na mesma página:
 
 - **Modelos** — a relação ventilador × cubo, o alerta de rotação e o motor máximo por cubo.
 - **Motores** — os frames IEC e NEMA, na ordem de tamanho, cada um com seu código.
@@ -44,6 +44,11 @@ Uma aba só, com três vistas:
 
 Juntando os códigos escolhidos em cada lista monta-se o código do equipamento — por isso a
 ordem dos grupos e dos itens importa.
+
+Subitens e frames têm **código e preço**. E há um **Excel do conjunto**: um botão exporta
+tudo o que está na guia (uma aba por tabela) e a importação traz de volta — é como a
+equipe mexe em preços e códigos em massa. A importação sempre atualiza e acrescenta,
+nunca apaga por ausência.
 
 ## A aba Motores (antiga — hoje é uma vista dentro de Dados)
 
