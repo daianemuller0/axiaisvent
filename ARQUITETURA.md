@@ -430,11 +430,38 @@ A semeadura é **por item**: uma lista nova de fábrica entra sem tocar nas que 
 ajustou ou já codificou. Bancos anteriores, que guardavam o grupo só dentro dos subitens,
 ganham os itens correspondentes na primeira abertura.
 
-### Preço
+### Código e preço: onde ficam
 
-Subitens e frames têm um campo **`preco`**, ao lado do `codigo`. Fica gravado como a
-equipe digita; `DadosExcel.Numero` lê tanto `1.234,56` quanto `1234.56`, e o campo recusa
-o que não for número.
+| O quê | Entidade | Campos |
+|---|---|---|
+| Ventilador (Fan Diameter) | `itens_modelo` | `codigo`, `preco` |
+| Cubo (Fan Hub Diameter) | `itens_modelo` | `codigo`, `preco` |
+| Frame de motor | `frames` | `codigo`, `preco` |
+| Subitem de característica | `caracteristicas` | `codigo`, `preco` |
+
+Ventiladores e cubos moram na mesma entidade, separados pelo campo `tipo`. **A lista deles
+não é gravada**: sai da matriz de equipamentos, que é a fonte do que existe. Assim não há
+duas listas para manter em sincronia — um rótulo que saia da matriz some da tela de preço
+também.
+
+### Lendo o preço (`DadosExcel.Numero`)
+
+Não dá para fixar uma cultura: o mesmo campo recebe o que a pessoa digita (`12500,90`) e o
+que o Excel devolve já formatado pela cultura da máquina (`12.500,90` no Brasil,
+`12,500.90` em inglês). Tentar pt-BR primeiro **corrompia valores** — `9100.5` virava
+91005, porque em pt-BR o ponto é separador de milhar.
+
+O separador decimal é **deduzido do texto**:
+
+- com `.` e `,` juntos, o da direita é o decimal e o outro é milhar;
+- com um só, três casas depois dele indicam milhar (`1.234` = 1234), menos quando a parte
+  inteira é `0` (`0,125` é decimal); qualquer outra quantidade de casas é decimal;
+- o caractere escolhido como decimal só pode aparecer uma vez — `12,5,7` é recusado, que
+  num campo de preço é melhor do que adivinhar.
+
+Na importação o preço é **normalizado** para o formato brasileiro (`PrecoNormalizado`).
+Sem isso, exportar e importar de volta mudaria `12500,90` para `12,500.90` a cada volta,
+mesmo com o valor certo.
 
 ### O Excel do conjunto (`Data/DadosExcel.cs`)
 
@@ -444,9 +471,14 @@ uma aba, com o mesmo nome nos dois sentidos — o que sai é exatamente o que en
 | Aba | Colunas |
 |---|---|
 | `Modelos` | Série · Ventilador · Cubo · Rotação máx (rpm) |
+| `Ventiladores` | Série · Ventilador · Código · Preço |
+| `Cubos` | Série · Cubo · Código · Preço |
 | `Limites de motor` | Série · Cubo · Padrão · Frame máximo |
 | `Motores` | Padrão · Ordem · Frame · Código · Preço |
 | `Características` | Item · Ordem · Subitem · Código · Preço |
+
+Nas abas `Ventiladores` e `Cubos` a lista sai da matriz, como na tela: a importação só
+grava código e preço, não cria rótulo.
 
 A importação é sempre **atualizar e acrescentar**: nada é apagado por ausência, aba que
 não vier no arquivo não é tocada, e linha que já existe tem os campos atualizados. É o que

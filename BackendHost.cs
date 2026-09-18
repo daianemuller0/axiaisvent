@@ -80,6 +80,7 @@ public static class BackendHost
         builder.Services.AddSingleton(new ParquetStore(dataFolder));
         builder.Services.AddScoped<BaseRepository>();
         builder.Services.AddScoped<EquipamentoRepository>();
+        builder.Services.AddScoped<ItemModeloRepository>();
         builder.Services.AddScoped<FrameRepository>();
         builder.Services.AddScoped<LimiteMotorRepository>();
         builder.Services.AddScoped<CaracteristicaRepository>();

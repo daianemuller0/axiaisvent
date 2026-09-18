@@ -15,6 +15,8 @@ namespace HowdenAxiais.Poc.Data;
 public static class DadosExcel
 {
     public const string AbaModelos = "Modelos";
+    public const string AbaVentiladores = "Ventiladores";
+    public const string AbaCubos = "Cubos";
     public const string AbaLimites = "Limites de motor";
     public const string AbaMotores = "Motores";
     public const string AbaCaracteristicas = "Características";
@@ -25,6 +27,7 @@ public static class DadosExcel
 
     public static byte[] Exportar(
         List<Equipamento> equipamentos,
+        List<ItemModelo> itensModelo,
         List<LimiteMotor> limites,
         List<FrameMotor> frames,
         List<GrupoCaracteristica> grupos,
@@ -38,6 +41,31 @@ public static class DadosExcel
             {
                 e.Serie, e.Diametro, e.Cubo, e.RpmMax,
             }));
+
+        // A lista sai da matriz (é ela que diz o que existe); o código e o preço
+        // vêm do cadastro, quando houver.
+        foreach (var (aba, tipo, titulo) in new[]
+                 {
+                     (AbaVentiladores, ItemModelo.TipoVentilador, "Ventilador"),
+                     (AbaCubos, ItemModelo.TipoCubo, "Cubo"),
+                 })
+        {
+            var rotulos = equipamentos
+                .Select(e => (e.Serie, Rotulo: tipo == ItemModelo.TipoVentilador ? e.Diametro : e.Cubo))
+                .Distinct()
+                .OrderBy(x => x.Serie)
+                .ThenBy(x => Medida.Numero(x.Rotulo))
+                .ThenBy(x => x.Rotulo)
+                .ToList();
+
+            Montar(wb, aba, new[] { "Série", titulo, "Código", "Preço" },
+                rotulos.Select(x =>
+                {
+                    var item = itensModelo.FirstOrDefault(i =>
+                        i.Serie == x.Serie && i.Tipo == tipo && i.Rotulo == x.Rotulo);
+                    return new object?[] { x.Serie, x.Rotulo, item?.Codigo, Numero(item?.Preco ?? "") };
+                }));
+        }
 
         Montar(wb, AbaLimites,
             new[] { "Série", "Cubo", "Padrão", "Frame máximo" },
@@ -112,9 +140,10 @@ public static class DadosExcel
 
     // ---------------------------------------------------------------- importar
 
-    public sealed record Resumo(int Modelos, int Limites, int Motores, int Caracteristicas, List<string> Avisos)
+    public sealed record Resumo(int Modelos, int ItensModelo, int Limites, int Motores,
+        int Caracteristicas, List<string> Avisos)
     {
-        public int Total => Modelos + Limites + Motores + Caracteristicas;
+        public int Total => Modelos + ItensModelo + Limites + Motores + Caracteristicas;
     }
 
     /// <summary>
@@ -127,6 +156,7 @@ public static class DadosExcel
     /// </summary>
     public static Resumo Importar(Stream arquivo,
         EquipamentoRepository equipamentos,
+        ItemModeloRepository itensModelo,
         LimiteMotorRepository limites,
         FrameRepository frames,
         CaracteristicaRepository caracteristicas)
@@ -135,18 +165,70 @@ public static class DadosExcel
         var avisos = new List<string>();
 
         var nModelos = ImportarModelos(wb, equipamentos, avisos);
+        var nItens = ImportarItensModelo(wb, itensModelo, avisos);
         var nLimites = ImportarLimites(wb, limites, avisos);
         var nMotores = ImportarMotores(wb, frames, avisos);
         var nCaract = ImportarCaracteristicas(wb, caracteristicas, avisos);
 
-        if (nModelos + nLimites + nMotores + nCaract == 0 && avisos.Count == 0)
+        if (nModelos + nItens + nLimites + nMotores + nCaract == 0 && avisos.Count == 0)
         {
-            avisos.Add("Nenhuma aba reconhecida. Esperava \"" + AbaModelos + "\", \"" + AbaLimites +
+            avisos.Add("Nenhuma aba reconhecida. Esperava \"" + AbaModelos + "\", \"" +
+                       AbaVentiladores + "\", \"" + AbaCubos + "\", \"" + AbaLimites +
                        "\", \"" + AbaMotores + "\" ou \"" + AbaCaracteristicas +
                        "\" — ou uma planilha com as colunas Grupo, Valor e Código.");
         }
 
-        return new Resumo(nModelos, nLimites, nMotores, nCaract, avisos);
+        return new Resumo(nModelos, nItens, nLimites, nMotores, nCaract, avisos);
+    }
+
+    /// <summary>
+    /// Código e preço de ventiladores e cubos. A lista de rótulos NÃO é criada
+    /// aqui — ela vem da matriz —, então uma linha cujo rótulo não exista na
+    /// matriz grava mesmo assim, mas só aparece na tela quando a matriz tiver
+    /// esse rótulo.
+    /// </summary>
+    private static int ImportarItensModelo(XLWorkbook wb, ItemModeloRepository repo, List<string> avisos)
+    {
+        var gravadas = 0;
+
+        foreach (var (aba, tipo, titulo) in new[]
+                 {
+                     (AbaVentiladores, ItemModelo.TipoVentilador, "ventilador"),
+                     (AbaCubos, ItemModelo.TipoCubo, "cubo"),
+                 })
+        {
+            if (!Achar(wb, aba, out var ws)) continue;
+
+            var (cab, linhas) = Ler(ws);
+            var iSerie = Coluna(cab, "série", "serie");
+            var iRotulo = Coluna(cab, titulo, "rótulo", "rotulo");
+            var iCodigo = Coluna(cab, "código", "codigo", "cod");
+            var iPreco = Coluna(cab, "preço", "preco");
+
+            if (iSerie < 0 || iRotulo < 0)
+            {
+                avisos.Add($"Aba \"{aba}\": faltam colunas (Série e {titulo}).");
+                continue;
+            }
+
+            foreach (var l in linhas)
+            {
+                var serie = T(l, iSerie);
+                var rotulo = T(l, iRotulo);
+                if (serie.Length == 0 || rotulo.Length == 0) continue;
+
+                var codigo = iCodigo >= 0 ? T(l, iCodigo) : "";
+                var preco = iPreco >= 0 ? PrecoNormalizado(T(l, iPreco)) : "";
+                if (codigo.Length == 0 && preco.Length == 0) continue;
+
+                repo.Salvar(new ItemModelo
+                {
+                    Serie = serie, Tipo = tipo, Rotulo = rotulo, Codigo = codigo, Preco = preco,
+                });
+                gravadas++;
+            }
+        }
+        return gravadas;
     }
 
     private static int ImportarModelos(XLWorkbook wb, EquipamentoRepository repo, List<string> avisos)
@@ -258,7 +340,7 @@ public static class DadosExcel
                 Nome = nome,
                 Ordem = ordem,
                 Codigo = iCodigo >= 0 ? T(l, iCodigo) : atual?.Codigo ?? "",
-                Preco = iPreco >= 0 ? T(l, iPreco) : atual?.Preco ?? "",
+                Preco = iPreco >= 0 ? PrecoNormalizado(T(l, iPreco)) : atual?.Preco ?? "",
             });
             gravadas++;
         }
@@ -328,7 +410,7 @@ public static class DadosExcel
                 Valor = sub,
                 Ordem = ordem,
                 Codigo = iCodigo >= 0 ? T(l, iCodigo) : atual?.Codigo ?? "",
-                Preco = iPreco >= 0 ? T(l, iPreco) : atual?.Preco ?? "",
+                Preco = iPreco >= 0 ? PrecoNormalizado(T(l, iPreco)) : atual?.Preco ?? "",
             });
             gravadas++;
         }
@@ -391,21 +473,90 @@ public static class DadosExcel
     }
 
     /// <summary>
-    /// Preço como número quando dá para ler — aí o Excel soma e filtra. Aceita
-    /// o formato brasileiro (1.234,56) e o invariante (1234.56).
+    /// Texto canônico do preço, no formato brasileiro: 12500,90.
+    ///
+    /// A importação normaliza por aqui porque o Excel devolve o número já
+    /// formatado pela cultura da máquina — sem isso, exportar e importar de
+    /// volta mudaria "12500,90" para "12,500.90" a cada volta, mesmo com o valor
+    /// certo. O que não for número passa intacto.
+    /// </summary>
+    public static string PrecoNormalizado(string texto)
+    {
+        var valor = Numero(texto);
+        return valor is null ? texto.Trim() : valor.Value.ToString("0.00", new CultureInfo("pt-BR"));
+    }
+
+    /// <summary>
+    /// Preço como número quando dá para ler — aí o Excel soma e filtra.
+    ///
+    /// Não dá para escolher uma cultura e pronto: o mesmo campo recebe o que a
+    /// pessoa digita (12500,90) e o que o Excel devolve formatado pela cultura
+    /// da máquina (12.500,90 no Brasil, 12,500.90 em inglês). Tentar pt-BR
+    /// primeiro corrompia valores: "9100.5" virava 91005, porque em pt-BR o
+    /// ponto é separador de milhar.
+    ///
+    /// Então o separador decimal é DEDUZIDO do texto:
+    ///  - com "." e "," juntos, o da direita é o decimal e o outro é milhar;
+    ///  - com um só, três casas depois dele indicam milhar (1.234 = 1234),
+    ///    menos quando a parte inteira é 0 (0,125 é decimal); qualquer outra
+    ///    quantidade de casas é decimal.
     /// </summary>
     public static decimal? Numero(string texto)
     {
-        texto = texto.Trim();
-        if (texto.Length == 0) return null;
+        var limpo = (texto ?? "").Replace("R$", "").Replace(" ", "")
+            .Replace("\u00A0", "").Trim();
+        if (limpo.Length == 0) return null;
 
-        var limpo = texto.Replace("R$", "").Replace(" ", "").Trim();
+        var negativo = limpo.StartsWith("-");
+        if (negativo) limpo = limpo[1..];
 
-        if (decimal.TryParse(limpo, NumberStyles.Number, new CultureInfo("pt-BR"), out var ptBr))
-            return ptBr;
-        if (decimal.TryParse(limpo, NumberStyles.Number, CultureInfo.InvariantCulture, out var inv))
-            return inv;
+        var ultimoPonto = limpo.LastIndexOf('.');
+        var ultimaVirgula = limpo.LastIndexOf(',');
 
-        return null;
+        string semSeparadores;
+        if (ultimoPonto >= 0 && ultimaVirgula >= 0)
+        {
+            // os dois aparecem: o da direita é o decimal
+            var decimalEm = Math.Max(ultimoPonto, ultimaVirgula);
+            if (!DecimalUnico(limpo, limpo[decimalEm])) return null;
+            semSeparadores = Tirar(limpo[..decimalEm]) + "." + limpo[(decimalEm + 1)..];
+        }
+        else if (ultimoPonto >= 0 || ultimaVirgula >= 0)
+        {
+            var pos = Math.Max(ultimoPonto, ultimaVirgula);
+            var inteira = limpo[..pos];
+            var casas = limpo.Length - pos - 1;
+
+            // 3 casas = separador de milhar (1.234), salvo quando a parte
+            // inteira é só "0" — aí é decimal mesmo (0,125)
+            var milhar = casas == 3 && inteira.TrimStart('0').Length > 0;
+            if (!milhar && !DecimalUnico(limpo, limpo[pos])) return null;
+
+            semSeparadores = milhar
+                ? Tirar(limpo)
+                : Tirar(inteira) + "." + limpo[(pos + 1)..];
+        }
+        else
+        {
+            semSeparadores = limpo;
+        }
+
+        if (!decimal.TryParse(semSeparadores, NumberStyles.Number,
+                CultureInfo.InvariantCulture, out var valor))
+        {
+            return null;
+        }
+
+        return negativo ? -valor : valor;
     }
+
+    /// <summary>
+    /// O caractere escolhido como decimal só pode aparecer UMA vez — o mesmo
+    /// símbolo servindo de decimal e de milhar é entrada malformada ("12,5,7"),
+    /// e num campo de preço é melhor recusar do que adivinhar.
+    /// </summary>
+    private static bool DecimalUnico(string texto, char separador) =>
+        texto.Count(c => c == separador) == 1;
+
+    private static string Tirar(string texto) => texto.Replace(".", "").Replace(",", "");
 }

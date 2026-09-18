@@ -45,7 +45,9 @@ Uma guia só, com tudo na mesma página:
 Juntando os códigos escolhidos em cada lista monta-se o código do equipamento — por isso a
 ordem dos grupos e dos itens importa.
 
-Subitens e frames têm **código e preço**. E há um **Excel do conjunto**: um botão exporta
+Ventiladores, cubos, frames e subitens de característica têm **código e preço** — a lista
+de ventiladores e cubos sai da própria matriz de modelos, então não há duas listas para
+manter. E há um **Excel do conjunto**: um botão exporta
 tudo o que está na guia (uma aba por tabela) e a importação traz de volta — é como a
 equipe mexe em preços e códigos em massa. A importação sempre atualiza e acrescenta,
 nunca apaga por ausência.

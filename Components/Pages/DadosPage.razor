@@ -4,6 +4,7 @@
 @attribute [Authorize]
 @rendermode InteractiveServer
 @inject EquipamentoRepository Equipamentos
+@inject ItemModeloRepository ItensModelo
 @inject LimiteMotorRepository Limites
 @inject FrameRepository Frames
 @inject CaracteristicaRepository Caracteristicas
@@ -41,8 +42,9 @@
     }
 
     <p class="subtitle" style="margin:10px 0 0">
-        Uma aba por tabela: <strong>Modelos</strong>, <strong>Limites de motor</strong>,
-        <strong>Motores</strong> e <strong>Características</strong>. A importação sempre
+        Uma aba por tabela: <strong>Modelos</strong>, <strong>Ventiladores</strong>,
+        <strong>Cubos</strong>, <strong>Limites de motor</strong>, <strong>Motores</strong>
+        e <strong>Características</strong>. A importação sempre
         <em>atualiza e acrescenta</em> — nada é apagado por ausência, e aba que não vier no
         arquivo não é tocada. Também aceita uma planilha de uma aba só com Item/Subitem
         (ou Grupo/Valor) e Código.
@@ -77,7 +79,7 @@
     private async Task Exportar()
     {
         var bytes = DadosExcel.Exportar(
-            Equipamentos.Todos(), Limites.Todos(), Frames.Todos(),
+            Equipamentos.Todos(), ItensModelo.Todos(), Limites.Todos(), Frames.Todos(),
             Caracteristicas.Grupos(), Caracteristicas.Todas());
 
         await JS.InvokeVoidAsync("appDownload",
@@ -107,10 +109,12 @@
             await arquivo.OpenReadStream(TamanhoMaximo).CopyToAsync(memoria);
             memoria.Position = 0;
 
-            var resumo = DadosExcel.Importar(memoria, Equipamentos, Limites, Frames, Caracteristicas);
+            var resumo = DadosExcel.Importar(memoria, Equipamentos, ItensModelo,
+                Limites, Frames, Caracteristicas);
 
             var partes = new List<string>();
             if (resumo.Modelos > 0) partes.Add($"{resumo.Modelos} modelo(s)");
+            if (resumo.ItensModelo > 0) partes.Add($"{resumo.ItensModelo} ventilador(es)/cubo(s)");
             if (resumo.Limites > 0) partes.Add($"{resumo.Limites} limite(s) de motor");
             if (resumo.Motores > 0) partes.Add($"{resumo.Motores} frame(s)");
             if (resumo.Caracteristicas > 0) partes.Add($"{resumo.Caracteristicas} subitem(ns)");

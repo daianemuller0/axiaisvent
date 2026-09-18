@@ -1,6 +1,7 @@
 @inject EquipamentoRepository Repo
 @inject FrameRepository Frames
 @inject LimiteMotorRepository Limites
+@inject ItemModeloRepository Itens
 
 <p class="subtitle">
     Os equipamentos e a relação <strong>ventilador × cubo</strong>, por linha de produto.
@@ -136,8 +137,62 @@
     número numa célula vazia cria a combinação.
 </p>
 
+<!-- ---------- código e preço do ventilador e do cubo ---------- -->
+<h3 style="margin:26px 0 6px">Ventiladores e cubos — código e preço</h3>
+<p class="subtitle">
+    A lista sai da matriz acima: o que existe lá aparece aqui para receber
+    <strong>código</strong> e <strong>preço</strong>. Um rótulo que saia da matriz some
+    daqui também.
+</p>
+
+<div class="prop-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start">
+    @foreach (var tipo in new[] { ItemModelo.TipoVentilador, ItemModelo.TipoCubo })
+    {
+        var t = tipo;
+        var rotulos = t == ItemModelo.TipoVentilador ? _diametros : _cubos;
+
+        <div>
+            <div class="toolbar" style="margin-bottom:8px">
+                <strong>@(t == ItemModelo.TipoVentilador ? "Fan Diameter" : "Fan Hub Diameter")</strong>
+                <span class="val-count">@rotulos.Count</span>
+            </div>
+            <div class="panel" style="padding:0; overflow-x:auto">
+                <table class="grid">
+                    <thead>
+                        <tr>
+                            <th class="nowrap">@t</th>
+                            <th class="nowrap" style="width:130px">Código</th>
+                            <th class="nowrap" style="width:150px">Preço</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var r in rotulos)
+                        {
+                            var rotulo = r;
+                            var item = AcharItem(t, rotulo);
+                            <tr @key="@(t + rotulo)">
+                                <td class="nowrap"><strong>@rotulo</strong></td>
+                                <td>
+                                    <input class="cell" style="max-width:115px" placeholder="—"
+                                           value="@(item?.Codigo ?? "")"
+                                           @onchange="e => DefinirItem(t, rotulo, e.Value?.ToString() ?? string.Empty, null)" />
+                                </td>
+                                <td>
+                                    <input class="cell" style="max-width:130px; text-align:right" placeholder="—"
+                                           value="@(item?.Preco ?? "")"
+                                           @onchange="e => DefinirItem(t, rotulo, null, e.Value?.ToString() ?? string.Empty)" />
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+</div>
+
 <!-- ---------- motor máximo por cubo ---------- -->
-<h2 style="margin:26px 0 6px">Motor máximo por cubo</h2>
+<h3 style="margin:26px 0 6px">Motor máximo por cubo</h3>
 <p class="subtitle">
     O maior frame que cabe dentro de cada cubo (a linha <em>Maximum Internal Motor</em> da
     planilha). A comparação é feita pela posição do frame na escada de tamanho da aba
@@ -191,6 +246,7 @@
     private List<Equipamento> _daSerie = new();
     private List<FrameMotor> _frames = new();
     private List<LimiteMotor> _limites = new();
+    private List<ItemModelo> _itens = new();
 
     private List<string> _series = new();
     private List<string> _diametros = new();
@@ -224,6 +280,7 @@
         _todos = Repo.Todos();
         _frames = Frames.Todos();
         _limites = Limites.Todos();
+        _itens = Itens.Todos();
 
         // VAX primeiro, Joy depois, e qualquer linha nova em ordem alfabética.
         var preferida = new[] { "VAX", "Joy" };
@@ -261,6 +318,52 @@
 
     private Equipamento? Achar(string diametro, string cubo) =>
         _daSerie.FirstOrDefault(e => e.Diametro == diametro && e.Cubo == cubo);
+
+    private ItemModelo? AcharItem(string tipo, string rotulo) => _itens
+        .FirstOrDefault(i => i.Serie == _serie && i.Tipo == tipo && i.Rotulo == rotulo);
+
+    /// <summary>
+    /// Grava código e/ou preço do ventilador ou do cubo. O parâmetro que vier
+    /// nulo não é mexido — é o mesmo registro alimentado por dois campos.
+    /// </summary>
+    private void DefinirItem(string tipo, string rotulo, string? codigo, string? preco)
+    {
+        var atual = AcharItem(tipo, rotulo);
+
+        var novoCodigo = (codigo ?? atual?.Codigo ?? "").Trim();
+        var novoPreco = (preco ?? atual?.Preco ?? "").Trim();
+
+        if (novoPreco.Length > 0 && DadosExcel.Numero(novoPreco) is null)
+        {
+            _msg = $"\"{novoPreco}\" não parece um preço. Use 1234,56 ou 1234.56.";
+            Recarregar();
+            return;
+        }
+
+        if (atual is not null && novoCodigo == atual.Codigo && novoPreco == atual.Preco) return;
+
+        if (novoCodigo.Length == 0 && novoPreco.Length == 0)
+        {
+            if (atual is not null)
+            {
+                Itens.Apagar(atual.Id);
+                _msg = $"{tipo} {rotulo}: código e preço apagados.";
+            }
+        }
+        else
+        {
+            Itens.Salvar(new ItemModelo
+            {
+                Serie = _serie, Tipo = tipo, Rotulo = rotulo,
+                Codigo = novoCodigo, Preco = novoPreco,
+            });
+            _msg = $"{tipo} {rotulo}: " +
+                   (novoCodigo.Length > 0 ? $"código {novoCodigo}" : "sem código") +
+                   (novoPreco.Length > 0 ? $", preço {novoPreco}" : "");
+        }
+
+        Recarregar();
+    }
 
     private string FrameLimite(string cubo, string padrao) => _limites
         .FirstOrDefault(l => l.Serie == _serie && l.Cubo == cubo && l.Padrao == padrao)?.Frame ?? "";
