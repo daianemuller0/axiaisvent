@@ -25,14 +25,21 @@ public static class DadosExcel
 
     // ---------------------------------------------------------------- exportar
 
+    /// <param name="somenteAba">
+    /// Quando vem preenchido, o arquivo sai com <b>uma aba só</b> — é o botão
+    /// de Excel de cada tabela. Vazio: sai o conjunto inteiro.
+    /// </param>
     public static byte[] Exportar(
         List<Equipamento> equipamentos,
         List<ItemModelo> itensModelo,
         List<LimiteMotor> limites,
         List<Motor> motores,
         List<GrupoCaracteristica> grupos,
-        List<Caracteristica> caracteristicas)
+        List<Caracteristica> caracteristicas,
+        string somenteAba = "")
     {
+        bool Vai(string aba) => somenteAba.Length == 0 || aba == somenteAba;
+
         using var wb = new XLWorkbook();
 
         // A aba Modelos é a LISTA CRUZADA: uma linha por combinação
@@ -43,6 +50,7 @@ public static class DadosExcel
         int Pos(string serie, string tipo, string rotulo) =>
             posicao.TryGetValue((serie, tipo, rotulo), out var o) ? o : int.MaxValue;
 
+        if (Vai(AbaModelos))
         Montar(wb, AbaModelos,
             new[]
             {
@@ -69,6 +77,7 @@ public static class DadosExcel
                      (AbaCubos, ItemModelo.TipoCubo, "Cubo"),
                  })
         {
+            if (!Vai(aba)) continue;
             Montar(wb, aba, new[] { "Ordem", "Série", titulo },
                 itensModelo
                     .Where(i => i.Tipo == tipo)
@@ -77,6 +86,7 @@ public static class DadosExcel
                     .Select(i => new object?[] { i.Ordem, i.Serie, i.Rotulo }));
         }
 
+        if (Vai(AbaLimites))
         Montar(wb, AbaLimites,
             new[] { "Série", "Cubo", "Padrão", "Frame máximo" },
             limites
@@ -87,6 +97,7 @@ public static class DadosExcel
         // coluna é o id: é ela que faz exportar → mexer → importar cair na mesma
         // linha, já que dois motores podem ter padrão e frame iguais. Linha nova
         // é linha com o id em branco.
+        if (Vai(AbaMotores))
         Montar(wb, AbaMotores,
             new[]
             {
@@ -104,6 +115,8 @@ public static class DadosExcel
 
         // As listas entram mesmo vazias: assim um item recém-criado aparece na
         // planilha e a equipe já pode preencher os subitens por lá.
+        if (!Vai(AbaCaracteristicas)) return Bytes(wb);
+
         var linhas = new List<object?[]>();
         foreach (var g in grupos)
         {
@@ -124,10 +137,37 @@ public static class DadosExcel
             new[] { "Item", "Ordem", "Subitem", "Código", "Preço USD", "Preço CLP", "Preço R$" },
             linhas);
 
+        return Bytes(wb);
+    }
+
+    private static byte[] Bytes(XLWorkbook wb)
+    {
         using var ms = new MemoryStream();
         wb.SaveAs(ms);
         return ms.ToArray();
     }
+
+    // --------------------------------------------- uma tabela de cada vez
+    //
+    // Cada tela tem o seu par de botões, e cada um mexe só na aba dela: assim
+    // dá para subir a planilha dos motores sem encostar nos equipamentos.
+
+    public static byte[] ExportarModelos(List<Equipamento> equipamentos, List<ItemModelo> itens) =>
+        Exportar(equipamentos, itens, new(), new(), new(), new(), AbaModelos);
+
+    public static byte[] ExportarItens(List<ItemModelo> itens, string tipo) =>
+        Exportar(new(), itens, new(), new(), new(), new(),
+            tipo == ItemModelo.TipoVentilador ? AbaVentiladores : AbaCubos);
+
+    public static byte[] ExportarLimites(List<LimiteMotor> limites) =>
+        Exportar(new(), new(), limites, new(), new(), new(), AbaLimites);
+
+    public static byte[] ExportarMotores(List<Motor> motores) =>
+        Exportar(new(), new(), new(), motores, new(), new(), AbaMotores);
+
+    public static byte[] ExportarCaracteristicas(
+        List<GrupoCaracteristica> grupos, List<Caracteristica> caracteristicas) =>
+        Exportar(new(), new(), new(), new(), grupos, caracteristicas, AbaCaracteristicas);
 
     private static void Montar(XLWorkbook wb, string nome, string[] colunas, IEnumerable<object?[]> linhas)
     {
@@ -210,11 +250,66 @@ public static class DadosExcel
     }
 
     /// <summary>
+    /// Importa só a aba de uma tabela. Devolve quantas linhas foram gravadas e
+    /// os avisos — a tela mostra o texto.
+    /// </summary>
+    public static (int Linhas, List<string> Avisos) ImportarModelos(
+        Stream arquivo, EquipamentoRepository repo)
+    {
+        using var wb = new XLWorkbook(arquivo);
+        var avisos = new List<string>();
+        return (ImportarModelos(wb, repo, avisos), AvisoSeVazio(wb, AbaModelos, avisos));
+    }
+
+    public static (int Linhas, List<string> Avisos) ImportarItens(
+        Stream arquivo, ItemModeloRepository repo, string tipo)
+    {
+        using var wb = new XLWorkbook(arquivo);
+        var avisos = new List<string>();
+        var aba = tipo == ItemModelo.TipoVentilador ? AbaVentiladores : AbaCubos;
+        return (ImportarItensModelo(wb, repo, avisos, aba), AvisoSeVazio(wb, aba, avisos));
+    }
+
+    public static (int Linhas, List<string> Avisos) ImportarLimites(
+        Stream arquivo, LimiteMotorRepository repo)
+    {
+        using var wb = new XLWorkbook(arquivo);
+        var avisos = new List<string>();
+        return (ImportarLimites(wb, repo, avisos), AvisoSeVazio(wb, AbaLimites, avisos));
+    }
+
+    public static (int Linhas, List<string> Avisos) ImportarMotores(
+        Stream arquivo, MotorRepository repo)
+    {
+        using var wb = new XLWorkbook(arquivo);
+        var avisos = new List<string>();
+        return (ImportarMotores(wb, repo, avisos), AvisoSeVazio(wb, AbaMotores, avisos));
+    }
+
+    public static (int Linhas, List<string> Avisos) ImportarCaracteristicas(
+        Stream arquivo, CaracteristicaRepository repo)
+    {
+        using var wb = new XLWorkbook(arquivo);
+        var avisos = new List<string>();
+        return (ImportarCaracteristicas(wb, repo, avisos), AvisoSeVazio(wb, AbaCaracteristicas, avisos));
+    }
+
+    /// <summary>Diz o que faltou quando o arquivo não tinha a aba esperada.</summary>
+    private static List<string> AvisoSeVazio(XLWorkbook wb, string aba, List<string> avisos)
+    {
+        if (avisos.Count == 0 && !Achar(wb, aba, out _))
+            avisos.Add($"O arquivo não tem a aba \"{aba}\". " +
+                       "Exporte esta tabela primeiro para ver o formato esperado.");
+        return avisos;
+    }
+
+    /// <summary>
     /// A lista de ventiladores e cubos: rótulo, ordem, código e preço. Rótulo
     /// que ainda não existe é CRIADO — é como se acrescenta uma linha ou uma
     /// coluna à matriz pela planilha.
     /// </summary>
-    private static int ImportarItensModelo(XLWorkbook wb, ItemModeloRepository repo, List<string> avisos)
+    private static int ImportarItensModelo(XLWorkbook wb, ItemModeloRepository repo,
+        List<string> avisos, string somenteAba = "")
     {
         var gravadas = 0;
 
@@ -224,6 +319,7 @@ public static class DadosExcel
                      (AbaCubos, ItemModelo.TipoCubo, "cubo"),
                  })
         {
+            if (somenteAba.Length > 0 && aba != somenteAba) continue;
             if (!Achar(wb, aba, out var ws)) continue;
 
             var (cab, linhas) = Ler(ws);

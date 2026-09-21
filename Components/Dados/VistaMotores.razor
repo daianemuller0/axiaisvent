@@ -58,6 +58,11 @@
                 🗑 Limpar @(_filtro.Length == 0 ? "tudo" : _filtro)
             </button>
         }
+
+        <ExcelDaTabela Nome="motores"
+                       Exportar="@(() => DadosExcel.ExportarMotores(_todos))"
+                       Importar="Subir"
+                       Importou="DepoisDeImportar" />
     </div>
 </div>
 
@@ -374,6 +379,21 @@
         _limpando = false;
         _todos = Repo.Todos();
         Aviso($"Limpo: {quantos} motor(es){onde}.");
+    }
+
+    // ---------- Excel desta tabela ----------
+
+    private string Subir(Stream fluxo)
+    {
+        var (linhas, avisos) = DadosExcel.ImportarMotores(fluxo, Repo);
+        var texto = linhas > 0 ? $"{linhas} motor(es) gravado(s)." : "Nada foi gravado.";
+        return avisos.Count > 0 ? texto + " " + string.Join(" ", avisos) : texto;
+    }
+
+    private void DepoisDeImportar(string resumo)
+    {
+        _todos = Repo.Todos();
+        Aviso(resumo);
     }
 
     private void Aviso(string texto, bool erro = false)

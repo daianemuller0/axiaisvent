@@ -118,6 +118,10 @@
                     + Incluir
                 </button>
                 @Limpeza(ventilador ? AlvoVentiladores : AlvoCubos)
+                <ExcelDaTabela Nome="@(ventilador ? "ventiladores" : "cubos")"
+                               Exportar="@(() => DadosExcel.ExportarItens(_itens, t))"
+                               Importar="@(fluxo => SubirItens(fluxo, t))"
+                               Importou="DepoisDeImportar" />
             </div>
 
             @if (lista.Count == 0)
@@ -133,7 +137,7 @@
                     <table class="grid">
                         <thead>
                             <tr>
-                                <th class="nowrap" style="width:96px">Série</th>
+                                <th class="nowrap" style="width:116px">Série</th>
                                 <th class="nowrap">@t</th>
                                 <th class="nowrap" style="width:116px"></th>
                             </tr>
@@ -144,7 +148,7 @@
                                 var item = i;
                                 <tr @key="item.Id">
                                     <td>
-                                        <select class="cell" style="max-width:88px" value="@item.Serie"
+                                        <select class="cell" style="width:84px" value="@item.Serie"
                                                 @onchange="e => TrocarSerieItem(item, e.Value?.ToString() ?? string.Empty)">
                                             @foreach (var x in _series)
                                             {
@@ -211,6 +215,10 @@
     <input class="cell" style="width:190px" placeholder="filtrar…" value="@_filtro"
            @oninput="e => _filtro = e.Value?.ToString() ?? string.Empty" />
     @Limpeza(AlvoListaCruzada)
+    <ExcelDaTabela Nome="equipamentos"
+                   Exportar="@(() => DadosExcel.ExportarModelos(_todos, _itens))"
+                   Importar="SubirModelos"
+                   Importou="DepoisDeImportar" />
 </div>
 
 <div class="panel" style="padding:0; overflow-x:auto">
@@ -295,6 +303,10 @@
 <div class="toolbar" style="margin:26px 0 6px; flex-wrap:wrap">
     <h3 style="margin:0">Motor máximo por cubo</h3>
     @Limpeza(AlvoLimites)
+    <ExcelDaTabela Nome="limites-de-motor"
+                   Exportar="@(() => DadosExcel.ExportarLimites(_limites))"
+                   Importar="SubirLimites"
+                   Importou="DepoisDeImportar" />
 </div>
 <p class="subtitle">
     O maior frame que cabe dentro de cada cubo (a linha <em>Maximum Internal Motor</em> da
@@ -1011,6 +1023,42 @@
         _msg = $"{eq.Serie} {eq.Diametro} / {eq.Cubo}: combinação removida.";
         Recarregar();
         Verificar();
+    }
+
+    // ---------- Excel de cada tabela ----------
+
+    private string SubirItens(Stream fluxo, string tipo)
+    {
+        var (linhas, avisos) = DadosExcel.ImportarItens(fluxo, Itens, tipo);
+        return Resumo(linhas, tipo == ItemModelo.TipoVentilador ? "ventilador(es)" : "cubo(s)", avisos);
+    }
+
+    private string SubirModelos(Stream fluxo)
+    {
+        var (linhas, avisos) = DadosExcel.ImportarModelos(fluxo, Repo);
+        return Resumo(linhas, "equipamento(s)", avisos);
+    }
+
+    private string SubirLimites(Stream fluxo)
+    {
+        var (linhas, avisos) = DadosExcel.ImportarLimites(fluxo, Limites);
+        return Resumo(linhas, "limite(s) de motor", avisos);
+    }
+
+    private static string Resumo(int linhas, string oQue, List<string> avisos)
+    {
+        var texto = linhas > 0 ? $"{linhas} {oQue} gravado(s)." : "Nada foi gravado.";
+        return avisos.Count > 0 ? texto + " " + string.Join(" ", avisos) : texto;
+    }
+
+    /// <summary>Depois de subir uma planilha, relê tudo e mostra o resumo.</summary>
+    private void DepoisDeImportar(string resumo)
+    {
+        Recarregar();
+        if (_diametros.All(d => d.Id != _vVentilador))
+            _vVentilador = _diametros.FirstOrDefault()?.Id ?? "";
+        TrocarVentilador();
+        _msg = resumo;
     }
 
     // ---------- limite de motor ----------

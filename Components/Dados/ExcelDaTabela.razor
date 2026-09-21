@@ -1,0 +1,86 @@
+@inject IJSRuntime JS
+
+@*
+    O par de botões de Excel de UMA tabela. Cada tela põe um destes na barra
+    dela, e cada um mexe só na aba correspondente — dá para subir a planilha
+    dos motores sem encostar nos equipamentos.
+
+    O <InputFile> fica escondido dentro de um <label>: assim o "⬆ Excel" tem a
+    mesma cara dos outros botões da barra, em vez do "Escolher arquivo" que o
+    navegador desenha.
+*@
+
+<button class="btn-link" title="Baixar só esta tabela em Excel" @onclick="Baixar">⬇ Excel</button>
+
+@if (_lendo)
+{
+    <span class="saved-flag">lendo…</span>
+}
+else
+{
+    <label class="btn-link" style="cursor:pointer" title="Subir uma planilha só desta tabela">
+        ⬆ Excel
+        <InputFile OnChange="Subir" accept=".xlsx,.xlsm" style="display:none" />
+    </label>
+}
+
+@code {
+    private const long TamanhoMaximo = 30L * 1024 * 1024;
+
+    /// <summary>Vira o nome do arquivo baixado: "motores-2026-09-21.xlsx".</summary>
+    [Parameter, EditorRequired] public string Nome { get; set; } = "tabela";
+
+    /// <summary>Monta o .xlsx desta tabela.</summary>
+    [Parameter, EditorRequired] public Func<byte[]> Exportar { get; set; } = default!;
+
+    /// <summary>
+    /// Grava a planilha e devolve o texto do resumo. Roda no servidor, com o
+    /// arquivo já inteiro na memória.
+    /// </summary>
+    [Parameter, EditorRequired] public Func<Stream, string> Importar { get; set; } = default!;
+
+    /// <summary>Avisa a tela: ela recarrega a lista e mostra a mensagem.</summary>
+    [Parameter] public EventCallback<string> Importou { get; set; }
+
+    private bool _lendo;
+
+    private async Task Baixar()
+    {
+        var bytes = Exportar();
+        await JS.InvokeVoidAsync("appDownload",
+            $"{Nome}-{DateTime.Now:yyyy-MM-dd}.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            Convert.ToBase64String(bytes));
+    }
+
+    private async Task Subir(InputFileChangeEventArgs e)
+    {
+        var arquivo = e.File;
+
+        var ext = Path.GetExtension(arquivo.Name).ToLowerInvariant();
+        if (ext is not (".xlsx" or ".xlsm"))
+        {
+            await Importou.InvokeAsync($"\"{arquivo.Name}\" não é uma planilha do Excel. Use .xlsx ou .xlsm.");
+            return;
+        }
+
+        _lendo = true;
+        try
+        {
+            // o ClosedXML precisa de um stream posicionável; o do navegador é sequencial
+            using var memoria = new MemoryStream();
+            await arquivo.OpenReadStream(TamanhoMaximo).CopyToAsync(memoria);
+            memoria.Position = 0;
+
+            await Importou.InvokeAsync(Importar(memoria));
+        }
+        catch (Exception ex)
+        {
+            await Importou.InvokeAsync("Não consegui ler a planilha: " + ex.Message);
+        }
+        finally
+        {
+            _lendo = false;
+        }
+    }
+}

@@ -675,8 +675,14 @@ mesmo com o valor certo.
 
 ### O Excel do conjunto (`Data/DadosExcel.cs`)
 
-Um botão exporta **tudo o que está na guia** e a importação traz de volta. Cada tabela é
-uma aba, com o mesmo nome nos dois sentidos — o que sai é exatamente o que entra:
+Cada tabela tem **o seu par de botões** (⬇ Excel / ⬆ Excel) na própria barra, e cada um
+mexe só na aba dela: dá para subir a planilha dos motores sem encostar nos equipamentos.
+Subir o arquivo errado não estraga nada — a importação diz que o arquivo não tem a aba
+esperada e não grava. No alto da guia continua o par que leva e traz **tudo de uma vez**.
+
+É a mesma máquina nos dois casos: `Exportar(..., somenteAba)` monta uma aba só, e os
+`ImportarXxx(fluxo, repositório)` chamam o importador daquela aba. Cada tabela é uma aba,
+com o mesmo nome nos dois sentidos — o que sai é exatamente o que entra:
 
 | Aba | Colunas |
 |---|---|

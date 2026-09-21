@@ -78,7 +78,11 @@ Modelos, Motores e Características.
 Em qualquer um deles a limpeza **fica gravada**: o que foi apagado não volta na abertura
 seguinte. A aba Base não é tocada.
 
-E há um **Excel do conjunto**: um botão exporta
+**Cada tabela tem o seu ⬇ Excel e ⬆ Excel**, na barra dela, mexendo só na aba dela — dá
+para subir a planilha dos motores sem encostar nos equipamentos. Subir o arquivo errado
+não estraga nada: a tela avisa que falta a aba esperada e não grava.
+
+E há também o **Excel do conjunto**: um botão exporta
 tudo o que está na guia (uma aba por tabela) e a importação traz de volta — é como a
 equipe mexe em preços e códigos em massa. A importação sempre atualiza e acrescenta,
 nunca apaga por ausência.

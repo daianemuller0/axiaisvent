@@ -84,6 +84,10 @@
         <button class="btn-link" title="Esvaziar a aba inteira" disabled="@(_grupos.Count == 0)"
                 @onclick="@(() => _limparTudo = true)">🗑 Limpar tudo</button>
     }
+    <ExcelDaTabela Nome="caracteristicas"
+                   Exportar="@(() => DadosExcel.ExportarCaracteristicas(Repo.Grupos(), _todas))"
+                   Importar="Subir"
+                   Importou="DepoisDeImportar" />
     <span style="flex:1"></span>
     <input class="cell" style="min-width:240px" placeholder="Procurar valor ou código…"
            @bind="_busca" @bind:event="oninput" />
@@ -483,6 +487,21 @@
 
         Recarregar();
         _msg = null;
+    }
+
+    // ---------- Excel desta tabela ----------
+
+    private string Subir(Stream fluxo)
+    {
+        var (linhas, avisos) = DadosExcel.ImportarCaracteristicas(fluxo, Repo);
+        var texto = linhas > 0 ? $"{linhas} subitem(ns) gravado(s)." : "Nada foi gravado.";
+        return avisos.Count > 0 ? texto + " " + string.Join(" ", avisos) : texto;
+    }
+
+    private void DepoisDeImportar(string resumo)
+    {
+        Recarregar();
+        Aviso(resumo);
     }
 
     private void Aviso(string texto, bool erro = false)
