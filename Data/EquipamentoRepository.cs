@@ -34,13 +34,32 @@ public sealed class Equipamento
     /// dois equipamentos diferentes, com código e preço próprios.
     /// </summary>
     public string Codigo { get; set; } = "";
-    /// <summary>Preço da combinação, como a equipe digita. Vazio = sem preço.</summary>
+    /// <summary>
+    /// Preço em reais, como a equipe digita. Vazio = sem preço.
+    /// É o campo antigo <c>preco</c>: o que já estava gravado continua aqui.
+    /// </summary>
     public string Preco { get; set; } = "";
+    /// <summary>Preço em dólar.</summary>
+    public string PrecoUsd { get; set; } = "";
+    /// <summary>Preço em peso chileno.</summary>
+    public string PrecoClp { get; set; } = "";
 
     /// <summary>FB/HB, como a equipe escreve. Vazio = ainda não definido.</summary>
     public string FbHb { get; set; } = "";
     /// <summary>Número de estágios do equipamento: "1" ou "2".</summary>
     public string Estagios { get; set; } = "";
+
+    /// <summary>
+    /// O maior frame IEC que cabe nesta combinação. Vazio = usar o limite do
+    /// cubo (a tabela "Motor máximo por cubo"), que é o cadastro mais grosso.
+    /// </summary>
+    public string FrameMaxIec { get; set; } = "";
+    /// <summary>O maior frame NEMA que cabe nesta combinação.</summary>
+    public string FrameMaxNema { get; set; } = "";
+
+    /// <summary>O frame máximo de um padrão, ou vazio se não houver.</summary>
+    public string FrameMaximo(string padrao) =>
+        padrao.Equals("NEMA", StringComparison.OrdinalIgnoreCase) ? FrameMaxNema : FrameMaxIec;
 
     /// <summary>Os estagiamentos possíveis, como a equipe preenche.</summary>
     public static readonly string[] Estagiamentos = { "1", "2" };
@@ -98,13 +117,17 @@ public sealed class EquipamentoRepository
     public EquipamentoRepository(ParquetStore store) => _store = store;
 
     public List<Equipamento> Todos() => _store
-        .ReadLatest(Entidade, "id, serie, diametro, cubo, rpmMax, codigo, preco, fbHb, estagios",
+        .ReadLatest(Entidade,
+            "id, serie, diametro, cubo, rpmMax, codigo, preco, fbHb, estagios, " +
+            "precoUsd, precoClp, frameMaxIec, frameMaxNema",
             r => new Equipamento
             {
                 Id = S(r, 0), Serie = S(r, 1), Diametro = S(r, 2),
                 Cubo = S(r, 3), RpmMax = Int(S(r, 4)),
                 Codigo = S(r, 5), Preco = S(r, 6),
                 FbHb = S(r, 7), Estagios = S(r, 8),
+                PrecoUsd = S(r, 9), PrecoClp = S(r, 10),
+                FrameMaxIec = S(r, 11), FrameMaxNema = S(r, 12),
             })
         .OrderBy(e => e.Serie)
         .ThenBy(e => Medida.Numero(e.Diametro))
@@ -121,6 +144,8 @@ public sealed class EquipamentoRepository
             new("rpmMax", e.RpmMax.ToString()),
             new("codigo", e.Codigo), new("preco", e.Preco),
             new("fbHb", e.FbHb), new("estagios", e.Estagios),
+            new("precoUsd", e.PrecoUsd), new("precoClp", e.PrecoClp),
+            new("frameMaxIec", e.FrameMaxIec), new("frameMaxNema", e.FrameMaxNema),
         });
     }
 
@@ -152,6 +177,8 @@ public sealed class EquipamentoRepository
                     Serie = e.Serie, Diametro = e.Diametro, Cubo = para, RpmMax = e.RpmMax,
                     Codigo = e.Codigo, Preco = e.Preco,
                     FbHb = e.FbHb, Estagios = e.Estagios,
+                    PrecoUsd = e.PrecoUsd, PrecoClp = e.PrecoClp,
+                    FrameMaxIec = e.FrameMaxIec, FrameMaxNema = e.FrameMaxNema,
                 });
             }
         }

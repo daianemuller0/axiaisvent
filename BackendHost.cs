@@ -90,6 +90,11 @@ public static class BackendHost
         // Tabelas de fábrica (equipamentos e frames) na primeira execução.
         using (var escopo = app.Services.CreateScope())
         {
+            // Antes de tudo: juntar os arquivinhos que a última sessão deixou.
+            // Cada gravação cria um arquivo, e a leitura abre todos — sem isto
+            // o sistema fica mais lento a cada dia de uso.
+            escopo.ServiceProvider.GetRequiredService<ParquetStore>().CompactarSePreciso();
+
             escopo.ServiceProvider.GetRequiredService<EquipamentoRepository>().SemearSeVazio();
             escopo.ServiceProvider.GetRequiredService<MotorRepository>().SemearSeVazio();
             escopo.ServiceProvider.GetRequiredService<LimiteMotorRepository>().SemearSeVazio();

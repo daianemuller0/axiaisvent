@@ -144,7 +144,9 @@
                     <th class="nowrap" style="width:70px">Ordem</th>
                     <th class="nowrap">Valor</th>
                     <th class="nowrap" style="width:160px">Código</th>
-                    <th class="nowrap" style="width:160px">Preço</th>
+                    <th class="nowrap" style="width:120px">Preço USD</th>
+                    <th class="nowrap" style="width:120px">Preço CLP</th>
+                    <th class="nowrap" style="width:120px">Preço R$</th>
                     <th class="nowrap" style="width:130px"></th>
                 </tr>
             </thead>
@@ -162,11 +164,9 @@
                             <input class="cell" style="max-width:140px" value="@item.Codigo" placeholder="—"
                                    @onchange="e => DefinirCodigo(item, e.Value?.ToString() ?? string.Empty)" />
                         </td>
-                        <td>
-                            <input class="cell" style="max-width:140px; text-align:right" value="@item.Preco"
-                                   placeholder="—"
-                                   @onchange="e => DefinirPreco(item, e.Value?.ToString() ?? string.Empty)" />
-                        </td>
+                        <td>@Preco(item, Moeda.Usd)</td>
+                        <td>@Preco(item, Moeda.Clp)</td>
+                        <td>@Preco(item, Moeda.Brl)</td>
                         <td class="nowrap center">
                             <button class="btn-link" title="Subir" @onclick="() => Mover(item, -1)">↑</button>
                             <button class="btn-link" title="Descer" @onclick="() => Mover(item, 1)">↓</button>
@@ -418,10 +418,29 @@
             : $"\"{item.Valor}\": código {codigo}.");
     }
 
-    private void DefinirPreco(Caracteristica item, string texto)
+    /// <summary>As três moedas em que a equipe cadastra preço.</summary>
+    private enum Moeda { Usd, Clp, Brl }
+
+    private static string Rotulo(Moeda m) => m switch
+    {
+        Moeda.Usd => "USD", Moeda.Clp => "CLP", _ => "R$",
+    };
+
+    private static string ValorDe(Caracteristica c, Moeda m) => m switch
+    {
+        Moeda.Usd => c.PrecoUsd, Moeda.Clp => c.PrecoClp, _ => c.Preco,
+    };
+
+    private RenderFragment Preco(Caracteristica item, Moeda moeda) => @<text>
+        <input class="cell" style="max-width:100px; text-align:right" placeholder="—"
+               value="@ValorDe(item, moeda)"
+               @onchange="e => DefinirPreco(item, moeda, e.Value?.ToString() ?? string.Empty)" />
+    </text>;
+
+    private void DefinirPreco(Caracteristica item, Moeda moeda, string texto)
     {
         var preco = texto.Trim();
-        if (preco == item.Preco) return;
+        if (preco == ValorDe(item, moeda)) return;
 
         if (preco.Length > 0 && DadosExcel.Numero(preco) is null)
         {
@@ -430,12 +449,17 @@
             return;
         }
 
-        item.Preco = preco;
+        switch (moeda)
+        {
+            case Moeda.Usd: item.PrecoUsd = preco; break;
+            case Moeda.Clp: item.PrecoClp = preco; break;
+            default: item.Preco = preco; break;
+        }
         Repo.Salvar(item);
-        Recarregar();
+
         Aviso(preco.Length == 0
-            ? $"Preço de \"{item.Valor}\" apagado."
-            : $"\"{item.Valor}\": preço {preco}.");
+            ? $"\"{item.Valor}\": {Rotulo(moeda)} apagado."
+            : $"\"{item.Valor}\": {Rotulo(moeda)} {preco}.");
     }
 
     private void Apagar(Caracteristica item)

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Data;
 using DuckDB.NET.Data;
 
@@ -48,6 +49,15 @@ public sealed class ParquetStore
     /// Último carimbo entregue por <see cref="ProximoTs"/>.
     /// </summary>
     private static long _ultimoTs;
+
+    /// <summary>Gravações desde a última compactação, por entidade.</summary>
+    private static readonly ConcurrentDictionary<string, int> _desdeCompactacao = new();
+
+    /// <summary>
+    /// A partir de quantos arquivos vale a pena juntar tudo num só. Abaixo
+    /// disso a leitura é rápida e compactar só daria trabalho.
+    /// </summary>
+    private const int LimiteDeArquivos = 200;
 
     /// <summary>
     /// O carimbo (_ts) de uma gravação, <b>estritamente crescente</b>.
@@ -126,6 +136,102 @@ public sealed class ParquetStore
         {
             cmd.CommandText = $"COPY t TO '{full}' (FORMAT PARQUET);";
             cmd.ExecuteNonQuery();
+        }
+
+        // Sem isto a pasta cresce para sempre e cada leitura fica mais lenta —
+        // é o que fazia a tela travar depois de uma tarde de digitação.
+        if (_desdeCompactacao.AddOrUpdate(entity, 1, (_, n) => n + 1) >= LimiteDeArquivos)
+        {
+            _desdeCompactacao[entity] = 0;
+            Compactar(entity);
+        }
+    }
+
+    /// <summary>
+    /// Junta os arquivos de uma entidade num só, mantendo exatamente o que a
+    /// leitura enxerga: a versão mais recente de cada id, marcas de apagado
+    /// incluídas (elas ainda precisam vencer arquivos antigos de outra máquina).
+    ///
+    /// Cada gravação cria um arquivo novo — é o que permite vários usuários
+    /// escreverem ao mesmo tempo sem travar nada. O preço é que a pasta só
+    /// cresce, e a leitura, que abre todos, fica linearmente mais lenta: medido
+    /// em disco local, ~28 ms com 98 arquivos e ~104 ms com 686. Numa pasta de
+    /// rede cada arquivo custa muito mais, e a tela começa a engasgar.
+    ///
+    /// Só apaga os arquivos que listou ANTES de ler: se outra pessoa gravar no
+    /// meio da compactação, o arquivo dela não estava na lista e sobrevive.
+    /// </summary>
+    public void Compactar(string entity)
+    {
+        var dir = EntityDir(entity);
+
+        string[] antigos;
+        try
+        {
+            antigos = Directory.GetFiles(dir, "*.parquet");
+        }
+        catch (IOException)
+        {
+            return;
+        }
+
+        if (antigos.Length < 2) return;
+
+        // arquivo temporário fora da pasta da entidade: se algo falhar no meio,
+        // um arquivo pela metade não entra no caminho da leitura
+        var temporario = Path.Combine(Folder, $".compactar-{Guid.NewGuid():N}.tmp");
+        var destino = Path.Combine(dir, $"{ProximoTs():D19}_compacto.parquet");
+
+        try
+        {
+            var lista = string.Join(", ", antigos.Select(a => $"'{Duck(a)}'"));
+
+            using (var conn = Open())
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = $@"
+COPY (
+    SELECT * EXCLUDE (_rn, filename)
+    FROM (
+        SELECT *, row_number() OVER (
+            PARTITION BY id ORDER BY _ts DESC, filename DESC
+        ) AS _rn
+        FROM read_parquet([{lista}], union_by_name=true, filename=true)
+    )
+    WHERE _rn = 1
+) TO '{Duck(temporario)}' (FORMAT PARQUET);";
+                cmd.ExecuteNonQuery();
+            }
+
+            File.Move(temporario, destino);
+        }
+        catch (Exception)
+        {
+            // compactar é otimização: se não deu, a pasta segue como estava
+            try { if (File.Exists(temporario)) File.Delete(temporario); } catch { /* ignora */ }
+            return;
+        }
+
+        foreach (var antigo in antigos)
+        {
+            try { File.Delete(antigo); } catch { /* outro processo pode estar lendo */ }
+        }
+    }
+
+    /// <summary>Compacta todas as entidades que já passaram do limite de arquivos.</summary>
+    public void CompactarSePreciso()
+    {
+        foreach (var dir in Directory.EnumerateDirectories(Folder))
+        {
+            try
+            {
+                if (Directory.GetFiles(dir, "*.parquet").Length >= LimiteDeArquivos)
+                    Compactar(Path.GetFileName(dir));
+            }
+            catch (IOException)
+            {
+                // pasta de rede indisponível no momento: fica para a próxima
+            }
         }
     }
 

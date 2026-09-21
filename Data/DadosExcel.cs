@@ -47,7 +47,8 @@ public static class DadosExcel
             new[]
             {
                 "Série", "Ventilador", "Cubo", "FB/HB", "Nº de estágios",
-                "Rotação máx (rpm)", "Código", "Preço",
+                "Rotação máx (rpm)", "Frame máx IEC", "Frame máx NEMA", "Código",
+                "Preço USD", "Preço CLP", "Preço R$",
             },
             equipamentos
                 .OrderBy(e => Pos(e.Serie, ItemModelo.TipoVentilador, e.Diametro))
@@ -55,7 +56,8 @@ public static class DadosExcel
                 .Select(e => new object?[]
                 {
                     e.Serie, e.Diametro, e.Cubo, e.FbHb, Numero(e.Estagios),
-                    e.RpmMax, e.Codigo, Numero(e.Preco),
+                    e.RpmMax, e.FrameMaxIec, e.FrameMaxNema, e.Codigo,
+                    Numero(e.PrecoUsd), Numero(e.PrecoClp), Numero(e.Preco),
                 }));
 
         // O cadastro de ventiladores e de cubos — é ele que forma as linhas e as
@@ -90,13 +92,14 @@ public static class DadosExcel
             {
                 "Ordem", "Série", "Fabricante", "Potência CV", "Frequência", "Tensão",
                 "Rotação", "Nº Polos", "Tipo de Flange", "IEC/NEMA", "Frame", "Código",
-                "Preço", "Observações", "Id (não mexer)",
+                "Preço USD", "Preço CLP", "Preço R$", "Observações", "Id (não mexer)",
             },
             motores.Select(m => new object?[]
             {
                 m.Ordem, m.Serie, m.Fabricante, Numero(m.PotenciaCv), Numero(m.Frequencia),
                 m.Tensao, Numero(m.Rotacao), Numero(m.Polos), m.Flange, m.Padrao, m.Frame,
-                m.Codigo, Numero(m.Preco), m.Observacoes, m.Id,
+                m.Codigo, Numero(m.PrecoUsd), Numero(m.PrecoClp), Numero(m.Preco),
+                m.Observacoes, m.Id,
             }));
 
         // As listas entram mesmo vazias: assim um item recém-criado aparece na
@@ -111,9 +114,15 @@ public static class DadosExcel
                 continue;
             }
             foreach (var c in subitens)
-                linhas.Add(new object?[] { g.Nome, c.Ordem, c.Valor, c.Codigo, Numero(c.Preco) });
+                linhas.Add(new object?[]
+            {
+                g.Nome, c.Ordem, c.Valor, c.Codigo,
+                Numero(c.PrecoUsd), Numero(c.PrecoClp), Numero(c.Preco),
+            });
         }
-        Montar(wb, AbaCaracteristicas, new[] { "Item", "Ordem", "Subitem", "Código", "Preço" }, linhas);
+        Montar(wb, AbaCaracteristicas,
+            new[] { "Item", "Ordem", "Subitem", "Código", "Preço USD", "Preço CLP", "Preço R$" },
+            linhas);
 
         using var ms = new MemoryStream();
         wb.SaveAs(ms);
@@ -268,7 +277,11 @@ public static class DadosExcel
         var iCubo = Coluna(cab, "cubo", "fan hub diameter");
         var iRpm = Coluna(cab, "rotação máx (rpm)", "rotação", "rotacao", "rpm");
         var iCodigo = Coluna(cab, "código", "codigo", "cod");
-        var iPreco = Coluna(cab, "preço", "preco");
+        var iPreco = Coluna(cab, "preço r$", "preco r$", "preço", "preco");
+        var iPrecoUsd = Coluna(cab, "preço usd", "preco usd", "usd");
+        var iPrecoClp = Coluna(cab, "preço clp", "preco clp", "clp");
+        var iFrameIec = Coluna(cab, "frame máx iec", "frame max iec", "frame máximo iec");
+        var iFrameNema = Coluna(cab, "frame máx nema", "frame max nema", "frame máximo nema");
         var iFbHb = Coluna(cab, "fb/hb", "fbhb", "fb / hb");
         var iEstagios = Coluna(cab, "nº de estágios", "n° de estágios", "no de estagios",
             "nº estágios", "estágios", "estagios");
@@ -299,6 +312,10 @@ public static class DadosExcel
                 Serie = serie, Diametro = vent, Cubo = cubo, RpmMax = rpm,
                 Codigo = iCodigo >= 0 ? T(l, iCodigo) : atual?.Codigo ?? "",
                 Preco = iPreco >= 0 ? PrecoNormalizado(T(l, iPreco)) : atual?.Preco ?? "",
+                PrecoUsd = iPrecoUsd >= 0 ? PrecoNormalizado(T(l, iPrecoUsd)) : atual?.PrecoUsd ?? "",
+                PrecoClp = iPrecoClp >= 0 ? PrecoNormalizado(T(l, iPrecoClp)) : atual?.PrecoClp ?? "",
+                FrameMaxIec = iFrameIec >= 0 ? T(l, iFrameIec) : atual?.FrameMaxIec ?? "",
+                FrameMaxNema = iFrameNema >= 0 ? T(l, iFrameNema) : atual?.FrameMaxNema ?? "",
                 FbHb = iFbHb >= 0 ? T(l, iFbHb) : atual?.FbHb ?? "",
                 // o Excel devolve "1,00" onde a equipe digitou 1
                 Estagios = iEstagios >= 0
@@ -360,7 +377,9 @@ public static class DadosExcel
         var iTensao = Coluna(cab, "tensão", "tensao", "volt", "volts", "v");
         var iObs = Coluna(cab, "observações", "observacoes", "observação", "observacao", "obs");
         var iCodigo = Coluna(cab, "código", "codigo", "cod");
-        var iPreco = Coluna(cab, "preço", "preco", "valor");
+        var iPreco = Coluna(cab, "preço r$", "preco r$", "preço", "preco", "valor");
+        var iPrecoUsd = Coluna(cab, "preço usd", "preco usd", "usd");
+        var iPrecoClp = Coluna(cab, "preço clp", "preco clp", "clp");
 
         if (iPadrao < 0 && iFrame < 0 && iFabricante < 0)
         {
@@ -427,6 +446,8 @@ public static class DadosExcel
                 Observacoes = Campo(iObs, atual?.Observacoes),
                 Codigo = Campo(iCodigo, atual?.Codigo),
                 Preco = iPreco >= 0 ? PrecoNormalizado(T(l, iPreco)) : atual?.Preco ?? "",
+                PrecoUsd = iPrecoUsd >= 0 ? PrecoNormalizado(T(l, iPrecoUsd)) : atual?.PrecoUsd ?? "",
+                PrecoClp = iPrecoClp >= 0 ? PrecoNormalizado(T(l, iPrecoClp)) : atual?.PrecoClp ?? "",
             });
             gravadas++;
         }
@@ -453,7 +474,9 @@ public static class DadosExcel
         var iSub = Coluna(cab, "subitem", "valor", "descrição", "descricao");
         var iOrdem = Coluna(cab, "ordem");
         var iCodigo = Coluna(cab, "código", "codigo", "cod");
-        var iPreco = Coluna(cab, "preço", "preco");
+        var iPreco = Coluna(cab, "preço r$", "preco r$", "preço", "preco");
+        var iPrecoUsd = Coluna(cab, "preço usd", "preco usd", "usd");
+        var iPrecoClp = Coluna(cab, "preço clp", "preco clp", "clp");
 
         if (iItem < 0 || iSub < 0)
         {
@@ -497,6 +520,8 @@ public static class DadosExcel
                 Ordem = ordem,
                 Codigo = iCodigo >= 0 ? T(l, iCodigo) : atual?.Codigo ?? "",
                 Preco = iPreco >= 0 ? PrecoNormalizado(T(l, iPreco)) : atual?.Preco ?? "",
+                PrecoUsd = iPrecoUsd >= 0 ? PrecoNormalizado(T(l, iPrecoUsd)) : atual?.PrecoUsd ?? "",
+                PrecoClp = iPrecoClp >= 0 ? PrecoNormalizado(T(l, iPrecoClp)) : atual?.PrecoClp ?? "",
             });
             gravadas++;
         }

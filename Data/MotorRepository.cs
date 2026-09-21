@@ -51,8 +51,12 @@ public sealed class Motor
     public int Ordem { get; set; }
     /// <summary>Código do motor, que entra na montagem do código do equipamento.</summary>
     public string Codigo { get; set; } = "";
-    /// <summary>Preço, como a equipe digita. Vazio = sem preço.</summary>
+    /// <summary>Preço em reais, como a equipe digita. Vazio = sem preço.</summary>
     public string Preco { get; set; } = "";
+    /// <summary>Preço em dólar.</summary>
+    public string PrecoUsd { get; set; } = "";
+    /// <summary>Preço em peso chileno.</summary>
+    public string PrecoClp { get; set; } = "";
     /// <summary>Observações em texto livre — o que não coube nas outras colunas.</summary>
     public string Observacoes { get; set; } = "";
 
@@ -91,7 +95,7 @@ public sealed class MotorRepository
         .ReadLatest(Entidade,
             "id, padrao, frame, nome, ordem, codigo, preco, " +
             "fabricante, potenciaCv, frequencia, rotacao, polos, flange, " +
-            "tensao, observacoes, serie",
+            "tensao, observacoes, serie, precoUsd, precoClp",
             r => new Motor
             {
                 Id = S(r, 0), Padrao = S(r, 1),
@@ -100,6 +104,7 @@ public sealed class MotorRepository
                 Fabricante = S(r, 7), PotenciaCv = S(r, 8), Frequencia = S(r, 9),
                 Rotacao = S(r, 10), Polos = S(r, 11), Flange = S(r, 12),
                 Tensao = S(r, 13), Observacoes = S(r, 14), Serie = S(r, 15),
+                PrecoUsd = S(r, 16), PrecoClp = S(r, 17),
             })
         .OrderBy(m => PosicaoDoPadrao(m.Padrao))
         .ThenBy(m => m.Ordem)
@@ -139,6 +144,7 @@ public sealed class MotorRepository
             new("polos", m.Polos), new("flange", m.Flange),
             new("tensao", m.Tensao), new("observacoes", m.Observacoes),
             new("serie", m.Serie),
+            new("precoUsd", m.PrecoUsd), new("precoClp", m.PrecoClp),
         });
     }
 

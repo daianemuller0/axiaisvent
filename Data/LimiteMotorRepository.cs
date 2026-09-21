@@ -111,16 +111,30 @@ public static class RegraMotor
 
     public sealed record Resultado(Situacao Situacao, string Mensagem);
 
+    /// <param name="frameDaCombinacao">
+    /// O frame máximo cadastrado na própria combinação (colunas <em>Frame máx
+    /// IEC/NEMA</em> da lista de equipamentos). Quando vem preenchido, manda:
+    /// é o cadastro mais fino, e o do cubo é só o padrão de quem não preencheu.
+    /// </param>
     public static Resultado Verificar(List<LimiteMotor> limites, List<Motor> motores,
-        string serie, string cubo, string padrao, string frameEscolhido)
+        string serie, string cubo, string padrao, string frameEscolhido,
+        string frameDaCombinacao = "")
     {
         if (string.IsNullOrWhiteSpace(frameEscolhido))
             return new(Situacao.SemLimite, "Escolha um frame para verificar o motor.");
 
-        var limite = limites.FirstOrDefault(l =>
+        var maximo = frameDaCombinacao.Trim();
+        var doCubo = limites.FirstOrDefault(l =>
             l.Serie == serie && l.Cubo == cubo && l.Padrao == padrao);
 
-        if (limite is null || limite.Frame.Length == 0)
+        if (maximo.Length == 0) maximo = doCubo?.Frame ?? "";
+
+        var limite = maximo.Length == 0 ? null : new LimiteMotor
+        {
+            Serie = serie, Cubo = cubo, Padrao = padrao, Frame = maximo,
+        };
+
+        if (limite is null)
         {
             return new(Situacao.SemLimite,
                 $"Ainda não há motor máximo cadastrado para o cubo {cubo} em {padrao} — " +

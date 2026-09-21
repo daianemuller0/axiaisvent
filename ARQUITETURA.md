@@ -508,6 +508,45 @@ A correção tem duas partes:
 > A lição, para o resto do sistema: um carimbo de tempo não é uma chave de ordenação
 > confiável enquanto não for **estritamente crescente por construção**.
 
+### Juntar os arquivinhos (compactação)
+
+Cada gravação cria um arquivo Parquet novo — é o que deixa vários usuários escreverem ao
+mesmo tempo sem travar nada. O preço é que a pasta **só cresce**, e a leitura, que abre
+todos, fica linearmente mais lenta. Medido em disco local:
+
+| Arquivos | Tempo por leitura |
+|---|---|
+| 98 | 28 ms |
+| 294 | 50 ms |
+| 686 | 104 ms |
+
+Numa pasta de rede cada arquivo custa muito mais do que em disco local, e uma tela que
+relê o banco a cada gravação começa a engasgar — a pessoa digita, a tela demora, e o que
+estava sendo digitado se perde no meio do caminho.
+
+`ParquetStore.Compactar(entidade)` junta tudo num arquivo só, mantendo exatamente o que a
+leitura enxerga: a versão mais recente de cada id, **marcas de apagado incluídas** — elas
+ainda precisam vencer arquivos antigos de outra máquina. Roda sozinha a cada 200 gravações
+da entidade, e `CompactarSePreciso()` roda na abertura para limpar o que a sessão anterior
+deixou.
+
+Duas garantias, porque compactar apaga arquivos:
+
+- o arquivo novo é escrito num **temporário fora da pasta da entidade** e só depois movido
+  para o lugar — um arquivo pela metade nunca entra no caminho da leitura;
+- só são apagados os arquivos **listados antes da leitura**: se outra pessoa gravar no
+  meio da compactação, o arquivo dela não estava na lista e sobrevive.
+
+Verificado: 165 arquivos → 1, com edições, exclusões e uma recriação no meio; conteúdo
+idêntico linha a linha, nada apagado voltou, e gravar e apagar continuam funcionando
+depois.
+
+### Uma tela não relê o banco a cada campo
+
+Gravar um campo **não** recarrega a lista inteira. O objeto editado já é o da lista, então
+salvar basta. Recarregar forçava o Blazor a redesenhar a tabela toda — e, com muitas
+linhas, o que estava sendo digitado em outro campo se perdia no redesenho.
+
 ### Código e preço: onde ficam
 
 | O quê | Entidade | Campos |

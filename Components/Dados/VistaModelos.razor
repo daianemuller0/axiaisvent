@@ -79,42 +79,11 @@
     }
 </div>
 
-<!-- ---------- incluir ventilador / cubo ---------- -->
-<div class="toolbar" style="flex-wrap:wrap; gap:18px">
-    @foreach (var tipo in new[] { ItemModelo.TipoVentilador, ItemModelo.TipoCubo })
-    {
-        var t = tipo;
-        var ventilador = t == ItemModelo.TipoVentilador;
-
-        <div class="toolbar" style="margin:0; flex-wrap:nowrap">
-            <strong>@(ventilador ? "Fan Diameter" : "Fan Hub Diameter")</strong>
-            <span class="val-count">@(ventilador ? _diametros.Count : _cubos.Count)</span>
-            <select class="cell" style="max-width:88px"
-                    value="@(ventilador ? _novaSerieVentilador : _novaSerieCubo)"
-                    @onchange="e => GuardarNovaSerie(t, e.Value?.ToString() ?? string.Empty)">
-                @foreach (var x in _series)
-                {
-                    <option value="@x" selected="@(x == (ventilador ? _novaSerieVentilador : _novaSerieCubo))">@x</option>
-                }
-            </select>
-            <input class="cell" style="width:130px" placeholder="@(ventilador ? "novo ventilador" : "novo cubo")"
-                   value="@(ventilador ? _novoVentilador : _novoCubo)"
-                   @onchange="e => GuardarNovo(t, e.Value?.ToString() ?? string.Empty)" />
-            <button class="btn-primary" @onclick="() => IncluirRotulo(t)"
-                    disabled="@((ventilador ? _novoVentilador : _novoCubo).Trim().Length == 0)">
-                + Incluir
-            </button>
-            @Limpeza(ventilador ? AlvoVentiladores : AlvoCubos)
-        </div>
-    }
-</div>
-
-<!-- ---------- a matriz ---------- -->
+<!-- ---------- cadastro de ventiladores e cubos ---------- -->
 <div class="toolbar" style="flex-wrap:wrap">
     <span class="subtitle" style="margin:0">
         @_todos.Count combinação(ões) · @_diametros.Count ventilador(es) · @_cubos.Count cubo(s)
     </span>
-    @Limpeza(AlvoCombinacoes)
     <span style="flex:1"></span>
     @if (_msg is not null)
     {
@@ -122,105 +91,86 @@
     }
 </div>
 
-@if (_diametros.Count == 0 && _cubos.Count == 0)
-{
-    <div class="panel">
-        <p class="subtitle" style="margin:0">
-            A tabela está vazia. Cadastre um <strong>Fan Diameter</strong> e um
-            <strong>Fan Hub Diameter</strong> na barra acima — ou suba a sua planilha pelo
-            <em>Importar Excel</em> — e a matriz aparece aqui.
-        </p>
-    </div>
-}
-else
-{
-<div class="panel" style="padding:0; overflow-x:auto">
-    <table class="grid">
-        <thead>
-            <tr>
-                <th class="nowrap" rowspan="3" style="min-width:280px">Fan Diameter</th>
-                <th class="center" colspan="@Math.Max(1, _cubos.Count)">Fan Hub Diameter</th>
-            </tr>
-            <tr>
-                @foreach (var g in GruposDeCubos())
-                {
-                    <th class="center" colspan="@g.Quantas">@g.Serie</th>
-                }
-            </tr>
-            <tr>
-                @foreach (var c in _cubos)
-                {
-                    var cubo = c;
-                    <th class="center" style="min-width:160px">
-                        <div style="display:flex; gap:4px; justify-content:center">
-                            <select class="cell" style="max-width:74px" value="@cubo.Serie"
-                                    @onchange="e => TrocarSerieItem(cubo, e.Value?.ToString() ?? string.Empty)">
-                                @foreach (var x in _series)
-                                {
-                                    <option value="@x" selected="@(x == cubo.Serie)">@x</option>
-                                }
-                            </select>
-                            <input class="cell" style="width:120px; font-weight:600" value="@cubo.Rotulo"
-                                   @onchange="e => RenomearRotulo(cubo, e.Value?.ToString() ?? string.Empty)" />
-                        </div>
-                        <div class="nowrap" style="margin-top:2px">
-                            @Controles(cubo)
-                        </div>
-                    </th>
-                }
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var v in _diametros)
-            {
-                var vent = v;
-                <tr @key="vent.Id">
-                    <td class="nowrap">
-                        <div style="display:flex; gap:4px; align-items:center">
-                            <select class="cell" style="max-width:74px" value="@vent.Serie"
-                                    @onchange="e => TrocarSerieItem(vent, e.Value?.ToString() ?? string.Empty)">
-                                @foreach (var x in _series)
-                                {
-                                    <option value="@x" selected="@(x == vent.Serie)">@x</option>
-                                }
-                            </select>
-                            <input class="cell" style="width:120px; font-weight:600" value="@vent.Rotulo"
-                                   @onchange="e => RenomearRotulo(vent, e.Value?.ToString() ?? string.Empty)" />
-                            @Controles(vent)
-                        </div>
-                    </td>
-                    @foreach (var c in _cubos)
+<div class="prop-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start">
+    @foreach (var tipo in new[] { ItemModelo.TipoVentilador, ItemModelo.TipoCubo })
+    {
+        var t = tipo;
+        var ventilador = t == ItemModelo.TipoVentilador;
+        var lista = ventilador ? _diametros : _cubos;
+
+        <div>
+            <div class="toolbar" style="margin-bottom:8px; flex-wrap:wrap">
+                <strong>@(ventilador ? "Fan Diameter" : "Fan Hub Diameter")</strong>
+                <span class="val-count">@lista.Count</span>
+                <select class="cell" style="max-width:88px"
+                        value="@(ventilador ? _novaSerieVentilador : _novaSerieCubo)"
+                        @onchange="e => GuardarNovaSerie(t, e.Value?.ToString() ?? string.Empty)">
+                    @foreach (var x in _series)
                     {
-                        var cubo = c;
-                        @if (cubo.Serie != vent.Serie)
-                        {
-                            <td class="center" style="opacity:.25"
-                                title="@($"{vent.Serie} não se combina com {cubo.Serie}")">·</td>
-                        }
-                        else
-                        {
-                            var eq = Achar(vent.Serie, vent.Rotulo, cubo.Rotulo);
-                            <td class="center @(eq is null ? "" : "combina")">
-                                <input class="cell" style="width:86px; text-align:center"
-                                       value="@(eq?.RpmMax.ToString() ?? "")"
-                                       title="@(eq is null ? "Não cabe" : $"Máx. {eq.RpmMax} rpm (V-Belt)")"
-                                       @onchange="e => Editar(vent.Serie, vent.Rotulo, cubo.Rotulo, e.Value?.ToString() ?? string.Empty)" />
-                            </td>
-                        }
+                        <option value="@x" selected="@(x == (ventilador ? _novaSerieVentilador : _novaSerieCubo))">@x</option>
                     }
-                </tr>
+                </select>
+                <input class="cell" style="width:130px" placeholder="@(ventilador ? "novo ventilador" : "novo cubo")"
+                       value="@(ventilador ? _novoVentilador : _novoCubo)"
+                       @onchange="e => GuardarNovo(t, e.Value?.ToString() ?? string.Empty)" />
+                <button class="btn-primary" @onclick="() => IncluirRotulo(t)"
+                        disabled="@((ventilador ? _novoVentilador : _novoCubo).Trim().Length == 0)">
+                    + Incluir
+                </button>
+                @Limpeza(ventilador ? AlvoVentiladores : AlvoCubos)
+            </div>
+
+            @if (lista.Count == 0)
+            {
+                <div class="panel empty" style="padding:18px">
+                    Nenhum @(ventilador ? "ventilador" : "cubo") cadastrado — inclua acima ou
+                    suba a sua planilha pelo <em>Importar Excel</em>.
+                </div>
             }
-        </tbody>
-    </table>
+            else
+            {
+                <div class="panel" style="padding:0; overflow:auto; max-height:420px">
+                    <table class="grid">
+                        <thead>
+                            <tr>
+                                <th class="nowrap" style="width:96px">Série</th>
+                                <th class="nowrap">@t</th>
+                                <th class="nowrap" style="width:116px"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var i in lista)
+                            {
+                                var item = i;
+                                <tr @key="item.Id">
+                                    <td>
+                                        <select class="cell" style="max-width:88px" value="@item.Serie"
+                                                @onchange="e => TrocarSerieItem(item, e.Value?.ToString() ?? string.Empty)">
+                                            @foreach (var x in _series)
+                                            {
+                                                <option value="@x" selected="@(x == item.Serie)">@x</option>
+                                            }
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <input class="cell" style="font-weight:600; max-width:170px" value="@item.Rotulo"
+                                               @onchange="e => RenomearRotulo(item, e.Value?.ToString() ?? string.Empty)" />
+                                    </td>
+                                    <td class="nowrap center">@Controles(item)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    }
 </div>
-}
 
 <p class="subtitle" style="margin-top:12px">
-    Célula preenchida (amarela) = o ventilador cabe naquele cubo, e o valor é o teto de rotação.
-    Célula vazia = combinação que não existe. Apagar o número tira a combinação; digitar um
-    número numa célula vazia cria a combinação. O <strong>·</strong> apagado é cruzamento de
-    séries diferentes — um ventilador VAX não entra num cubo Joy. A série, o nome e a posição
-    de cada ventilador e de cada cubo se editam no próprio cabeçalho.
+    Estas são as duas listas que alimentam os seletores da lista de equipamentos abaixo.
+    É aqui que se renomeia, muda de série, reordena (↑ ↓) e apaga um ventilador ou um cubo —
+    apagar leva junto as combinações dele.
 </p>
 
 <!-- ---------- a lista cruzada: código e preço ---------- -->
@@ -264,17 +214,21 @@ else
 </div>
 
 <div class="panel" style="padding:0; overflow-x:auto">
-    <table class="grid">
+    <table class="grid" style="min-width:1780px">
         <thead>
             <tr>
                 <th class="nowrap" style="width:90px">Série</th>
-                <th class="nowrap">Fan Diameter</th>
-                <th class="nowrap">Fan Hub Diameter</th>
-                <th class="nowrap" style="width:110px">FB/HB</th>
-                <th class="nowrap" style="width:140px">Nº de estágios</th>
-                <th class="nowrap" style="width:150px">Rotação máx (rpm)</th>
-                <th class="nowrap" style="width:150px">Código</th>
-                <th class="nowrap" style="width:150px">Preço</th>
+                <th class="nowrap" style="min-width:120px">Fan Diameter</th>
+                <th class="nowrap" style="min-width:140px">Fan Hub Diameter</th>
+                <th class="nowrap" style="width:100px">FB/HB</th>
+                <th class="nowrap" style="width:120px">Nº de estágios</th>
+                <th class="nowrap" style="width:130px">Rotação máx (rpm)</th>
+                <th class="nowrap" style="width:150px">Frame máx IEC</th>
+                <th class="nowrap" style="width:150px">Frame máx NEMA</th>
+                <th class="nowrap" style="width:130px">Código</th>
+                <th class="nowrap" style="width:120px">Preço USD</th>
+                <th class="nowrap" style="width:120px">Preço CLP</th>
+                <th class="nowrap" style="width:120px">Preço R$</th>
                 <th class="nowrap" style="width:90px"></th>
             </tr>
         </thead>
@@ -305,14 +259,15 @@ else
                                value="@eq.RpmMax"
                                @onchange="a => Editar(eq.Serie, eq.Diametro, eq.Cubo, a.Value?.ToString() ?? string.Empty)" />
                     </td>
+                    <td>@FrameMax(eq, "IEC")</td>
+                    <td>@FrameMax(eq, "NEMA")</td>
                     <td>
-                        <input class="cell" style="max-width:130px" placeholder="—" value="@eq.Codigo"
-                               @onchange="a => DefinirCombinacao(eq, a.Value?.ToString() ?? string.Empty, null)" />
+                        <input class="cell" style="max-width:110px" placeholder="—" value="@eq.Codigo"
+                               @onchange="a => DefinirCodigo(eq, a.Value?.ToString() ?? string.Empty)" />
                     </td>
-                    <td>
-                        <input class="cell" style="max-width:130px; text-align:right" placeholder="—" value="@eq.Preco"
-                               @onchange="a => DefinirCombinacao(eq, null, a.Value?.ToString() ?? string.Empty)" />
-                    </td>
+                    <td>@PrecoDe(eq, Moeda.Usd)</td>
+                    <td>@PrecoDe(eq, Moeda.Clp)</td>
+                    <td>@PrecoDe(eq, Moeda.Brl)</td>
                     <td class="nowrap center">
                         @if (_apagarComb == eq.Id)
                         {
@@ -516,32 +471,18 @@ else
         }
 
         _rotacao = RegraRotacao.Verificar(_todos, vent.Serie, vent.Rotulo, cubo.Rotulo, _vRpm);
+        // o frame máximo da própria combinação, quando houver, manda sobre o do cubo
+        var comb = Achar(vent.Serie, vent.Rotulo, cubo.Rotulo);
         _motor = _vFrame.Length == 0
             ? null
-            : RegraMotor.Verificar(_limites, _motores, vent.Serie, cubo.Rotulo, _vPadrao, _vFrame);
+            : RegraMotor.Verificar(_limites, _motores, vent.Serie, cubo.Rotulo, _vPadrao,
+                _vFrame, comb?.FrameMaximo(_vPadrao) ?? "");
     }
 
     // ---------- a matriz ----------
 
     private Equipamento? Achar(string serie, string diametro, string cubo) => _todos
         .FirstOrDefault(e => e.Serie == serie && e.Diametro == diametro && e.Cubo == cubo);
-
-    /// <summary>
-    /// As colunas da matriz vêm da lista única, então uma série ocupa um trecho
-    /// contínuo de colunas — é esse trecho que vira o cabeçalho "VAX"/"Joy".
-    /// </summary>
-    private List<(string Serie, int Quantas)> GruposDeCubos()
-    {
-        var grupos = new List<(string Serie, int Quantas)>();
-        foreach (var c in _cubos)
-        {
-            if (grupos.Count > 0 && grupos[^1].Serie == c.Serie)
-                grupos[^1] = (c.Serie, grupos[^1].Quantas + 1);
-            else
-                grupos.Add((c.Serie, 1));
-        }
-        return grupos;
-    }
 
     // ---------- limpar uma lista ----------
 
@@ -621,18 +562,10 @@ else
         _msg = $"Limpo: {quantos} {alvo.Explica}.";
     }
 
-    /// <summary>
-    /// Os botões de posição e de exclusão de um ventilador ou de um cubo. Ficam
-    /// no cabeçalho da matriz — que é onde a lista de ventiladores (as linhas) e
-    /// a de cubos (as colunas) de fato moram. A seta acompanha o sentido: o
-    /// ventilador sobe e desce, o cubo anda para os lados.
-    /// </summary>
+    /// <summary>Os botões de posição e de exclusão de um ventilador ou de um cubo.</summary>
     private RenderFragment Controles(ItemModelo item) => @<text>
-        @{ var linha = item.Tipo == ItemModelo.TipoVentilador; }
-        <button class="btn-link" title="@(linha ? "Subir" : "Mover para a esquerda")"
-                @onclick="() => MoverRotulo(item, -1)">@(linha ? "↑" : "←")</button>
-        <button class="btn-link" title="@(linha ? "Descer" : "Mover para a direita")"
-                @onclick="() => MoverRotulo(item, 1)">@(linha ? "↓" : "→")</button>
+        <button class="btn-link" title="Subir" @onclick="() => MoverRotulo(item, -1)">↑</button>
+        <button class="btn-link" title="Descer" @onclick="() => MoverRotulo(item, 1)">↓</button>
         @if (_apagarRotulo == item.Id)
         {
             <button class="btn-link" @onclick="() => ApagarRotulo(item)">Sim</button>
@@ -640,14 +573,14 @@ else
         }
         else
         {
-            <button class="btn-link" title="@(linha ? "Apagar a linha inteira" : "Apagar a coluna inteira")"
+            <button class="btn-link" title="Apagar a linha inteira"
                     @onclick="@(() => _apagarRotulo = item.Id)">✕</button>
         }
     </text>;
 
     /// <summary>
-    /// A própria matriz é o editor: número na célula cria/atualiza a combinação,
-    /// célula apagada tira a combinação da tabela.
+    /// Cria/atualiza a rotação de uma combinação. Texto vazio tira a combinação
+    /// da lista.
     /// </summary>
     private void Editar(string serie, string diametro, string cubo, string texto)
     {
@@ -959,33 +892,93 @@ else
         Editar(_combSerie, vent, cubo, _combRpm.ToString());
     }
 
-    /// <summary>
-    /// Grava código e/ou preço da COMBINAÇÃO. O parâmetro que vier nulo não é
-    /// mexido — é o mesmo registro alimentado por dois campos.
-    /// </summary>
-    private void DefinirCombinacao(Equipamento eq, string? codigo, string? preco)
+    private void DefinirCodigo(Equipamento eq, string texto)
     {
-        var novoCodigo = (codigo ?? eq.Codigo).Trim();
-        var novoPreco = (preco ?? eq.Preco).Trim();
+        var codigo = texto.Trim();
+        if (codigo == eq.Codigo) return;
 
-        if (novoPreco.Length > 0 && DadosExcel.Numero(novoPreco) is null)
+        eq.Codigo = codigo;
+        Repo.Salvar(eq);
+        _msg = $"{eq.Serie} {eq.Diametro} / {eq.Cubo}: " +
+               (codigo.Length > 0 ? $"código {codigo}" : "sem código");
+    }
+
+    /// <summary>As três moedas em que a equipe cadastra preço.</summary>
+    private enum Moeda { Usd, Clp, Brl }
+
+    private static string Rotulo(Moeda m) => m switch
+    {
+        Moeda.Usd => "USD", Moeda.Clp => "CLP", _ => "R$",
+    };
+
+    private static string ValorDe(Equipamento eq, Moeda m) => m switch
+    {
+        Moeda.Usd => eq.PrecoUsd, Moeda.Clp => eq.PrecoClp, _ => eq.Preco,
+    };
+
+    /// <summary>Um dos três campos de preço da linha.</summary>
+    private RenderFragment PrecoDe(Equipamento eq, Moeda moeda) => @<text>
+        <input class="cell" style="max-width:100px; text-align:right" placeholder="—"
+               value="@ValorDe(eq, moeda)"
+               @onchange="a => DefinirPreco(eq, moeda, a.Value?.ToString() ?? string.Empty)" />
+    </text>;
+
+    private void DefinirPreco(Equipamento eq, Moeda moeda, string texto)
+    {
+        var preco = texto.Trim();
+        if (preco == ValorDe(eq, moeda)) return;
+
+        if (preco.Length > 0 && DadosExcel.Numero(preco) is null)
         {
-            _msg = $"\"{novoPreco}\" não parece um preço. Use 1234,56 ou 1234.56.";
-            Recarregar();
+            _msg = $"\"{preco}\" não parece um preço. Use 1234,56 ou 1234.56.";
+            Recarregar();   // devolve o campo ao valor gravado
             return;
         }
 
-        if (novoCodigo == eq.Codigo && novoPreco == eq.Preco) return;
-
-        eq.Codigo = novoCodigo;
-        eq.Preco = novoPreco;
+        switch (moeda)
+        {
+            case Moeda.Usd: eq.PrecoUsd = preco; break;
+            case Moeda.Clp: eq.PrecoClp = preco; break;
+            default: eq.Preco = preco; break;
+        }
         Repo.Salvar(eq);
 
         _msg = $"{eq.Serie} {eq.Diametro} / {eq.Cubo}: " +
-               (novoCodigo.Length > 0 ? $"código {novoCodigo}" : "sem código") +
-               (novoPreco.Length > 0 ? $", preço {novoPreco}" : "");
+               (preco.Length > 0 ? $"{Rotulo(moeda)} {preco}" : $"{Rotulo(moeda)} apagado");
+    }
 
-        Recarregar();
+    /// <summary>
+    /// O frame máximo desta combinação, num padrão. As opções são a escada da
+    /// aba Motores; "— do cubo —" deixa valer o limite mais grosso, o da tabela
+    /// <em>Motor máximo por cubo</em>.
+    /// </summary>
+    private RenderFragment FrameMax(Equipamento eq, string padrao) => @<text>
+        <select class="cell" style="max-width:135px" value="@eq.FrameMaximo(padrao)"
+                @onchange="a => DefinirFrameMax(eq, padrao, a.Value?.ToString() ?? string.Empty)">
+            <option value="" selected="@(eq.FrameMaximo(padrao).Length == 0)">— do cubo —</option>
+            @foreach (var f in MotorRepository.Escada(_motores, padrao))
+            {
+                <option value="@f" selected="@(f == eq.FrameMaximo(padrao))">@f</option>
+            }
+            @if (eq.FrameMaximo(padrao).Length > 0 &&
+                 !MotorRepository.Escada(_motores, padrao).Contains(eq.FrameMaximo(padrao)))
+            {
+                <option value="@eq.FrameMaximo(padrao)" selected>@eq.FrameMaximo(padrao) (fora da lista)</option>
+            }
+        </select>
+    </text>;
+
+    private void DefinirFrameMax(Equipamento eq, string padrao, string frame)
+    {
+        frame = frame.Trim();
+        var nema = padrao.Equals("NEMA", StringComparison.OrdinalIgnoreCase);
+        if (frame == (nema ? eq.FrameMaxNema : eq.FrameMaxIec)) return;
+
+        if (nema) eq.FrameMaxNema = frame; else eq.FrameMaxIec = frame;
+        Repo.Salvar(eq);
+
+        _msg = $"{eq.Serie} {eq.Diametro} / {eq.Cubo}: motor máximo {padrao} " +
+               (frame.Length > 0 ? frame : "= o do cubo");
     }
 
     /// <summary>FB/HB é texto livre por enquanto — a equipe ainda vai dizer os valores.</summary>
@@ -998,7 +991,6 @@ else
         Repo.Salvar(eq);
         _msg = $"{eq.Serie} {eq.Diametro} / {eq.Cubo}: " +
                (valor.Length > 0 ? $"FB/HB {valor}" : "FB/HB apagado");
-        Recarregar();
     }
 
     private void DefinirEstagios(Equipamento eq, string texto)
@@ -1010,7 +1002,6 @@ else
         Repo.Salvar(eq);
         _msg = $"{eq.Serie} {eq.Diametro} / {eq.Cubo}: " +
                (valor.Length > 0 ? $"{valor} estágio(s)" : "estágios em branco");
-        Recarregar();
     }
 
     private void ApagarCombinacao(Equipamento eq)

@@ -18,8 +18,12 @@ public sealed class Caracteristica
     public string Valor { get; set; } = "";
     /// <summary>Código do item. Vazio enquanto a equipe não subir os códigos.</summary>
     public string Codigo { get; set; } = "";
-    /// <summary>Preço do subitem, como a equipe digita. Vazio = sem preço.</summary>
+    /// <summary>Preço em reais, como a equipe digita. Vazio = sem preço.</summary>
     public string Preco { get; set; } = "";
+    /// <summary>Preço em dólar.</summary>
+    public string PrecoUsd { get; set; } = "";
+    /// <summary>Preço em peso chileno.</summary>
+    public string PrecoClp { get; set; } = "";
     /// <summary>Posição dentro do grupo (1 = primeiro da lista).</summary>
     public int Ordem { get; set; }
 
@@ -60,11 +64,13 @@ public sealed class CaracteristicaRepository
     public CaracteristicaRepository(ParquetStore store) => _store = store;
 
     public List<Caracteristica> Todas() => _store
-        .ReadLatest(Entidade, "id, grupo, valor, codigo, ordem, preco", r => new Caracteristica
-        {
-            Id = S(r, 0), Grupo = S(r, 1), Valor = S(r, 2), Codigo = S(r, 3), Ordem = Int(S(r, 4)),
-            Preco = S(r, 5),
-        })
+        .ReadLatest(Entidade, "id, grupo, valor, codigo, ordem, preco, precoUsd, precoClp",
+            r => new Caracteristica
+            {
+                Id = S(r, 0), Grupo = S(r, 1), Valor = S(r, 2), Codigo = S(r, 3),
+                Ordem = Int(S(r, 4)), Preco = S(r, 5),
+                PrecoUsd = S(r, 6), PrecoClp = S(r, 7),
+            })
         .OrderBy(c => c.Grupo)
         .ThenBy(c => c.Ordem)
         .ToList();
@@ -76,6 +82,7 @@ public sealed class CaracteristicaRepository
         {
             new("id", c.Id), new("grupo", c.Grupo), new("valor", c.Valor),
             new("codigo", c.Codigo), new("preco", c.Preco),
+            new("precoUsd", c.PrecoUsd), new("precoClp", c.PrecoClp),
             // zeros à esquerda: o Parquet guarda texto e sem isso a 10 viria antes da 2
             new("ordem", c.Ordem.ToString("D4")),
         });

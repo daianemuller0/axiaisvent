@@ -69,7 +69,7 @@
 <div class="panel" style="padding:0; overflow-x:auto">
     <!-- min-width: sem ele a tabela encolhe para caber no painel e as colunas
          cortam o texto ("< 112M" virava "< 1"); com ele, o painel rola -->
-    <table class="grid" style="min-width:1975px">
+    <table class="grid" style="min-width:2180px">
         <thead>
             <tr>
                 <th class="nowrap" style="width:64px">Ordem</th>
@@ -84,7 +84,9 @@
                 <th class="nowrap" style="width:105px">IEC/NEMA</th>
                 <th class="nowrap" style="width:150px">Frame</th>
                 <th class="nowrap" style="width:130px">Código</th>
-                <th class="nowrap" style="width:130px">Preço</th>
+                <th class="nowrap" style="width:120px">Preço USD</th>
+                <th class="nowrap" style="width:120px">Preço CLP</th>
+                <th class="nowrap" style="width:120px">Preço R$</th>
                 <th class="nowrap" style="min-width:230px">Observações</th>
                 <th class="nowrap" style="width:110px"></th>
             </tr>
@@ -123,7 +125,9 @@
                     </td>
                     <td>@Campo(motor, motor.Frame, (x, v) => x.Frame = v, "carcaça", 130, negrito: true)</td>
                     <td>@Campo(motor, motor.Codigo, (x, v) => x.Codigo = v, "—", 110)</td>
-                    <td>@Preco(motor)</td>
+                    <td>@Preco(motor, Moeda.Usd)</td>
+                    <td>@Preco(motor, Moeda.Clp)</td>
+                    <td>@Preco(motor, Moeda.Brl)</td>
                     <td>@Campo(motor, motor.Observacoes, (x, v) => x.Observacoes = v, "—", 230)</td>
                     <td class="nowrap center">
                         <button class="btn-link" title="Subir (carcaça menor)" @onclick="() => Mover(motor, -1)">↑</button>
@@ -230,27 +234,46 @@
                @onchange="e => Definir(motor, guardar, e.Value?.ToString() ?? string.Empty)" />
     </text>;
 
+    /// <summary>
+    /// Grava um campo. NÃO relê a lista inteira de propósito: o objeto editado
+    /// já é o da lista, e reler forçava um redesenho da tabela toda — que, com
+    /// muitas linhas, apagava o que estava sendo digitado em outro campo.
+    /// </summary>
     private void Definir(Motor motor, Action<Motor, string> guardar, string texto)
     {
         guardar(motor, texto.Trim());
         Repo.Salvar(motor);
-        _todos = Repo.Todos();
         Aviso($"{motor.Descricao}: gravado.");
     }
+
+    /// <summary>As três moedas em que a equipe cadastra preço.</summary>
+    private enum Moeda { Usd, Clp, Brl }
+
+    private static string Rotulo(Moeda m) => m switch
+    {
+        Moeda.Usd => "USD", Moeda.Clp => "CLP", _ => "R$",
+    };
+
+    private static string ValorDe(Motor m, Moeda moeda) => moeda switch
+    {
+        Moeda.Usd => m.PrecoUsd, Moeda.Clp => m.PrecoClp, _ => m.Preco,
+    };
 
     /// <summary>
     /// O preço tem validação própria: número que não dá para ler é recusado,
     /// porque um preço errado é pior do que um preço em branco.
     /// </summary>
-    private RenderFragment Preco(Motor motor) => @<text>
-        <input class="cell" placeholder="—" style="max-width:110px; text-align:right"
-               value="@motor.Preco"
-               @onchange="e => DefinirPreco(motor, e.Value?.ToString() ?? string.Empty)" />
+    private RenderFragment Preco(Motor motor, Moeda moeda) => @<text>
+        <input class="cell" placeholder="—" style="max-width:100px; text-align:right"
+               value="@ValorDe(motor, moeda)"
+               @onchange="e => DefinirPreco(motor, moeda, e.Value?.ToString() ?? string.Empty)" />
     </text>;
 
-    private void DefinirPreco(Motor motor, string texto)
+    private void DefinirPreco(Motor motor, Moeda moeda, string texto)
     {
         var preco = texto.Trim();
+        if (preco == ValorDe(motor, moeda)) return;
+
         if (preco.Length > 0 && DadosExcel.Numero(preco) is null)
         {
             _todos = Repo.Todos();   // devolve o campo ao valor gravado
@@ -258,12 +281,17 @@
             return;
         }
 
-        motor.Preco = preco;
+        switch (moeda)
+        {
+            case Moeda.Usd: motor.PrecoUsd = preco; break;
+            case Moeda.Clp: motor.PrecoClp = preco; break;
+            default: motor.Preco = preco; break;
+        }
         Repo.Salvar(motor);
-        _todos = Repo.Todos();
+
         Aviso(preco.Length == 0
-            ? $"Preço de {motor.Descricao} apagado."
-            : $"{motor.Descricao}: preço {preco}.");
+            ? $"{motor.Descricao}: {Rotulo(moeda)} apagado."
+            : $"{motor.Descricao}: {Rotulo(moeda)} {preco}.");
     }
 
     /// <summary>
