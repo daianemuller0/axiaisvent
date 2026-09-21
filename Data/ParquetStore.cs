@@ -44,6 +44,39 @@ public sealed class ParquetStore
         return dir;
     }
 
+    /// <summary>
+    /// Último carimbo entregue por <see cref="ProximoTs"/>.
+    /// </summary>
+    private static long _ultimoTs;
+
+    /// <summary>
+    /// O carimbo (_ts) de uma gravação, <b>estritamente crescente</b>.
+    ///
+    /// Não dá para usar <c>DateTime.UtcNow.Ticks</c> direto: no Windows o
+    /// relógio do sistema só avança a cada ~15 ms, então duas gravações
+    /// seguidas recebem o MESMO carimbo. E aí a consolidação da leitura
+    /// (row_number() por _ts) empata, o desempate é arbitrário, e a versão
+    /// velha do registro pode ganhar — na prática o dado recém-digitado some,
+    /// volta e some de novo a cada leitura. (No Linux o relógio tem resolução
+    /// de nanossegundos e o problema não aparece, que é por que ele passou
+    /// despercebido aqui.)
+    ///
+    /// Aqui o relógio é só o piso: se ele não andou, o carimbo anda sozinho,
+    /// +1 por gravação. Assim a ordem das gravações deste processo é sempre
+    /// respeitada, por mais rápido que a pessoa digite.
+    /// </summary>
+    private static long ProximoTs()
+    {
+        while (true)
+        {
+            var anterior = Interlocked.Read(ref _ultimoTs);
+            var agora = DateTime.UtcNow.Ticks;
+            var proximo = agora > anterior ? agora : anterior + 1;
+            if (Interlocked.CompareExchange(ref _ultimoTs, proximo, anterior) == anterior)
+                return proximo;
+        }
+    }
+
     private static DuckDBConnection Open()
     {
         var conn = new DuckDBConnection("Data Source=:memory:");
@@ -73,18 +106,21 @@ public sealed class ParquetStore
             cmd.ExecuteNonQuery();
         }
 
+        var ts = ProximoTs();
+
         var placeholders = string.Join(", ", row.Select(_ => "?")) + ", ?, ?";
         using (var cmd = conn.CreateCommand())
         {
             cmd.CommandText = $"INSERT INTO t VALUES ({placeholders});";
             foreach (var kv in row) AddParam(cmd, kv.Value);
-            AddParam(cmd, DateTime.UtcNow.Ticks);
+            AddParam(cmd, ts);
             AddParam(cmd, deleted);
             cmd.ExecuteNonQuery();
         }
 
         var dir = EntityDir(entity);
-        var fileName = $"{DateTime.UtcNow.Ticks:D19}_{Guid.NewGuid():N}.parquet";
+        // o nome do arquivo leva o MESMO carimbo: é o desempate da leitura
+        var fileName = $"{ts:D19}_{Guid.NewGuid():N}.parquet";
         var full = Duck(Path.Combine(dir, fileName));
         using (var cmd = conn.CreateCommand())
         {
@@ -122,11 +158,17 @@ public sealed class ParquetStore
             .Select(c => presentes.Contains(c) ? c : $"NULL AS {c}"));
 
         var order = string.IsNullOrWhiteSpace(orderBy) ? "" : $" ORDER BY {orderBy}";
+        // O desempate por nome de arquivo é o cinto de segurança: mesmo que dois
+        // carimbos coincidam (duas MÁQUINAS gravando no mesmo milissegundo), a
+        // leitura devolve sempre a mesma resposta em vez de oscilar. E como o
+        // nome começa pelo carimbo, a ordem continua sendo a das gravações.
         var sql = $@"
 SELECT {cols}
 FROM (
-    SELECT *, row_number() OVER (PARTITION BY id ORDER BY _ts DESC) AS _rn
-    FROM read_parquet('{glob}', union_by_name=true)
+    SELECT *, row_number() OVER (
+        PARTITION BY id ORDER BY _ts DESC, filename DESC
+    ) AS _rn
+    FROM read_parquet('{glob}', union_by_name=true, filename=true)
 )
 WHERE _rn = 1 AND NOT _deleted{order};";
 

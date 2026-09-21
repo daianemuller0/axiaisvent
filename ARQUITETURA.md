@@ -482,6 +482,32 @@ A semeadura é **por item**: uma lista nova de fábrica entra sem tocar nas que 
 ajustou ou já codificou. Bancos anteriores, que guardavam o grupo só dentro dos subitens,
 ganham os itens correspondentes na primeira abertura.
 
+### O carimbo de tempo tem de andar sempre
+
+Cada gravação é um arquivo Parquet novo, e a leitura consolida por `id` ficando com o
+`_ts` mais alto. Isso só funciona se **dois `_ts` nunca empatarem**.
+
+O `_ts` vinha de `DateTime.UtcNow.Ticks`. No Linux, onde este código foi escrito e testado,
+o relógio tem resolução de nanossegundos e nunca empata. **No Windows ele só avança a cada
+~15 ms** — então duas gravações seguidas recebiam o mesmo carimbo, o `row_number()`
+desempatava de forma arbitrária, e a versão *velha* do registro podia ganhar. O sintoma:
+o dado recém-digitado sumia, voltava e sumia de novo conforme a pessoa navegava. Só
+aparecia na máquina da equipe.
+
+A correção tem duas partes:
+
+- **`ProximoTs()`**: o relógio virou o *piso* do carimbo, não o carimbo. Se ele não andou,
+  o número anda sozinho (`anterior + 1`), num `Interlocked`. A ordem das gravações do
+  processo é sempre respeitada, por mais rápido que a pessoa digite.
+- **desempate pelo nome do arquivo** na leitura (`ORDER BY _ts DESC, filename DESC`, com
+  `filename=true` no `read_parquet`). O nome começa pelo mesmo carimbo, então a ordem
+  continua sendo a das gravações; e se dois carimbos coincidirem — duas *máquinas*
+  gravando no mesmo instante — a leitura pelo menos devolve sempre a mesma resposta, em
+  vez de oscilar.
+
+> A lição, para o resto do sistema: um carimbo de tempo não é uma chave de ordenação
+> confiável enquanto não for **estritamente crescente por construção**.
+
 ### Código e preço: onde ficam
 
 | O quê | Entidade | Campos |
