@@ -44,13 +44,18 @@ public static class DadosExcel
             posicao.TryGetValue((serie, tipo, rotulo), out var o) ? o : int.MaxValue;
 
         Montar(wb, AbaModelos,
-            new[] { "Série", "Ventilador", "Cubo", "Rotação máx (rpm)", "Código", "Preço" },
+            new[]
+            {
+                "Série", "Ventilador", "Cubo", "FB/HB", "Nº de estágios",
+                "Rotação máx (rpm)", "Código", "Preço",
+            },
             equipamentos
                 .OrderBy(e => Pos(e.Serie, ItemModelo.TipoVentilador, e.Diametro))
                 .ThenBy(e => Pos(e.Serie, ItemModelo.TipoCubo, e.Cubo))
                 .Select(e => new object?[]
                 {
-                    e.Serie, e.Diametro, e.Cubo, e.RpmMax, e.Codigo, Numero(e.Preco),
+                    e.Serie, e.Diametro, e.Cubo, e.FbHb, Numero(e.Estagios),
+                    e.RpmMax, e.Codigo, Numero(e.Preco),
                 }));
 
         // O cadastro de ventiladores e de cubos — é ele que forma as linhas e as
@@ -264,6 +269,9 @@ public static class DadosExcel
         var iRpm = Coluna(cab, "rotação máx (rpm)", "rotação", "rotacao", "rpm");
         var iCodigo = Coluna(cab, "código", "codigo", "cod");
         var iPreco = Coluna(cab, "preço", "preco");
+        var iFbHb = Coluna(cab, "fb/hb", "fbhb", "fb / hb");
+        var iEstagios = Coluna(cab, "nº de estágios", "n° de estágios", "no de estagios",
+            "nº estágios", "estágios", "estagios");
 
         if (iSerie < 0 || iVent < 0 || iCubo < 0 || iRpm < 0)
         {
@@ -291,6 +299,11 @@ public static class DadosExcel
                 Serie = serie, Diametro = vent, Cubo = cubo, RpmMax = rpm,
                 Codigo = iCodigo >= 0 ? T(l, iCodigo) : atual?.Codigo ?? "",
                 Preco = iPreco >= 0 ? PrecoNormalizado(T(l, iPreco)) : atual?.Preco ?? "",
+                FbHb = iFbHb >= 0 ? T(l, iFbHb) : atual?.FbHb ?? "",
+                // o Excel devolve "1,00" onde a equipe digitou 1
+                Estagios = iEstagios >= 0
+                    ? MedidaNormalizada(T(l, iEstagios))
+                    : atual?.Estagios ?? "",
             });
             gravadas++;
         }

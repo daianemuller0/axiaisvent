@@ -37,6 +37,14 @@ public sealed class Equipamento
     /// <summary>Preço da combinação, como a equipe digita. Vazio = sem preço.</summary>
     public string Preco { get; set; } = "";
 
+    /// <summary>FB/HB, como a equipe escreve. Vazio = ainda não definido.</summary>
+    public string FbHb { get; set; } = "";
+    /// <summary>Número de estágios do equipamento: "1" ou "2".</summary>
+    public string Estagios { get; set; } = "";
+
+    /// <summary>Os estagiamentos possíveis, como a equipe preenche.</summary>
+    public static readonly string[] Estagiamentos = { "1", "2" };
+
     public static string MontarId(string serie, string diametro, string cubo) =>
         $"{serie}-{diametro}-{cubo}";
 }
@@ -90,12 +98,14 @@ public sealed class EquipamentoRepository
     public EquipamentoRepository(ParquetStore store) => _store = store;
 
     public List<Equipamento> Todos() => _store
-        .ReadLatest(Entidade, "id, serie, diametro, cubo, rpmMax, codigo, preco", r => new Equipamento
-        {
-            Id = S(r, 0), Serie = S(r, 1), Diametro = S(r, 2),
-            Cubo = S(r, 3), RpmMax = Int(S(r, 4)),
-            Codigo = S(r, 5), Preco = S(r, 6),
-        })
+        .ReadLatest(Entidade, "id, serie, diametro, cubo, rpmMax, codigo, preco, fbHb, estagios",
+            r => new Equipamento
+            {
+                Id = S(r, 0), Serie = S(r, 1), Diametro = S(r, 2),
+                Cubo = S(r, 3), RpmMax = Int(S(r, 4)),
+                Codigo = S(r, 5), Preco = S(r, 6),
+                FbHb = S(r, 7), Estagios = S(r, 8),
+            })
         .OrderBy(e => e.Serie)
         .ThenBy(e => Medida.Numero(e.Diametro))
         .ThenBy(e => Medida.Numero(e.Cubo))
@@ -110,6 +120,7 @@ public sealed class EquipamentoRepository
             new("diametro", e.Diametro), new("cubo", e.Cubo),
             new("rpmMax", e.RpmMax.ToString()),
             new("codigo", e.Codigo), new("preco", e.Preco),
+            new("fbHb", e.FbHb), new("estagios", e.Estagios),
         });
     }
 
@@ -140,6 +151,7 @@ public sealed class EquipamentoRepository
                 {
                     Serie = e.Serie, Diametro = e.Diametro, Cubo = para, RpmMax = e.RpmMax,
                     Codigo = e.Codigo, Preco = e.Preco,
+                    FbHb = e.FbHb, Estagios = e.Estagios,
                 });
             }
         }

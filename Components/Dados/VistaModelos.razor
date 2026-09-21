@@ -270,6 +270,8 @@ else
                 <th class="nowrap" style="width:90px">Série</th>
                 <th class="nowrap">Fan Diameter</th>
                 <th class="nowrap">Fan Hub Diameter</th>
+                <th class="nowrap" style="width:110px">FB/HB</th>
+                <th class="nowrap" style="width:140px">Nº de estágios</th>
                 <th class="nowrap" style="width:150px">Rotação máx (rpm)</th>
                 <th class="nowrap" style="width:150px">Código</th>
                 <th class="nowrap" style="width:150px">Preço</th>
@@ -284,6 +286,20 @@ else
                     <td class="nowrap"><span class="val-count">@eq.Serie</span></td>
                     <td class="nowrap"><strong>@eq.Diametro</strong></td>
                     <td class="nowrap"><strong>@eq.Cubo</strong></td>
+                    <td>
+                        <input class="cell" style="max-width:90px" placeholder="—" value="@eq.FbHb"
+                               @onchange="a => DefinirFbHb(eq, a.Value?.ToString() ?? string.Empty)" />
+                    </td>
+                    <td>
+                        <select class="cell" style="max-width:110px" value="@eq.Estagios"
+                                @onchange="a => DefinirEstagios(eq, a.Value?.ToString() ?? string.Empty)">
+                            <option value="" selected="@(eq.Estagios.Length == 0)">—</option>
+                            @foreach (var n in Equipamento.Estagiamentos)
+                            {
+                                <option value="@n" selected="@(n == eq.Estagios)">@n</option>
+                            }
+                        </select>
+                    </td>
                     <td>
                         <input class="cell" style="max-width:130px; text-align:right"
                                value="@eq.RpmMax"
@@ -651,8 +667,9 @@ else
             Repo.Salvar(new Equipamento
             {
                 Serie = serie, Diametro = diametro, Cubo = cubo, RpmMax = rpm,
-                // mexer na rotação não pode apagar o que já foi codificado
+                // mexer na rotação não pode apagar o resto da linha
                 Codigo = existente?.Codigo ?? "", Preco = existente?.Preco ?? "",
+                FbHb = existente?.FbHb ?? "", Estagios = existente?.Estagios ?? "",
             });
             _msg = $"{serie} {diametro} / {cubo}: máx. {rpm} rpm.";
         }
@@ -803,6 +820,7 @@ else
                 Cubo = ventilador ? e.Cubo : rotulo,
                 RpmMax = e.RpmMax,
                 Codigo = e.Codigo, Preco = e.Preco,
+                FbHb = e.FbHb, Estagios = e.Estagios,
             });
             movidas++;
         }
@@ -894,7 +912,7 @@ else
     }
 
     private static bool Casa(Equipamento e, string filtro) =>
-        new[] { e.Serie, e.Diametro, e.Cubo, e.Codigo, e.RpmMax.ToString() }
+        new[] { e.Serie, e.Diametro, e.Cubo, e.Codigo, e.FbHb, e.Estagios, e.RpmMax.ToString() }
             .Any(t => t.Contains(filtro, StringComparison.OrdinalIgnoreCase));
 
     private void TrocarSerieNova(string serie)
@@ -967,6 +985,31 @@ else
                (novoCodigo.Length > 0 ? $"código {novoCodigo}" : "sem código") +
                (novoPreco.Length > 0 ? $", preço {novoPreco}" : "");
 
+        Recarregar();
+    }
+
+    /// <summary>FB/HB é texto livre por enquanto — a equipe ainda vai dizer os valores.</summary>
+    private void DefinirFbHb(Equipamento eq, string texto)
+    {
+        var valor = texto.Trim();
+        if (valor == eq.FbHb) return;
+
+        eq.FbHb = valor;
+        Repo.Salvar(eq);
+        _msg = $"{eq.Serie} {eq.Diametro} / {eq.Cubo}: " +
+               (valor.Length > 0 ? $"FB/HB {valor}" : "FB/HB apagado");
+        Recarregar();
+    }
+
+    private void DefinirEstagios(Equipamento eq, string texto)
+    {
+        var valor = texto.Trim();
+        if (valor == eq.Estagios) return;
+
+        eq.Estagios = valor;
+        Repo.Salvar(eq);
+        _msg = $"{eq.Serie} {eq.Diametro} / {eq.Cubo}: " +
+               (valor.Length > 0 ? $"{valor} estágio(s)" : "estágios em branco");
         Recarregar();
     }
 

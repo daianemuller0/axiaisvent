@@ -486,7 +486,7 @@ ganham os itens correspondentes na primeira abertura.
 
 | O quê | Entidade | Campos |
 |---|---|---|
-| **Equipamento** (ventilador × cubo) | `equipamentos` | `codigo`, `preco` |
+| **Equipamento** (ventilador × cubo) | `equipamentos` | `codigo`, `preco`, `fbHb`, `estagios` |
 | Frame de motor | `frames` | `codigo`, `preco` |
 | Subitem de característica | `caracteristicas` | `codigo`, `preco` |
 
@@ -499,7 +499,12 @@ isso que a tabela de referência da equipe diz, com uma célula amarela para cad
 
 Então o código e o preço vivem no `Equipamento`, que já era a combinação, e a tela mostra
 **uma lista só, cruzada**: uma linha por célula amarela, com série, ventilador, cubo,
-rotação máxima, código e preço. `itens_modelo` ficou sendo só o cadastro do rótulo e da
+**FB/HB**, **nº de estágios**, rotação máxima, código e preço. Estes dois últimos também
+são do par, não das pontas: é o equipamento montado que tem um ou dois estágios.
+
+`estagios` é `1` ou `2` (um seletor, em branco enquanto não definido). `fbHb` é texto
+livre **por enquanto** — a equipe ainda não disse quais valores entram; quando disser,
+vira seletor como os outros. `itens_modelo` ficou sendo só o cadastro do rótulo e da
 posição.
 
 Onde isso deixou a edição dos rótulos: **no cabeçalho da própria matriz**. A linha é o
@@ -610,7 +615,7 @@ uma aba, com o mesmo nome nos dois sentidos — o que sai é exatamente o que en
 
 | Aba | Colunas |
 |---|---|
-| `Modelos` | Série · Ventilador · Cubo · Rotação máx (rpm) · Código · Preço |
+| `Modelos` | Série · Ventilador · Cubo · FB/HB · Nº de estágios · Rotação máx (rpm) · Código · Preço |
 | `Ventiladores` | Ordem · Série · Ventilador |
 | `Cubos` | Ordem · Série · Cubo |
 | `Limites de motor` | Série · Cubo · Padrão · Frame máximo |
