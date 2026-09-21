@@ -38,8 +38,9 @@ Uma guia só, com tudo na mesma página:
   cruzada dos equipamentos com código e preço, o alerta de rotação e o motor máximo por
   cubo. **VAX e Joy ficam juntos**, com a série numa coluna — não há abas de linha de
   produto.
-- **Motores** — o catálogo de motores, com fabricante, potência (CV), frequência, rotação,
-  nº de polos, tipo de flange, IEC/NEMA e **frame** (a carcaça), além de código e preço.
+- **Motores** — o catálogo de motores, com fabricante, potência (CV), frequência, tensão,
+  rotação, nº de polos, tipo de flange, IEC/NEMA, **frame** (a carcaça) e observações,
+  além de código e preço.
   A ordem da lista, dentro de cada padrão, é a ordem de tamanho das carcaças.
 - **Características** — **itens** (as listas: solidez, base, partidores, instrumentação…)
   e seus **subitens** (as opções), cada subitem com um código. De fábrica são 15 itens e
@@ -85,7 +86,8 @@ nunca apaga por ausência.
 ## A aba Motores (antiga — hoje é uma vista dentro de Dados)
 
 O catálogo de motores, com as colunas da planilha da equipe: **Fabricante · Potência CV ·
-Frequência · Rotação · Nº Polos · Tipo de Flange · IEC/NEMA · Frame**, mais código e preço.
+Frequência · Tensão · Rotação · Nº Polos · Tipo de Flange · IEC/NEMA · Frame ·
+Observações**, mais código e preço.
 
 A ordem da lista **não é alfabética, é ordem de tamanho** das carcaças — do `< 112M` ao
 `355A/B` no IEC, do `254T` ao `588/9T` no NEMA. É essa escada que responde "esse motor

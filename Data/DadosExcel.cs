@@ -83,14 +83,15 @@ public static class DadosExcel
         Montar(wb, AbaMotores,
             new[]
             {
-                "Ordem", "Fabricante", "Potência CV", "Frequência", "Rotação", "Nº Polos",
-                "Tipo de Flange", "IEC/NEMA", "Frame", "Código", "Preço", "Id (não mexer)",
+                "Ordem", "Fabricante", "Potência CV", "Frequência", "Tensão", "Rotação",
+                "Nº Polos", "Tipo de Flange", "IEC/NEMA", "Frame", "Código", "Preço",
+                "Observações", "Id (não mexer)",
             },
             motores.Select(m => new object?[]
             {
-                m.Ordem, m.Fabricante, Numero(m.PotenciaCv), Numero(m.Frequencia),
+                m.Ordem, m.Fabricante, Numero(m.PotenciaCv), Numero(m.Frequencia), m.Tensao,
                 Numero(m.Rotacao), Numero(m.Polos), m.Flange, m.Padrao, m.Frame,
-                m.Codigo, Numero(m.Preco), m.Id,
+                m.Codigo, Numero(m.Preco), m.Observacoes, m.Id,
             }));
 
         // As listas entram mesmo vazias: assim um item recém-criado aparece na
@@ -342,6 +343,8 @@ public static class DadosExcel
         var iRotacao = Coluna(cab, "rotação", "rotacao", "rpm");
         var iPolos = Coluna(cab, "nº polos", "n° polos", "no polos", "polos");
         var iFlange = Coluna(cab, "tipo de flange", "flange");
+        var iTensao = Coluna(cab, "tensão", "tensao", "volt", "volts", "v");
+        var iObs = Coluna(cab, "observações", "observacoes", "observação", "observacao", "obs");
         var iCodigo = Coluna(cab, "código", "codigo", "cod");
         var iPreco = Coluna(cab, "preço", "preco", "valor");
 
@@ -405,6 +408,8 @@ public static class DadosExcel
                 Rotacao = MedidaNormalizada(Campo(iRotacao, atual?.Rotacao)),
                 Polos = MedidaNormalizada(Campo(iPolos, atual?.Polos)),
                 Flange = Campo(iFlange, atual?.Flange),
+                Tensao = Campo(iTensao, atual?.Tensao),
+                Observacoes = Campo(iObs, atual?.Observacoes),
                 Codigo = Campo(iCodigo, atual?.Codigo),
                 Preco = iPreco >= 0 ? PrecoNormalizado(T(l, iPreco)) : atual?.Preco ?? "",
             });

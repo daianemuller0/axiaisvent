@@ -322,6 +322,7 @@ planilha da equipe:
 | `fabricante` | quem fabrica |
 | `potenciaCv` | potência em CV (`7,5`) |
 | `frequencia` | Hz (`60`) |
+| `tensao` | tensão como a equipe escreve (`220/380 V`) |
 | `rotacao` | rpm (`1750`) |
 | `polos` | número de polos (`4`) |
 | `flange` | tipo de flange (`B5`) |
@@ -329,6 +330,7 @@ planilha da equipe:
 | `frame` | a carcaça, como a equipe escreve: `225S/M`, `364/5T` |
 | `ordem` | posição na lista, **dentro do padrão** |
 | `codigo`, `preco` | o que o motor contribui para o equipamento |
+| `observacoes` | texto livre — o que não coube nas outras colunas |
 
 A entidade no Parquet continua se chamando `frames`: é a pasta que já existe no
 compartilhamento de rede, com os dados gravados. O nome é interno. A coluna da carcaça

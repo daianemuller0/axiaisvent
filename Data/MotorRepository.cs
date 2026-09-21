@@ -25,6 +25,8 @@ public sealed class Motor
     public string PotenciaCv { get; set; } = "";
     /// <summary>Frequência em Hz ("60", "50").</summary>
     public string Frequencia { get; set; } = "";
+    /// <summary>Tensão, como a equipe escreve ("220/380 V", "440").</summary>
+    public string Tensao { get; set; } = "";
     /// <summary>Rotação em rpm ("1750", "3500").</summary>
     public string Rotacao { get; set; } = "";
     /// <summary>Número de polos ("2", "4", "6").</summary>
@@ -43,6 +45,8 @@ public sealed class Motor
     public string Codigo { get; set; } = "";
     /// <summary>Preço, como a equipe digita. Vazio = sem preço.</summary>
     public string Preco { get; set; } = "";
+    /// <summary>Observações em texto livre — o que não coube nas outras colunas.</summary>
+    public string Observacoes { get; set; } = "";
 
     /// <summary>Como o motor aparece numa mensagem: o frame, ou o que houver.</summary>
     public string Descricao
@@ -78,7 +82,8 @@ public sealed class MotorRepository
         // motores; bancos gravados naquela época ainda trazem a coluna antiga.
         .ReadLatest(Entidade,
             "id, padrao, frame, nome, ordem, codigo, preco, " +
-            "fabricante, potenciaCv, frequencia, rotacao, polos, flange",
+            "fabricante, potenciaCv, frequencia, rotacao, polos, flange, " +
+            "tensao, observacoes",
             r => new Motor
             {
                 Id = S(r, 0), Padrao = S(r, 1),
@@ -86,6 +91,7 @@ public sealed class MotorRepository
                 Ordem = Int(S(r, 4)), Codigo = S(r, 5), Preco = S(r, 6),
                 Fabricante = S(r, 7), PotenciaCv = S(r, 8), Frequencia = S(r, 9),
                 Rotacao = S(r, 10), Polos = S(r, 11), Flange = S(r, 12),
+                Tensao = S(r, 13), Observacoes = S(r, 14),
             })
         .OrderBy(m => PosicaoDoPadrao(m.Padrao))
         .ThenBy(m => m.Ordem)
@@ -123,6 +129,7 @@ public sealed class MotorRepository
             new("fabricante", m.Fabricante), new("potenciaCv", m.PotenciaCv),
             new("frequencia", m.Frequencia), new("rotacao", m.Rotacao),
             new("polos", m.Polos), new("flange", m.Flange),
+            new("tensao", m.Tensao), new("observacoes", m.Observacoes),
         });
     }
 

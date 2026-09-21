@@ -1,8 +1,8 @@
 @inject MotorRepository Repo
 
 <p class="subtitle">
-    O catálogo de motores: fabricante, potência, frequência, rotação, polos, flange, padrão
-    e <strong>frame</strong> (a carcaça). A ordem da lista, dentro de cada padrão, é a
+    O catálogo de motores: fabricante, potência, frequência, tensão, rotação, polos, flange,
+    padrão, <strong>frame</strong> (a carcaça) e observações. A ordem da lista, dentro de cada padrão, é a
     <strong>ordem de tamanho</strong> das carcaças — é ela que diz se um motor passa do
     máximo que cabe no cubo.
 </p>
@@ -68,13 +68,14 @@
 <div class="panel" style="padding:0; overflow-x:auto">
     <!-- min-width: sem ele a tabela encolhe para caber no painel e as colunas
          cortam o texto ("< 112M" virava "< 1"); com ele, o painel rola -->
-    <table class="grid" style="min-width:1480px">
+    <table class="grid" style="min-width:1860px">
         <thead>
             <tr>
                 <th class="nowrap" style="width:64px">Ordem</th>
                 <th class="nowrap" style="min-width:150px">Fabricante</th>
                 <th class="nowrap" style="width:110px">Potência CV</th>
                 <th class="nowrap" style="width:110px">Frequência</th>
+                <th class="nowrap" style="width:130px">Tensão</th>
                 <th class="nowrap" style="width:105px">Rotação</th>
                 <th class="nowrap" style="width:95px">Nº Polos</th>
                 <th class="nowrap" style="width:130px">Tipo de Flange</th>
@@ -82,6 +83,7 @@
                 <th class="nowrap" style="width:150px">Frame</th>
                 <th class="nowrap" style="width:130px">Código</th>
                 <th class="nowrap" style="width:130px">Preço</th>
+                <th class="nowrap" style="min-width:230px">Observações</th>
                 <th class="nowrap" style="width:110px"></th>
             </tr>
         </thead>
@@ -94,6 +96,7 @@
                     <td>@Campo(motor, motor.Fabricante, (x, v) => x.Fabricante = v, "—", 150)</td>
                     <td>@Campo(motor, motor.PotenciaCv, (x, v) => x.PotenciaCv = v, "—", 90, direita: true)</td>
                     <td>@Campo(motor, motor.Frequencia, (x, v) => x.Frequencia = v, "Hz", 90, direita: true)</td>
+                    <td>@Campo(motor, motor.Tensao, (x, v) => x.Tensao = v, "V", 110)</td>
                     <td>@Campo(motor, motor.Rotacao, (x, v) => x.Rotacao = v, Rpm(motor), 85, direita: true)</td>
                     <td>@Campo(motor, motor.Polos, (x, v) => x.Polos = v, "—", 75, direita: true)</td>
                     <td>@Campo(motor, motor.Flange, (x, v) => x.Flange = v, "—", 110)</td>
@@ -109,6 +112,7 @@
                     <td>@Campo(motor, motor.Frame, (x, v) => x.Frame = v, "carcaça", 130, negrito: true)</td>
                     <td>@Campo(motor, motor.Codigo, (x, v) => x.Codigo = v, "—", 110)</td>
                     <td>@Preco(motor)</td>
+                    <td>@Campo(motor, motor.Observacoes, (x, v) => x.Observacoes = v, "—", 230)</td>
                     <td class="nowrap center">
                         <button class="btn-link" title="Subir (carcaça menor)" @onclick="() => Mover(motor, -1)">↑</button>
                         <button class="btn-link" title="Descer (carcaça maior)" @onclick="() => Mover(motor, 1)">↓</button>
@@ -173,8 +177,8 @@
     }
 
     private static bool Casa(Motor m, string busca) =>
-        new[] { m.Fabricante, m.PotenciaCv, m.Frequencia, m.Rotacao, m.Polos,
-                m.Flange, m.Padrao, m.Frame, m.Codigo }
+        new[] { m.Fabricante, m.PotenciaCv, m.Frequencia, m.Tensao, m.Rotacao, m.Polos,
+                m.Flange, m.Padrao, m.Frame, m.Codigo, m.Observacoes }
             .Any(t => t.Contains(busca, StringComparison.OrdinalIgnoreCase));
 
     private List<Motor> DoPadrao(string padrao) =>
