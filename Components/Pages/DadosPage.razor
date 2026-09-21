@@ -6,7 +6,7 @@
 @inject EquipamentoRepository Equipamentos
 @inject ItemModeloRepository ItensModelo
 @inject LimiteMotorRepository Limites
-@inject FrameRepository Frames
+@inject MotorRepository Motores
 @inject CaracteristicaRepository Caracteristicas
 @inject IJSRuntime JS
 
@@ -142,7 +142,7 @@
     private void Contar()
     {
         _contaModelos = Equipamentos.Todos().Count;
-        _contaMotores = Frames.Todos().Count;
+        _contaMotores = Motores.Todos().Count;
         _contaCaracteristicas = Caracteristicas.Todas().Count;
     }
 
@@ -177,7 +177,7 @@
             ItensModelo.Limpar();
             Limites.Limpar();
         }
-        if (_limparMotores) Frames.Limpar();
+        if (_limparMotores) Motores.Limpar();
         if (_limparCaracteristicas) Caracteristicas.Limpar();
 
         _confirmandoLimpeza = false;
@@ -189,7 +189,7 @@
     private async Task Exportar()
     {
         var bytes = DadosExcel.Exportar(
-            Equipamentos.Todos(), ItensModelo.Todos(), Limites.Todos(), Frames.Todos(),
+            Equipamentos.Todos(), ItensModelo.Todos(), Limites.Todos(), Motores.Todos(),
             Caracteristicas.Grupos(), Caracteristicas.Todas());
 
         await JS.InvokeVoidAsync("appDownload",
@@ -220,7 +220,7 @@
             memoria.Position = 0;
 
             var resumo = DadosExcel.Importar(memoria, Equipamentos, ItensModelo,
-                Limites, Frames, Caracteristicas);
+                Limites, Motores, Caracteristicas);
 
             var partes = new List<string>();
             if (resumo.Modelos > 0) partes.Add($"{resumo.Modelos} modelo(s)");

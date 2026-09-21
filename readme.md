@@ -18,7 +18,7 @@ A tabela técnica dos equipamentos — as linhas **VAX** e **Joy**, transcritas 
   existe, ele diz quais cubos servem para aquele diâmetro.
 - **Limite de motor** — cada cubo tem um frame máximo em IEC e outro em NEMA (a faixa
   verde da planilha). Escolhendo um motor maior que o que cabe no cubo, o sistema avisa.
-  A comparação é pela posição do frame na escada de tamanho da aba Motores.
+  A comparação é pela posição da carcaça na escada de tamanho da aba Motores.
 - **Manutenção** — a própria matriz é o editor: digitar um número numa célula vazia cria
   a combinação, apagar o número tira. O motor máximo por cubo tem sua própria tabela
   logo abaixo.
@@ -38,7 +38,9 @@ Uma guia só, com tudo na mesma página:
   cruzada dos equipamentos com código e preço, o alerta de rotação e o motor máximo por
   cubo. **VAX e Joy ficam juntos**, com a série numa coluna — não há abas de linha de
   produto.
-- **Motores** — os frames IEC e NEMA, na ordem de tamanho, cada um com seu código.
+- **Motores** — o catálogo de motores, com fabricante, potência (CV), frequência, rotação,
+  nº de polos, tipo de flange, IEC/NEMA e **frame** (a carcaça), além de código e preço.
+  A ordem da lista, dentro de cada padrão, é a ordem de tamanho das carcaças.
 - **Características** — **itens** (as listas: solidez, base, partidores, instrumentação…)
   e seus **subitens** (as opções), cada subitem com um código. De fábrica são 15 itens e
   99 subitens. Dá para criar item novo — inclusive vazio, para preencher depois —,
@@ -82,16 +84,21 @@ nunca apaga por ausência.
 
 ## A aba Motores (antiga — hoje é uma vista dentro de Dados)
 
-O cadastro dos frames (carcaças) de motor, nos padrões **IEC** (19 frames) e **NEMA**
-(15 frames).
+O catálogo de motores, com as colunas da planilha da equipe: **Fabricante · Potência CV ·
+Frequência · Rotação · Nº Polos · Tipo de Flange · IEC/NEMA · Frame**, mais código e preço.
 
-A ordem da lista **não é alfabética, é ordem de tamanho** — do `< 112M` ao `355A/B` no
-IEC, do `254T` ao `588/9T` no NEMA. É essa escada que vai permitir responder "esse frame
-passa do máximo que cabe no cubo?", quando a linha *Maximum Internal Motor* da planilha
-entrar no sistema.
+A ordem da lista **não é alfabética, é ordem de tamanho** das carcaças — do `< 112M` ao
+`355A/B` no IEC, do `254T` ao `588/9T` no NEMA. É essa escada que responde "esse motor
+passa do máximo que cabe no cubo?". Vários motores podem dividir a mesma carcaça: ela
+conta uma vez só, pela primeira vez que aparece na lista.
 
-Dá para incluir, renomear, apagar e mudar o frame de lugar na escada (↑ ↓). Um frame IEC
-nunca troca de posição com um NEMA: são duas escadas independentes.
+O **+ Incluir** põe uma linha em branco no fim da lista do padrão escolhido, para preencher
+as colunas ali mesmo. Dá para renomear qualquer campo, mudar o motor de lugar na escada
+(↑ ↓), apagar e filtrar por texto. Um motor IEC nunca troca de posição com um NEMA — são
+duas escadas independentes.
+
+Onde a rotação está vazia, o campo sugere em cinza a rotação síncrona de polos +
+frequência; é só dica, o valor gravado é o que você digitar.
 
 ## A aba Base
 

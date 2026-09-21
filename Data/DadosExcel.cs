@@ -29,7 +29,7 @@ public static class DadosExcel
         List<Equipamento> equipamentos,
         List<ItemModelo> itensModelo,
         List<LimiteMotor> limites,
-        List<FrameMotor> frames,
+        List<Motor> motores,
         List<GrupoCaracteristica> grupos,
         List<Caracteristica> caracteristicas)
     {
@@ -76,11 +76,21 @@ public static class DadosExcel
                 .OrderBy(l => l.Serie).ThenBy(l => Medida.Numero(l.Cubo)).ThenBy(l => l.Padrao)
                 .Select(l => new object?[] { l.Serie, l.Cubo, l.Padrao, l.Frame }));
 
+        // O catálogo de motores, com as colunas da planilha da equipe. A última
+        // coluna é o id: é ela que faz exportar → mexer → importar cair na mesma
+        // linha, já que dois motores podem ter padrão e frame iguais. Linha nova
+        // é linha com o id em branco.
         Montar(wb, AbaMotores,
-            new[] { "Padrão", "Ordem", "Frame", "Código", "Preço" },
-            frames.Select(f => new object?[]
+            new[]
             {
-                f.Padrao, f.Ordem, f.Nome, f.Codigo, Numero(f.Preco),
+                "Ordem", "Fabricante", "Potência CV", "Frequência", "Rotação", "Nº Polos",
+                "Tipo de Flange", "IEC/NEMA", "Frame", "Código", "Preço", "Id (não mexer)",
+            },
+            motores.Select(m => new object?[]
+            {
+                m.Ordem, m.Fabricante, Numero(m.PotenciaCv), Numero(m.Frequencia),
+                Numero(m.Rotacao), Numero(m.Polos), m.Flange, m.Padrao, m.Frame,
+                m.Codigo, Numero(m.Preco), m.Id,
             }));
 
         // As listas entram mesmo vazias: assim um item recém-criado aparece na
@@ -161,7 +171,7 @@ public static class DadosExcel
         EquipamentoRepository equipamentos,
         ItemModeloRepository itensModelo,
         LimiteMotorRepository limites,
-        FrameRepository frames,
+        MotorRepository motores,
         CaracteristicaRepository caracteristicas)
     {
         using var wb = new XLWorkbook(arquivo);
@@ -170,7 +180,7 @@ public static class DadosExcel
         var nModelos = ImportarModelos(wb, equipamentos, avisos);
         var nItens = ImportarItensModelo(wb, itensModelo, avisos);
         var nLimites = ImportarLimites(wb, limites, avisos);
-        var nMotores = ImportarMotores(wb, frames, avisos);
+        var nMotores = ImportarMotores(wb, motores, avisos);
         var nCaract = ImportarCaracteristicas(wb, caracteristicas, avisos);
 
         if (nModelos + nItens + nLimites + nMotores + nCaract == 0 && avisos.Count == 0)
@@ -317,37 +327,56 @@ public static class DadosExcel
         return gravadas;
     }
 
-    private static int ImportarMotores(XLWorkbook wb, FrameRepository repo, List<string> avisos)
+    private static int ImportarMotores(XLWorkbook wb, MotorRepository repo, List<string> avisos)
     {
         if (!Achar(wb, AbaMotores, out var ws)) return 0;
 
         var (cab, linhas) = Ler(ws);
-        var iPadrao = Coluna(cab, "padrão", "padrao");
-        var iFrame = Coluna(cab, "frame", "nome");
+        var iId = Coluna(cab, "id (não mexer)", "id (nao mexer)", "id");
+        var iPadrao = Coluna(cab, "iec/nema", "padrão", "padrao");
+        var iFrame = Coluna(cab, "frame", "carcaça", "carcaca", "nome");
         var iOrdem = Coluna(cab, "ordem");
+        var iFabricante = Coluna(cab, "fabricante", "marca");
+        var iPotencia = Coluna(cab, "potência cv", "potencia cv", "potência", "potencia", "cv");
+        var iFrequencia = Coluna(cab, "frequência", "frequencia", "hz");
+        var iRotacao = Coluna(cab, "rotação", "rotacao", "rpm");
+        var iPolos = Coluna(cab, "nº polos", "n° polos", "no polos", "polos");
+        var iFlange = Coluna(cab, "tipo de flange", "flange");
         var iCodigo = Coluna(cab, "código", "codigo", "cod");
         var iPreco = Coluna(cab, "preço", "preco", "valor");
 
-        if (iPadrao < 0 || iFrame < 0)
+        if (iPadrao < 0 && iFrame < 0 && iFabricante < 0)
         {
-            avisos.Add($"Aba \"{AbaMotores}\": faltam colunas (Padrão e Frame).");
+            avisos.Add($"Aba \"{AbaMotores}\": não reconheci as colunas " +
+                       "(esperava IEC/NEMA, Frame, Fabricante…).");
             return 0;
         }
 
         var existentes = repo.Todos();
         var proxima = existentes
-            .GroupBy(f => f.Padrao)
-            .ToDictionary(g => g.Key, g => g.Max(f => f.Ordem));
+            .GroupBy(m => m.Padrao)
+            .ToDictionary(g => g.Key, g => g.Max(m => m.Ordem));
 
         var gravadas = 0;
         foreach (var l in linhas)
         {
-            var padrao = T(l, iPadrao);
-            var nome = T(l, iFrame);
-            if (padrao.Length == 0 || nome.Length == 0) continue;
+            var id = iId >= 0 ? T(l, iId) : "";
+            var padrao = iPadrao >= 0 ? T(l, iPadrao) : "";
+            var frame = iFrame >= 0 ? T(l, iFrame) : "";
 
-            var atual = existentes.FirstOrDefault(f =>
-                f.Padrao == padrao && f.Nome.Equals(nome, StringComparison.OrdinalIgnoreCase));
+            // uma linha só com o id, ou totalmente em branco, não é um motor
+            var vazia = new[] { padrao, frame, iFabricante >= 0 ? T(l, iFabricante) : "" }
+                .All(t => t.Length == 0);
+            if (vazia) continue;
+
+            // o id casa a linha com o motor gravado; sem ele (linha nova digitada
+            // na planilha), cai no par padrão+frame, e se nem isso, é motor novo
+            var atual = id.Length > 0
+                ? existentes.FirstOrDefault(m => m.Id == id)
+                : existentes.FirstOrDefault(m => m.Padrao == padrao && frame.Length > 0 &&
+                                                 m.Frame.Equals(frame, StringComparison.OrdinalIgnoreCase));
+
+            if (padrao.Length == 0) padrao = atual?.Padrao ?? MotorRepository.Padroes[0];
 
             int ordem;
             if (iOrdem >= 0 && int.TryParse(T(l, iOrdem), out var lida) && lida > 0) ordem = lida;
@@ -358,12 +387,25 @@ public static class DadosExcel
                 proxima[padrao] = ordem;
             }
 
-            repo.Salvar(new FrameMotor
+            // coluna que não veio no arquivo não apaga o que já está gravado
+            string Campo(int i, string? guardado) =>
+                i >= 0 ? T(l, i) : guardado ?? "";
+
+            repo.Salvar(new Motor
             {
+                Id = atual?.Id ?? "",
                 Padrao = padrao,
-                Nome = nome,
+                Frame = iFrame >= 0 ? frame : atual?.Frame ?? "",
                 Ordem = ordem,
-                Codigo = iCodigo >= 0 ? T(l, iCodigo) : atual?.Codigo ?? "",
+                Fabricante = Campo(iFabricante, atual?.Fabricante),
+                // estes voltam do Excel como número; MedidaNormalizada tira as
+                // casas decimais que a planilha acrescenta ("7.50" → "7,5")
+                PotenciaCv = MedidaNormalizada(Campo(iPotencia, atual?.PotenciaCv)),
+                Frequencia = MedidaNormalizada(Campo(iFrequencia, atual?.Frequencia)),
+                Rotacao = MedidaNormalizada(Campo(iRotacao, atual?.Rotacao)),
+                Polos = MedidaNormalizada(Campo(iPolos, atual?.Polos)),
+                Flange = Campo(iFlange, atual?.Flange),
+                Codigo = Campo(iCodigo, atual?.Codigo),
                 Preco = iPreco >= 0 ? PrecoNormalizado(T(l, iPreco)) : atual?.Preco ?? "",
             });
             gravadas++;
@@ -504,6 +546,24 @@ public static class DadosExcel
     /// volta mudaria "12500,90" para "12,500.90" a cada volta, mesmo com o valor
     /// certo. O que não for número passa intacto.
     /// </summary>
+    /// <summary>
+    /// Uma medida (potência, frequência, rotação, polos) de volta em texto
+    /// enxuto: sem as casas decimais que o Excel inventa.
+    ///
+    /// O preço sai sempre com duas casas — é dinheiro. Estes campos não: exportar
+    /// 7,5 CV como número e reimportar devolvia "7.50", e 4 polos viravam "4.00".
+    /// Aqui as casas inúteis caem e o separador volta a ser o brasileiro, então
+    /// exportar e importar de volta não mexe no que a equipe digitou.
+    /// </summary>
+    public static string MedidaNormalizada(string texto)
+    {
+        var valor = Numero(texto);
+        if (valor is null) return texto.Trim();
+
+        var enxuto = Math.Round(valor.Value, 3);
+        return enxuto.ToString("0.###", new CultureInfo("pt-BR"));
+    }
+
     public static string PrecoNormalizado(string texto)
     {
         var valor = Numero(texto);

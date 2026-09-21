@@ -170,7 +170,7 @@ A pasta vem de `Data:Folder` no `appsettings.json`
 | `/login` | Login | Formulário que posta em `/auth/login` |
 | `/axiais/base` | Base | A planilha da base: subir, ajustar linhas, procurar e exportar |
 | `/axiais/dados` | Dados | Três vistas na mesma aba: Modelos, Motores e Características |
-| `/axiais/motores` | Dados › Motores | Abre a aba Dados já na vista dos frames (rota antiga, mantida) |
+| `/axiais/motores` | Dados › Motores | Abre a aba Dados já na vista dos motores (rota antiga, mantida) |
 | `/axiais/caracteristicas` | Dados › Características | Abre a aba Dados já na vista das listas de características |
 
 ---
@@ -312,16 +312,39 @@ tanto o primeiro quanto o último ventilador de cada cubo só crescem:
 
 ---
 
-## 10. A aba Motores — os frames
+## 10. A aba Motores — o catálogo
 
-`/axiais/motores` guarda os frames (carcaças) de motor (`Data/FrameRepository.cs`),
-na entidade `frames`.
+`/axiais/motores` guarda os motores (`Data/MotorRepository.cs`), com as colunas da
+planilha da equipe:
 
 | Campo | O que é |
 |---|---|
+| `fabricante` | quem fabrica |
+| `potenciaCv` | potência em CV (`7,5`) |
+| `frequencia` | Hz (`60`) |
+| `rotacao` | rpm (`1750`) |
+| `polos` | número de polos (`4`) |
+| `flange` | tipo de flange (`B5`) |
 | `padrao` | `IEC` ou `NEMA` |
-| `nome` | o frame como a equipe escreve: `225S/M`, `364/5T` |
-| `ordem` | posição na escada de tamanho, **dentro do padrão** (1 = o menor) |
+| `frame` | a carcaça, como a equipe escreve: `225S/M`, `364/5T` |
+| `ordem` | posição na lista, **dentro do padrão** |
+| `codigo`, `preco` | o que o motor contribui para o equipamento |
+
+A entidade no Parquet continua se chamando `frames`: é a pasta que já existe no
+compartilhamento de rede, com os dados gravados. O nome é interno. A coluna da carcaça
+mudou de `nome` para `frame`, e a leitura aceita as duas — bancos anteriores continuam
+abrindo.
+
+### De escada de frames a catálogo de motores
+
+No começo esta lista era só a escada de carcaças, uma linha por frame. Com as colunas da
+equipe, cada linha passou a ser um **motor**, e a carcaça virou uma coluna — vários
+motores dividem o mesmo frame.
+
+A escada não sumiu, ficou **derivada**: `MotorRepository.Escada(motores, padrao)` são os
+frames distintos na ordem da lista, contando cada carcaça pela primeira vez que aparece.
+É essa sequência que a regra do cubo compara, e é ela que alimenta os seletores de frame
+da aba Modelos.
 
 ### Por que a ordem é o campo que importa
 
@@ -329,19 +352,40 @@ A lista da equipe não é alfabética — é uma **escada de tamanho**: `< 112M`
 `132S` → … → `355A/B` no IEC, e `254T` → … → `588/9T` no NEMA. Ordenar por texto
 embaralharia tudo (`112M` viria antes de `< 112M`, `315L` antes de `315M/L`).
 
-Guardar a posição é o que vai permitir, quando a linha *Maximum Internal Motor* da
-planilha entrar, responder à pergunta que interessa: **o frame escolhido passa do máximo
-que cabe nesse cubo?** — comparando posições, não nomes. São duas escadas independentes:
-um frame IEC nunca se compara com um NEMA.
+Guardar a posição é o que permite responder à pergunta que interessa: **o motor escolhido
+passa do máximo que cabe nesse cubo?** — comparando posições, não nomes. São duas escadas
+independentes: um frame IEC nunca se compara com um NEMA, e trocar o padrão de um motor
+manda ele para o fim da lista do padrão novo, porque a posição antiga não quer dizer nada
+lá.
 
 A `ordem` é gravada com zeros à esquerda (`0007`) porque o Parquet guarda texto. E o
 número que aparece na tela é a **posição na lista**, não o campo gravado — assim apagar
-um frame do meio não deixa buraco na numeração.
+um motor do meio não deixa buraco na numeração.
 
-### Renomear
+### O id deixou de ter significado
 
-O nome faz parte do `id` (`{padrao}-{nome}`), então renomear apaga o registro antigo e
-grava o novo, mantendo a posição. Nome repetido dentro do mesmo padrão é recusado.
+Era `{padrao}-{nome}`, o que só funcionava com uma linha por carcaça. Agora é um `Guid`,
+gerado na primeira gravação. Isso simplificou a tela: editar qualquer coluna é mexer no
+objeto e salvar, sem apagar-e-regravar. A semeadura de fábrica mantém os ids antigos, para
+casar com o que já estiver no banco.
+
+### Rotação × polos
+
+São os dois na planilha, e os dois são digitados. Onde a rotação está vazia, o campo
+mostra em cinza a **rotação síncrona** de polos + frequência (120 · Hz ÷ polos) — só como
+sugestão: o motor real fica abaixo disso por causa do escorregamento, então o sistema não
+grava esse número sozinho.
+
+### O Excel do catálogo
+
+A aba `Motores` leva todas as colunas mais `Id (não mexer)` no fim. O id é o que faz
+exportar → mexer → importar cair na **mesma linha**: sem ele, dois motores de mesma
+carcaça e padrão seriam indistinguíveis e a importação duplicaria a lista. Linha nova é
+linha com o id em branco.
+
+Potência, frequência, rotação e polos saem como número (o Excel soma e filtra) e voltam
+por `MedidaNormalizada`, que tira as casas decimais que a planilha acrescenta: sem isso
+`7,5` voltava `7.50` e `4` polos viravam `4.00` a cada volta.
 
 ---
 
@@ -367,7 +411,7 @@ diferir, vira um campo a mais.
 ### A comparação é por posição, nunca por nome
 
 `RegraMotor.Verificar` acha a posição do frame escolhido e a do frame máximo na escada do
-padrão (a `Ordem` da aba Motores) e compara os dois números. Comparar texto não
+padrão (a escada derivada da aba Motores) e compara os dois números. Comparar texto não
 funcionaria: `315L` vem antes de `315M/L` no alfabeto e depois na escada de tamanho.
 
 O limite é **inclusivo**: no cubo 1800, `225S/M` passa e `250S/M` alerta.
@@ -377,12 +421,12 @@ IEC e NEMA são escadas independentes — o mesmo cubo 1800 aceita até `225S/M`
 
 ### Quando o frame do limite não está no cadastro
 
-Vários rótulos da faixa verde não existem na lista de frames da equipe: `180M/L`, `286T`,
+Vários rótulos da faixa verde não existem entre as carcaças da lista de motores: `180M/L`, `286T`,
 `355S/M`, `315S/M/L`, `444/5TSC`, `504/5TSC`. Parecem designações combinadas ou com
 sufixo (`180M/L` = 180M ou 180L; `444/5TSC` = 444/5T com SC).
 
 O sistema **não adivinha** a correspondência: grava o rótulo como está na planilha e, na
-hora de comparar, diz que não consegue e pede para incluir o frame na aba Motores ou
+hora de comparar, diz que não consegue e pede para incluir um motor com esse frame ou
 corrigir o limite. Na tabela de manutenção o valor aparece marcado como *(fora da lista)*.
 Esconder isso seria pior — daria um "pode" ou um "não pode" sem base.
 

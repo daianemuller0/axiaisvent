@@ -1,58 +1,58 @@
-@inject FrameRepository Repo
+@inject MotorRepository Repo
 
 <p class="subtitle">
-    Os frames (carcaças) de motor, nos padrões <strong>IEC</strong> e <strong>NEMA</strong>.
-    A ordem da lista é a <strong>ordem de tamanho</strong>, do menor para o maior — é ela que
-    diz se um frame passa do máximo que cabe no cubo.
+    O catálogo de motores: fabricante, potência, frequência, rotação, polos, flange, padrão
+    e <strong>frame</strong> (a carcaça). A ordem da lista, dentro de cada padrão, é a
+    <strong>ordem de tamanho</strong> das carcaças — é ela que diz se um motor passa do
+    máximo que cabe no cubo.
 </p>
 
 <div class="tabs">
     <button class="tab @(_filtro == "" ? "active" : "")" @onclick="@(() => _filtro = "")">
         Todos <span class="tab-badge">@_todos.Count</span>
     </button>
-    @foreach (var p in FrameRepository.Padroes)
+    @foreach (var p in MotorRepository.Padroes)
     {
         var padrao = p;
         <button class="tab @(_filtro == padrao ? "active" : "")" @onclick="@(() => _filtro = padrao)">
-            @padrao <span class="tab-badge">@_todos.Count(f => f.Padrao == padrao)</span>
+            @padrao <span class="tab-badge">@_todos.Count(m => m.Padrao == padrao)</span>
         </button>
     }
 </div>
 
-<!-- ---------- incluir frame ---------- -->
+<!-- ---------- incluir motor ---------- -->
 <div class="panel" style="margin-bottom:16px">
     <div class="toolbar" style="margin-bottom:0; flex-wrap:wrap">
-        <strong>Incluir frame</strong>
+        <strong>Incluir motor</strong>
 
         <select class="cell" @bind="_novoPadrao">
-            @foreach (var p in FrameRepository.Padroes)
+            @foreach (var p in MotorRepository.Padroes)
             {
                 <option value="@p">@p</option>
             }
         </select>
 
-        <input class="cell" style="min-width:190px" placeholder="Nome do frame (ex.: 225S/M)"
-               @bind="_novoNome" @bind:event="oninput" @onkeydown="TeclaIncluir" />
-
-        <button class="btn-primary" @onclick="Incluir" disabled="@(_novoNome.Trim().Length == 0)">
-            + Incluir
-        </button>
-
-        <span class="subtitle" style="margin:0">entra no fim da lista do padrão escolhido</span>
+        <button class="btn-primary" @onclick="Incluir">+ Incluir</button>
+        <span class="subtitle" style="margin:0">
+            entra em branco no fim da lista @_novoPadrao — preencha as colunas na própria linha
+        </span>
 
         <span style="flex:1"></span>
+
+        <input class="cell" style="width:200px" placeholder="filtrar…" value="@_busca"
+               @oninput="e => _busca = e.Value?.ToString() ?? string.Empty" />
 
         @if (_limpando)
         {
             <span class="aviso aviso-alerta" style="margin:0; padding:5px 9px">
-                Apagar @Filtrados.Count frame(s)@(_filtro.Length == 0 ? "" : " do padrão " + _filtro)?
+                Apagar @Mostrados.Count motor(es)@(_filtro.Length == 0 ? "" : " do padrão " + _filtro)@(_busca.Trim().Length == 0 ? "" : " que o filtro mostra")?
             </span>
             <button class="btn-link" @onclick="Limpar">Sim, limpar</button>
             <button class="btn-link" @onclick="@(() => _limpando = false)">Cancelar</button>
         }
         else
         {
-            <button class="btn-link" title="Esvaziar a lista mostrada" disabled="@(Filtrados.Count == 0)"
+            <button class="btn-link" title="Esvaziar a lista mostrada" disabled="@(Mostrados.Count == 0)"
                     @onclick="@(() => _limpando = true)">
                 🗑 Limpar @(_filtro.Length == 0 ? "tudo" : _filtro)
             </button>
@@ -66,42 +66,62 @@
 }
 
 <div class="panel" style="padding:0; overflow-x:auto">
-    <table class="grid">
+    <!-- min-width: sem ele a tabela encolhe para caber no painel e as colunas
+         cortam o texto ("< 112M" virava "< 1"); com ele, o painel rola -->
+    <table class="grid" style="min-width:1480px">
         <thead>
             <tr>
-                <th class="nowrap" style="width:70px">Ordem</th>
-                <th class="nowrap">Frame</th>
-                <th class="nowrap" style="width:150px">Código</th>
-                <th class="nowrap" style="width:150px">Preço</th>
-                <th class="nowrap" style="width:120px">Padrão</th>
-                <th class="nowrap" style="width:140px"></th>
+                <th class="nowrap" style="width:64px">Ordem</th>
+                <th class="nowrap" style="min-width:150px">Fabricante</th>
+                <th class="nowrap" style="width:110px">Potência CV</th>
+                <th class="nowrap" style="width:110px">Frequência</th>
+                <th class="nowrap" style="width:105px">Rotação</th>
+                <th class="nowrap" style="width:95px">Nº Polos</th>
+                <th class="nowrap" style="width:130px">Tipo de Flange</th>
+                <th class="nowrap" style="width:105px">IEC/NEMA</th>
+                <th class="nowrap" style="width:150px">Frame</th>
+                <th class="nowrap" style="width:130px">Código</th>
+                <th class="nowrap" style="width:130px">Preço</th>
+                <th class="nowrap" style="width:110px"></th>
             </tr>
         </thead>
         <tbody>
-            @foreach (var f in Filtrados)
+            @foreach (var m in Mostrados)
             {
-                var frame = f;
-                <tr @key="frame.Id">
-                    <td class="center nowrap">@Posicao(frame)</td>
+                var motor = m;
+                <tr @key="motor.Id">
+                    <td class="nowrap center"><span class="val-count">@Posicao(motor)</span></td>
+                    <td>@Campo(motor, motor.Fabricante, (x, v) => x.Fabricante = v, "—", 150)</td>
+                    <td>@Campo(motor, motor.PotenciaCv, (x, v) => x.PotenciaCv = v, "—", 90, direita: true)</td>
+                    <td>@Campo(motor, motor.Frequencia, (x, v) => x.Frequencia = v, "Hz", 90, direita: true)</td>
+                    <td>@Campo(motor, motor.Rotacao, (x, v) => x.Rotacao = v, Rpm(motor), 85, direita: true)</td>
+                    <td>@Campo(motor, motor.Polos, (x, v) => x.Polos = v, "—", 75, direita: true)</td>
+                    <td>@Campo(motor, motor.Flange, (x, v) => x.Flange = v, "—", 110)</td>
                     <td>
-                        <input class="cell" style="max-width:220px" value="@frame.Nome"
-                               @onchange="e => Renomear(frame, e.Value?.ToString() ?? string.Empty)" />
+                        <select class="cell" style="max-width:88px" value="@motor.Padrao"
+                                @onchange="e => TrocarPadrao(motor, e.Value?.ToString() ?? string.Empty)">
+                            @foreach (var p in MotorRepository.Padroes)
+                            {
+                                <option value="@p" selected="@(p == motor.Padrao)">@p</option>
+                            }
+                        </select>
                     </td>
-                    <td>
-                        <input class="cell" style="max-width:130px" value="@frame.Codigo"
-                               placeholder="—"
-                               @onchange="e => DefinirCodigo(frame, e.Value?.ToString() ?? string.Empty)" />
-                    </td>
-                    <td>
-                        <input class="cell" style="max-width:130px; text-align:right" value="@frame.Preco"
-                               placeholder="—"
-                               @onchange="e => DefinirPreco(frame, e.Value?.ToString() ?? string.Empty)" />
-                    </td>
-                    <td class="nowrap"><span class="badge @(frame.Padrao == "IEC" ? "st-atencao" : "st-plan")">@frame.Padrao</span></td>
+                    <td>@Campo(motor, motor.Frame, (x, v) => x.Frame = v, "carcaça", 130, negrito: true)</td>
+                    <td>@Campo(motor, motor.Codigo, (x, v) => x.Codigo = v, "—", 110)</td>
+                    <td>@Preco(motor)</td>
                     <td class="nowrap center">
-                        <button class="btn-link" title="Subir (frame menor)" @onclick="() => Mover(frame, -1)">↑</button>
-                        <button class="btn-link" title="Descer (frame maior)" @onclick="() => Mover(frame, 1)">↓</button>
-                        <button class="btn-link" title="Apagar" @onclick="() => Apagar(frame)">✕</button>
+                        <button class="btn-link" title="Subir (carcaça menor)" @onclick="() => Mover(motor, -1)">↑</button>
+                        <button class="btn-link" title="Descer (carcaça maior)" @onclick="() => Mover(motor, 1)">↓</button>
+                        @if (_apagar == motor.Id)
+                        {
+                            <button class="btn-link" @onclick="() => Apagar(motor)">Sim</button>
+                            <button class="btn-link" @onclick="@(() => _apagar = null)">Não</button>
+                        }
+                        else
+                        {
+                            <button class="btn-link" title="Apagar o motor"
+                                    @onclick="@(() => _apagar = motor.Id)">✕</button>
+                        }
                     </td>
                 </tr>
             }
@@ -110,19 +130,23 @@
 </div>
 
 <p class="subtitle" style="margin-top:12px">
-    As setas mudam o frame de lugar na escada de tamanho do seu padrão. Um frame IEC nunca
-    troca de posição com um NEMA — são duas escadas independentes. O <strong>código</strong>
-    é o pedaço que este frame contribui para o código do equipamento.
+    As setas mudam o motor de lugar na lista do seu padrão, e é essa ordem que forma a
+    <strong>escada de tamanho das carcaças</strong>: vários motores podem dividir o mesmo
+    frame, e a carcaça vale pela primeira vez que aparece. Um motor IEC nunca troca de
+    posição com um NEMA — são duas escadas independentes. A rotação mostra, em cinza, o
+    valor síncrono de polos + frequência; é só uma sugestão, quem manda é o que for digitado.
 </p>
 
 @code {
-    private List<FrameMotor> _todos = new();
+    private List<Motor> _todos = new();
     private string _filtro = "";
+    private string _busca = "";
     /// <summary>Verdadeiro enquanto a limpeza espera confirmação.</summary>
     private bool _limpando;
+    /// <summary>Id do motor aguardando confirmação para ser apagado.</summary>
+    private string? _apagar;
 
     private string _novoPadrao = "IEC";
-    private string _novoNome = "";
 
     private string? _msg;
     private bool _erro;
@@ -133,131 +157,153 @@
         _todos = Repo.Todos();
     }
 
-    private List<FrameMotor> Filtrados => _filtro.Length == 0
-        ? _todos
-        : _todos.Where(f => f.Padrao == _filtro).ToList();
+    /// <summary>O que está na tela: a aba do padrão, depois o texto do filtro.</summary>
+    private List<Motor> Mostrados
+    {
+        get
+        {
+            var lista = _filtro.Length == 0 ? _todos : _todos.Where(m => m.Padrao == _filtro);
 
-    private List<FrameMotor> DoPadrao(string padrao) =>
-        _todos.Where(f => f.Padrao == padrao).OrderBy(f => f.Ordem).ToList();
+            var busca = _busca.Trim();
+            if (busca.Length > 0)
+                lista = lista.Where(m => Casa(m, busca));
+
+            return lista.ToList();
+        }
+    }
+
+    private static bool Casa(Motor m, string busca) =>
+        new[] { m.Fabricante, m.PotenciaCv, m.Frequencia, m.Rotacao, m.Polos,
+                m.Flange, m.Padrao, m.Frame, m.Codigo }
+            .Any(t => t.Contains(busca, StringComparison.OrdinalIgnoreCase));
+
+    private List<Motor> DoPadrao(string padrao) =>
+        _todos.Where(m => m.Padrao == padrao).OrderBy(m => m.Ordem).ToList();
 
     /// <summary>
-    /// O número que aparece na tela é a POSIÇÃO na escada do padrão, não o campo
+    /// O número que aparece na tela é a POSIÇÃO dentro do padrão, não o campo
     /// Ordem gravado — esse é só chave de ordenação e fica com buracos quando um
-    /// frame é apagado.
+    /// motor é apagado.
     /// </summary>
-    private int Posicao(FrameMotor frame) =>
-        DoPadrao(frame.Padrao).FindIndex(f => f.Id == frame.Id) + 1;
+    private int Posicao(Motor motor) =>
+        DoPadrao(motor.Padrao).FindIndex(m => m.Id == motor.Id) + 1;
 
-    private void Incluir()
+    /// <summary>
+    /// A rotação síncrona de polos + frequência (120 · Hz / polos), só como
+    /// sugestão no campo vazio. O motor real fica abaixo disso (escorregamento),
+    /// por isso não é gravado sozinho — é dica, não resposta.
+    /// </summary>
+    private static string Rpm(Motor m)
     {
-        var nome = _novoNome.Trim();
-        if (nome.Length == 0) return;
+        if (!int.TryParse(m.Polos, out var polos) || polos <= 0) return "rpm";
+        if (!int.TryParse(m.Frequencia, out var hz) || hz <= 0) return "rpm";
+        return (120 * hz / polos).ToString();
+    }
 
-        if (_todos.Any(f => f.Padrao == _novoPadrao &&
-                            f.Nome.Equals(nome, StringComparison.OrdinalIgnoreCase)))
+    // ---------- editar ----------
+
+    /// <summary>
+    /// Um campo de texto do motor. Todos funcionam igual — grava no cadastro ao
+    /// sair do campo —, então vale escrever uma vez e reusar nas dez colunas.
+    /// </summary>
+    private RenderFragment Campo(Motor motor, string valor, Action<Motor, string> guardar,
+        string vazio, int largura, bool direita = false, bool negrito = false) => @<text>
+        <input class="cell" placeholder="@vazio"
+               style="max-width:@(largura)px; @(direita ? "text-align:right;" : "") @(negrito ? "font-weight:600;" : "")"
+               value="@valor"
+               @onchange="e => Definir(motor, guardar, e.Value?.ToString() ?? string.Empty)" />
+    </text>;
+
+    private void Definir(Motor motor, Action<Motor, string> guardar, string texto)
+    {
+        guardar(motor, texto.Trim());
+        Repo.Salvar(motor);
+        _todos = Repo.Todos();
+        Aviso($"{motor.Descricao}: gravado.");
+    }
+
+    /// <summary>
+    /// O preço tem validação própria: número que não dá para ler é recusado,
+    /// porque um preço errado é pior do que um preço em branco.
+    /// </summary>
+    private RenderFragment Preco(Motor motor) => @<text>
+        <input class="cell" placeholder="—" style="max-width:110px; text-align:right"
+               value="@motor.Preco"
+               @onchange="e => DefinirPreco(motor, e.Value?.ToString() ?? string.Empty)" />
+    </text>;
+
+    private void DefinirPreco(Motor motor, string texto)
+    {
+        var preco = texto.Trim();
+        if (preco.Length > 0 && DadosExcel.Numero(preco) is null)
         {
-            Aviso($"O frame \"{nome}\" já existe no padrão {_novoPadrao}.", erro: true);
+            _todos = Repo.Todos();   // devolve o campo ao valor gravado
+            Aviso($"\"{preco}\" não parece um preço. Use 1234,56 ou 1234.56.", erro: true);
             return;
         }
 
+        motor.Preco = preco;
+        Repo.Salvar(motor);
+        _todos = Repo.Todos();
+        Aviso(preco.Length == 0
+            ? $"Preço de {motor.Descricao} apagado."
+            : $"{motor.Descricao}: preço {preco}.");
+    }
+
+    /// <summary>
+    /// Trocar de padrão é trocar de escada: o motor vai para o fim da lista do
+    /// padrão novo, porque a posição que ele tinha não quer dizer nada lá.
+    /// </summary>
+    private void TrocarPadrao(Motor motor, string padrao)
+    {
+        if (padrao.Length == 0 || padrao == motor.Padrao) return;
+
+        var destino = DoPadrao(padrao);
+        var antigo = motor.Padrao;
+
+        motor.Padrao = padrao;
+        motor.Ordem = destino.Count == 0 ? 1 : destino[^1].Ordem + 1;
+        Repo.Salvar(motor);
+
+        _todos = Repo.Todos();
+        Aviso($"{motor.Descricao}: {antigo} → {padrao}, no fim da lista.");
+    }
+
+    private void Incluir()
+    {
         var ultimos = DoPadrao(_novoPadrao);
-        Repo.Salvar(new FrameMotor
+        Repo.Salvar(new Motor
         {
             Padrao = _novoPadrao,
-            Nome = nome,
             Ordem = ultimos.Count == 0 ? 1 : ultimos[^1].Ordem + 1,
         });
 
         _todos = Repo.Todos();
-        _novoNome = "";
-        Aviso($"Frame {nome} incluído no fim da lista {_novoPadrao}.");
+        _filtro = _novoPadrao;   // para a linha nova aparecer mesmo com outra aba aberta
+        _busca = "";
+        Aviso($"Linha em branco no fim da lista {_novoPadrao} — preencha as colunas nela.");
     }
 
-    private void TeclaIncluir(KeyboardEventArgs e)
+    private void Apagar(Motor motor)
     {
-        if (e.Key == "Enter") Incluir();
-    }
-
-    /// <summary>
-    /// O nome faz parte do id, então renomear é apagar o registro antigo e
-    /// gravar o novo — mantendo a posição na escada.
-    /// </summary>
-    private void Renomear(FrameMotor frame, string texto)
-    {
-        var nome = texto.Trim();
-        if (nome.Length == 0 || nome == frame.Nome) return;
-
-        if (_todos.Any(f => f.Padrao == frame.Padrao && f.Id != frame.Id &&
-                            f.Nome.Equals(nome, StringComparison.OrdinalIgnoreCase)))
-        {
-            Aviso($"O frame \"{nome}\" já existe no padrão {frame.Padrao}.", erro: true);
-            _todos = Repo.Todos();   // devolve o campo ao valor gravado
-            return;
-        }
-
-        var antigo = frame.Nome;
-        Repo.Apagar(frame.Id);
-        Repo.Salvar(new FrameMotor
-        {
-            Padrao = frame.Padrao, Nome = nome, Ordem = frame.Ordem,
-            Codigo = frame.Codigo, Preco = frame.Preco,
-        });
-
+        Repo.Apagar(motor.Id);
+        _apagar = null;
         _todos = Repo.Todos();
-        Aviso($"{antigo} passou a se chamar {nome}.");
+        Aviso($"Motor {motor.Descricao} ({motor.Padrao}) apagado.");
     }
 
-    private void DefinirCodigo(FrameMotor frame, string texto)
+    /// <summary>Troca o motor de lugar com o vizinho do mesmo padrão.</summary>
+    private void Mover(Motor motor, int direcao)
     {
-        var codigo = texto.Trim();
-        if (codigo == frame.Codigo) return;
-
-        frame.Codigo = codigo;
-        Repo.Salvar(frame);
-        _todos = Repo.Todos();
-        Aviso(codigo.Length == 0
-            ? $"Código do frame {frame.Nome} apagado."
-            : $"Frame {frame.Nome}: código {codigo}.");
-    }
-
-    private void DefinirPreco(FrameMotor frame, string texto)
-    {
-        var preco = texto.Trim();
-        if (preco == frame.Preco) return;
-
-        if (preco.Length > 0 && DadosExcel.Numero(preco) is null)
-        {
-            Aviso($"\"{preco}\" não parece um preço. Use 1234,56 ou 1234.56.", erro: true);
-            _todos = Repo.Todos();
-            return;
-        }
-
-        frame.Preco = preco;
-        Repo.Salvar(frame);
-        _todos = Repo.Todos();
-        Aviso(preco.Length == 0
-            ? $"Preço do frame {frame.Nome} apagado."
-            : $"Frame {frame.Nome}: preço {preco}.");
-    }
-
-    private void Apagar(FrameMotor frame)
-    {
-        Repo.Apagar(frame.Id);
-        _todos = Repo.Todos();
-        Aviso($"Frame {frame.Nome} ({frame.Padrao}) apagado.");
-    }
-
-    /// <summary>Troca de lugar com o vizinho do MESMO padrão e regrava as duas posições.</summary>
-    private void Mover(FrameMotor frame, int direcao)
-    {
-        var lista = DoPadrao(frame.Padrao);
-        var i = lista.FindIndex(f => f.Id == frame.Id);
+        var lista = DoPadrao(motor.Padrao);
+        var i = lista.FindIndex(m => m.Id == motor.Id);
         var j = i + direcao;
         if (i < 0 || j < 0 || j >= lista.Count) return;
 
+        var atual = lista[i];
         var vizinho = lista[j];
-        (frame.Ordem, vizinho.Ordem) = (vizinho.Ordem, frame.Ordem);
-        Repo.Salvar(frame);
+        (atual.Ordem, vizinho.Ordem) = (vizinho.Ordem, atual.Ordem);
+        Repo.Salvar(atual);
         Repo.Salvar(vizinho);
 
         _todos = Repo.Todos();
@@ -266,21 +312,24 @@
 
     /// <summary>
     /// Esvazia a lista que está sendo mostrada: com uma aba de padrão ativa,
-    /// só aquele padrão; em "Todos", a escada inteira. O repositório grava
+    /// só aquele padrão; em "Todos", o catálogo inteiro. O repositório grava
     /// junto a marca de "a de fábrica já foi carregada", senão a próxima
-    /// abertura traria os 34 frames de volta.
+    /// abertura traria as 34 carcaças de volta.
     /// </summary>
     private void Limpar()
     {
-        var quantos = Filtrados.Count;
+        var mostrados = Mostrados;
+        var quantos = mostrados.Count;
         var onde = _filtro.Length == 0 ? "" : " do padrão " + _filtro;
 
-        if (_filtro.Length == 0) Repo.Limpar();
+        // o filtro de texto também conta: limpa o que está à vista, nada mais
+        if (_busca.Trim().Length > 0) Repo.LimparEstes(mostrados.Select(m => m.Id));
+        else if (_filtro.Length == 0) Repo.Limpar();
         else Repo.LimparPadrao(_filtro);
 
         _limpando = false;
         _todos = Repo.Todos();
-        Aviso($"Limpo: {quantos} frame(s){onde}.");
+        Aviso($"Limpo: {quantos} motor(es){onde}.");
     }
 
     private void Aviso(string texto, bool erro = false)

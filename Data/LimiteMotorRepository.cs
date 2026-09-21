@@ -102,7 +102,7 @@ public sealed class LimiteMotorRepository
 /// A regra do motor: o frame escolhido cabe no cubo?
 ///
 /// A comparação é por POSIÇÃO na escada de tamanho do padrão (ver
-/// <see cref="FrameMotor.Ordem"/>), nunca por nome — "315L" e "315M/L" não se
+/// <see cref="Motor.Ordem"/>), nunca por nome — "315L" e "315M/L" não se
 /// ordenam por texto.
 /// </summary>
 public static class RegraMotor
@@ -111,7 +111,7 @@ public static class RegraMotor
 
     public sealed record Resultado(Situacao Situacao, string Mensagem);
 
-    public static Resultado Verificar(List<LimiteMotor> limites, List<FrameMotor> frames,
+    public static Resultado Verificar(List<LimiteMotor> limites, List<Motor> motores,
         string serie, string cubo, string padrao, string frameEscolhido)
     {
         if (string.IsNullOrWhiteSpace(frameEscolhido))
@@ -127,22 +127,23 @@ public static class RegraMotor
                 "preencha na tabela abaixo.");
         }
 
-        var escada = frames.Where(f => f.Padrao == padrao).OrderBy(f => f.Ordem).ToList();
-        var posMaximo = escada.FindIndex(f => f.Nome == limite.Frame);
-        var posEscolhido = escada.FindIndex(f => f.Nome == frameEscolhido);
+        // a escada são os frames distintos da lista de motores, na ordem dela
+        var escada = MotorRepository.Escada(motores, padrao);
+        var posMaximo = escada.FindIndex(f => f.Equals(limite.Frame, StringComparison.OrdinalIgnoreCase));
+        var posEscolhido = escada.FindIndex(f => f.Equals(frameEscolhido, StringComparison.OrdinalIgnoreCase));
 
         if (posMaximo < 0)
         {
             return new(Situacao.FrameDesconhecido,
                 $"O motor máximo do cubo {cubo} está cadastrado como \"{limite.Frame}\", que não " +
-                $"está na lista de frames {padrao} — sem a posição dele na escada não dá para " +
-                "comparar. Inclua esse frame na aba Motores ou corrija o limite.");
+                $"está na lista de motores {padrao} — sem a posição dele na escada não dá para " +
+                "comparar. Inclua um motor com esse frame na aba Motores, ou corrija o limite.");
         }
 
         if (posEscolhido < 0)
         {
             return new(Situacao.FrameDesconhecido,
-                $"O frame \"{frameEscolhido}\" não está na lista {padrao}.");
+                $"O frame \"{frameEscolhido}\" não está na lista de motores {padrao}.");
         }
 
         if (posEscolhido > posMaximo)

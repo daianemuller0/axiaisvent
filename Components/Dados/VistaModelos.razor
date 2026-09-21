@@ -1,5 +1,5 @@
 @inject EquipamentoRepository Repo
-@inject FrameRepository Frames
+@inject MotorRepository Motores
 @inject LimiteMotorRepository Limites
 @inject ItemModeloRepository Itens
 
@@ -50,7 +50,7 @@
         <label style="display:flex; align-items:center; gap:6px">
             <span class="subtitle" style="margin:0">Motor</span>
             <select class="cell" @bind="_vPadrao" @bind:after="TrocarPadrao">
-                @foreach (var p in FrameRepository.Padroes)
+                @foreach (var p in MotorRepository.Padroes)
                 {
                     <option value="@p">@p</option>
                 }
@@ -59,7 +59,7 @@
                 <option value="">—</option>
                 @foreach (var f in FramesDoPadrao)
                 {
-                    <option value="@f.Nome">@f.Nome</option>
+                    <option value="@f">@f</option>
                 }
             </select>
         </label>
@@ -337,7 +337,7 @@ else
             <tr>
                 <th class="nowrap" style="width:96px">Série</th>
                 <th class="nowrap">Cubo</th>
-                @foreach (var p in FrameRepository.Padroes)
+                @foreach (var p in MotorRepository.Padroes)
                 {
                     <th class="nowrap">@p</th>
                 }
@@ -350,7 +350,7 @@ else
                 <tr @key="cubo.Id">
                     <td class="nowrap"><span class="val-count">@cubo.Serie</span></td>
                     <td class="nowrap"><strong>@cubo.Rotulo</strong></td>
-                    @foreach (var p in FrameRepository.Padroes)
+                    @foreach (var p in MotorRepository.Padroes)
                     {
                         var padrao = p;
                         var atual = FrameLimite(cubo.Serie, cubo.Rotulo, padrao);
@@ -358,11 +358,11 @@ else
                             <select class="cell" style="max-width:200px" value="@atual"
                                     @onchange="e => DefinirLimite(cubo.Serie, cubo.Rotulo, padrao, e.Value?.ToString() ?? string.Empty)">
                                 <option value="">— não cadastrado —</option>
-                                @foreach (var f in _frames.Where(f => f.Padrao == padrao))
+                                @foreach (var f in MotorRepository.Escada(_motores, padrao))
                                 {
-                                    <option value="@f.Nome" selected="@(f.Nome == atual)">@f.Nome</option>
+                                    <option value="@f" selected="@(f == atual)">@f</option>
                                 }
-                                @if (atual.Length > 0 && _frames.All(f => f.Padrao != padrao || f.Nome != atual))
+                                @if (atual.Length > 0 && !MotorRepository.Escada(_motores, padrao).Contains(atual))
                                 {
                                     <option value="@atual" selected>@atual (fora da lista)</option>
                                 }
@@ -377,7 +377,7 @@ else
 
 @code {
     private List<Equipamento> _todos = new();
-    private List<FrameMotor> _frames = new();
+    private List<Motor> _motores = new();
     private List<LimiteMotor> _limites = new();
     private List<ItemModelo> _itens = new();
 
@@ -417,7 +417,7 @@ else
     protected override void OnInitialized()
     {
         Repo.SemearSeVazio();
-        Frames.SemearSeVazio();
+        Motores.SemearSeVazio();
         Limites.SemearSeVazio();
         Recarregar();
 
@@ -429,7 +429,7 @@ else
     private void Recarregar()
     {
         _todos = Repo.Todos();
-        _frames = Frames.Todos();
+        _motores = Motores.Todos();
         _limites = Limites.Todos();
 
         Itens.SemearDaMatriz(_todos);
@@ -466,8 +466,8 @@ else
     private List<ItemModelo> CubosDaSerieVerificada =>
         _cubos.Where(c => c.Serie == SerieVerificada).ToList();
 
-    private List<FrameMotor> FramesDoPadrao =>
-        _frames.Where(f => f.Padrao == _vPadrao).OrderBy(f => f.Ordem).ToList();
+    /// <summary>As carcaças do padrão, na ordem da lista de motores.</summary>
+    private List<string> FramesDoPadrao => MotorRepository.Escada(_motores, _vPadrao);
 
     /// <summary>
     /// Trocar de ventilador pode trocar de série, e aí os cubos oferecidos são
@@ -502,7 +502,7 @@ else
         _rotacao = RegraRotacao.Verificar(_todos, vent.Serie, vent.Rotulo, cubo.Rotulo, _vRpm);
         _motor = _vFrame.Length == 0
             ? null
-            : RegraMotor.Verificar(_limites, _frames, vent.Serie, cubo.Rotulo, _vPadrao, _vFrame);
+            : RegraMotor.Verificar(_limites, _motores, vent.Serie, cubo.Rotulo, _vPadrao, _vFrame);
     }
 
     // ---------- a matriz ----------
