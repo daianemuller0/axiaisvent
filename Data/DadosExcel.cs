@@ -83,14 +83,14 @@ public static class DadosExcel
         Montar(wb, AbaMotores,
             new[]
             {
-                "Ordem", "Fabricante", "Potência CV", "Frequência", "Tensão", "Rotação",
-                "Nº Polos", "Tipo de Flange", "IEC/NEMA", "Frame", "Código", "Preço",
-                "Observações", "Id (não mexer)",
+                "Ordem", "Série", "Fabricante", "Potência CV", "Frequência", "Tensão",
+                "Rotação", "Nº Polos", "Tipo de Flange", "IEC/NEMA", "Frame", "Código",
+                "Preço", "Observações", "Id (não mexer)",
             },
             motores.Select(m => new object?[]
             {
-                m.Ordem, m.Fabricante, Numero(m.PotenciaCv), Numero(m.Frequencia), m.Tensao,
-                Numero(m.Rotacao), Numero(m.Polos), m.Flange, m.Padrao, m.Frame,
+                m.Ordem, m.Serie, m.Fabricante, Numero(m.PotenciaCv), Numero(m.Frequencia),
+                m.Tensao, Numero(m.Rotacao), Numero(m.Polos), m.Flange, m.Padrao, m.Frame,
                 m.Codigo, Numero(m.Preco), m.Observacoes, m.Id,
             }));
 
@@ -337,6 +337,7 @@ public static class DadosExcel
         var iPadrao = Coluna(cab, "iec/nema", "padrão", "padrao");
         var iFrame = Coluna(cab, "frame", "carcaça", "carcaca", "nome");
         var iOrdem = Coluna(cab, "ordem");
+        var iSerie = Coluna(cab, "série", "serie", "linha");
         var iFabricante = Coluna(cab, "fabricante", "marca");
         var iPotencia = Coluna(cab, "potência cv", "potencia cv", "potência", "potencia", "cv");
         var iFrequencia = Coluna(cab, "frequência", "frequencia", "hz");
@@ -408,6 +409,7 @@ public static class DadosExcel
                 Rotacao = MedidaNormalizada(Campo(iRotacao, atual?.Rotacao)),
                 Polos = MedidaNormalizada(Campo(iPolos, atual?.Polos)),
                 Flange = Campo(iFlange, atual?.Flange),
+                Serie = Campo(iSerie, atual?.Serie),
                 Tensao = Campo(iTensao, atual?.Tensao),
                 Observacoes = Campo(iObs, atual?.Observacoes),
                 Codigo = Campo(iCodigo, atual?.Codigo),

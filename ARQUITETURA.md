@@ -319,6 +319,7 @@ planilha da equipe:
 
 | Campo | O que é |
 |---|---|
+| `serie` | linha de produto: `VAX`, `Joy` — ou **vazio**, que quer dizer "as duas" |
 | `fabricante` | quem fabrica |
 | `potenciaCv` | potência em CV (`7,5`) |
 | `frequencia` | Hz (`60`) |
@@ -347,6 +348,11 @@ A escada não sumiu, ficou **derivada**: `MotorRepository.Escada(motores, padrao
 frames distintos na ordem da lista, contando cada carcaça pela primeira vez que aparece.
 É essa sequência que a regra do cubo compara, e é ela que alimenta os seletores de frame
 da aba Modelos.
+
+A **série** é do motor, não da escada: um motor pode ser só do VAX, só do Joy ou servir aos
+dois (série em branco). A escada de carcaças continua sendo **por padrão**, não por série —
+o tamanho de uma carcaça é físico e é o mesmo nas duas linhas, e os limites por cubo já
+guardam a série do lado deles.
 
 ### Por que a ordem é o campo que importa
 

@@ -20,6 +20,14 @@ public sealed class Motor
     /// </summary>
     public string Id { get; set; } = "";
 
+    /// <summary>
+    /// Linha de produto a que o motor atende: VAX, Joy — ou <b>vazio</b>, que
+    /// quer dizer "serve às duas". A escada de carcaças continua sendo por
+    /// padrão, não por série: o tamanho de uma carcaça é físico, é o mesmo nas
+    /// duas linhas.
+    /// </summary>
+    public string Serie { get; set; } = "";
+
     public string Fabricante { get; set; } = "";
     /// <summary>Potência em CV, como a equipe digita ("7,5", "10").</summary>
     public string PotenciaCv { get; set; } = "";
@@ -53,7 +61,7 @@ public sealed class Motor
     {
         get
         {
-            var partes = new[] { Fabricante, Frame, PotenciaCv.Length > 0 ? PotenciaCv + " CV" : "" }
+            var partes = new[] { Serie, Fabricante, Frame, PotenciaCv.Length > 0 ? PotenciaCv + " CV" : "" }
                 .Where(p => p.Length > 0)
                 .ToList();
             return partes.Count > 0 ? string.Join(" ", partes) : "(motor sem descrição)";
@@ -83,7 +91,7 @@ public sealed class MotorRepository
         .ReadLatest(Entidade,
             "id, padrao, frame, nome, ordem, codigo, preco, " +
             "fabricante, potenciaCv, frequencia, rotacao, polos, flange, " +
-            "tensao, observacoes",
+            "tensao, observacoes, serie",
             r => new Motor
             {
                 Id = S(r, 0), Padrao = S(r, 1),
@@ -91,7 +99,7 @@ public sealed class MotorRepository
                 Ordem = Int(S(r, 4)), Codigo = S(r, 5), Preco = S(r, 6),
                 Fabricante = S(r, 7), PotenciaCv = S(r, 8), Frequencia = S(r, 9),
                 Rotacao = S(r, 10), Polos = S(r, 11), Flange = S(r, 12),
-                Tensao = S(r, 13), Observacoes = S(r, 14),
+                Tensao = S(r, 13), Observacoes = S(r, 14), Serie = S(r, 15),
             })
         .OrderBy(m => PosicaoDoPadrao(m.Padrao))
         .ThenBy(m => m.Ordem)
@@ -130,6 +138,7 @@ public sealed class MotorRepository
             new("frequencia", m.Frequencia), new("rotacao", m.Rotacao),
             new("polos", m.Polos), new("flange", m.Flange),
             new("tensao", m.Tensao), new("observacoes", m.Observacoes),
+            new("serie", m.Serie),
         });
     }
 

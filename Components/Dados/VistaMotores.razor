@@ -1,8 +1,9 @@
 @inject MotorRepository Repo
 
 <p class="subtitle">
-    O catálogo de motores: fabricante, potência, frequência, tensão, rotação, polos, flange,
-    padrão, <strong>frame</strong> (a carcaça) e observações. A ordem da lista, dentro de cada padrão, é a
+    O catálogo de motores: série, fabricante, potência, frequência, tensão, rotação, polos,
+    flange, padrão, <strong>frame</strong> (a carcaça) e observações. Série em branco quer
+    dizer que o motor serve às duas linhas. A ordem da lista, dentro de cada padrão, é a
     <strong>ordem de tamanho</strong> das carcaças — é ela que diz se um motor passa do
     máximo que cabe no cubo.
 </p>
@@ -68,10 +69,11 @@
 <div class="panel" style="padding:0; overflow-x:auto">
     <!-- min-width: sem ele a tabela encolhe para caber no painel e as colunas
          cortam o texto ("< 112M" virava "< 1"); com ele, o painel rola -->
-    <table class="grid" style="min-width:1860px">
+    <table class="grid" style="min-width:1975px">
         <thead>
             <tr>
                 <th class="nowrap" style="width:64px">Ordem</th>
+                <th class="nowrap" style="width:110px">Série</th>
                 <th class="nowrap" style="min-width:150px">Fabricante</th>
                 <th class="nowrap" style="width:110px">Potência CV</th>
                 <th class="nowrap" style="width:110px">Frequência</th>
@@ -93,6 +95,16 @@
                 var motor = m;
                 <tr @key="motor.Id">
                     <td class="nowrap center"><span class="val-count">@Posicao(motor)</span></td>
+                    <td>
+                        <select class="cell" style="max-width:94px" value="@motor.Serie"
+                                @onchange="e => Definir(motor, (x, v) => x.Serie = v, e.Value?.ToString() ?? string.Empty)">
+                            <option value="" selected="@(motor.Serie.Length == 0)">as duas</option>
+                            @foreach (var x in ItemModelo.Series)
+                            {
+                                <option value="@x" selected="@(x == motor.Serie)">@x</option>
+                            }
+                        </select>
+                    </td>
                     <td>@Campo(motor, motor.Fabricante, (x, v) => x.Fabricante = v, "—", 150)</td>
                     <td>@Campo(motor, motor.PotenciaCv, (x, v) => x.PotenciaCv = v, "—", 90, direita: true)</td>
                     <td>@Campo(motor, motor.Frequencia, (x, v) => x.Frequencia = v, "Hz", 90, direita: true)</td>
@@ -177,8 +189,8 @@
     }
 
     private static bool Casa(Motor m, string busca) =>
-        new[] { m.Fabricante, m.PotenciaCv, m.Frequencia, m.Tensao, m.Rotacao, m.Polos,
-                m.Flange, m.Padrao, m.Frame, m.Codigo, m.Observacoes }
+        new[] { m.Serie, m.Fabricante, m.PotenciaCv, m.Frequencia, m.Tensao, m.Rotacao,
+                m.Polos, m.Flange, m.Padrao, m.Frame, m.Codigo, m.Observacoes }
             .Any(t => t.Contains(busca, StringComparison.OrdinalIgnoreCase));
 
     private List<Motor> DoPadrao(string padrao) =>
