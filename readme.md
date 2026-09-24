@@ -52,6 +52,11 @@ não recarrega a página:
 Juntando os códigos escolhidos em cada lista monta-se o código do equipamento — por isso a
 ordem dos grupos e dos itens importa.
 
+Acessório que **muda de preço com o tamanho do equipamento** — o difusor, por exemplo — tem
+um **▸ por equipamento** na própria opção: abre ali mesmo a lista dos equipamentos com os
+três preços em cada linha, com filtro e páginas. O preço solto da opção continua valendo
+como padrão, e o botão mostra quantas exceções já foram cadastradas.
+
 O **código e o preço são da combinação**: quem é vendido é o par ventilador + cubo, então
 o 3000 no cubo 1800 e o 3000 no cubo 2100 são dois equipamentos, cada um com o seu. Por
 isso a tela tem **uma lista só, cruzada** — uma linha por célula amarela da matriz, com

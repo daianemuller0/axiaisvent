@@ -1,4 +1,6 @@
 @inject CaracteristicaRepository Repo
+@inject PrecoEquipamentoRepository Precos
+@inject EquipamentoRepository Equipamentos
 
 <p class="subtitle">
     As características do equipamento. Cada <strong>item</strong> é uma lista (Solidez,
@@ -151,6 +153,7 @@
                     <th class="nowrap" style="width:120px">Preço USD</th>
                     <th class="nowrap" style="width:120px">Preço CLP</th>
                     <th class="nowrap" style="width:120px">Preço R$</th>
+                    <th class="nowrap" style="width:190px">Por equipamento</th>
                     <th class="nowrap" style="width:130px"></th>
                 </tr>
             </thead>
@@ -171,6 +174,7 @@
                         <td>@Preco(item, Moeda.Usd)</td>
                         <td>@Preco(item, Moeda.Clp)</td>
                         <td>@Preco(item, Moeda.Brl)</td>
+                        <td class="nowrap">@PorEquipamento(item)</td>
                         <td class="nowrap center">
                             <button class="btn-link" title="Subir" @onclick="() => Mover(item, -1)">↑</button>
                             <button class="btn-link" title="Descer" @onclick="() => Mover(item, 1)">↓</button>
@@ -181,6 +185,71 @@
             </tbody>
         </table>
     </div>
+
+    @* ---------- preço por equipamento da opção aberta ---------- *@
+    @if (itens.FirstOrDefault(i => i.Id == _abertoPara) is { } opcao)
+    {
+        var equipamentos = EquipamentosFiltrados();
+
+        <div class="panel" style="margin-top:10px; border-left:3px solid var(--azul, #0b3d6b)">
+            <div class="toolbar" style="flex-wrap:wrap">
+                <strong>@opcao.Grupo › @opcao.Valor — preço por equipamento</strong>
+                <span class="val-count">@ComPrecoProprio(opcao) com preço próprio</span>
+
+                <input class="cell" style="width:180px" placeholder="filtrar equipamento…"
+                       value="@_buscaEquip"
+                       @oninput="e => FiltrarEquipamentos(e.Value?.ToString() ?? string.Empty)" />
+
+                <span class="subtitle" style="margin:0">
+                    @(equipamentos.Count == 0 ? "nenhum" : $"{PrimeiraLinha + 1}–{UltimaLinha(equipamentos.Count)} de {equipamentos.Count}")
+                </span>
+                <button class="btn-link" disabled="@(_paginaEquip == 0)" @onclick="() => _paginaEquip--">◀</button>
+                <button class="btn-link" disabled="@(UltimaLinha(equipamentos.Count) >= equipamentos.Count)"
+                        @onclick="() => _paginaEquip++">▶</button>
+
+                <span style="flex:1"></span>
+                <ExcelDaTabela Nome="@($"precos-{opcao.Valor}")"
+                               Exportar="@(() => DadosExcel.ExportarPrecosPorEquipamento(Precos.Todos()))"
+                               Importar="SubirPrecos"
+                               Importou="DepoisDeImportar" />
+                <button class="btn-link" @onclick="@(() => _abertoPara = null)">fechar</button>
+            </div>
+
+            <p class="subtitle" style="margin:0 0 10px">
+                Linha em branco usa o preço da própria opção (@(Resumo(opcao))). Preencha só
+                os equipamentos em que o tamanho muda o valor.
+            </p>
+
+            <div class="panel" style="padding:0; overflow-x:auto">
+                <table class="grid">
+                    <thead>
+                        <tr>
+                            <th class="nowrap" style="width:90px">Série</th>
+                            <th class="nowrap">Fan Diameter</th>
+                            <th class="nowrap">Fan Hub Diameter</th>
+                            <th class="nowrap" style="width:130px">Preço USD</th>
+                            <th class="nowrap" style="width:130px">Preço CLP</th>
+                            <th class="nowrap" style="width:130px">Preço R$</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var e in equipamentos.Skip(PrimeiraLinha).Take(PorPaginaEquip))
+                        {
+                            var eq = e;
+                            <tr @key="@(opcao.Id + "|" + eq.Id)">
+                                <td class="nowrap"><span class="val-count">@eq.Serie</span></td>
+                                <td class="nowrap"><strong>@eq.Diametro</strong></td>
+                                <td class="nowrap"><strong>@eq.Cubo</strong></td>
+                                <td>@PrecoDoEquipamento(opcao, eq, Moeda.Usd)</td>
+                                <td>@PrecoDoEquipamento(opcao, eq, Moeda.Clp)</td>
+                                <td>@PrecoDoEquipamento(opcao, eq, Moeda.Brl)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
 }
 
 @code {
@@ -188,6 +257,16 @@
     private List<string> _grupos = new();
 
     private string _busca = "";
+
+    // ---------- preço por equipamento ----------
+    private List<Equipamento> _equipamentos = new();
+    private Dictionary<string, PrecoEquipamento> _precos = new();
+    /// <summary>Id da opção cujo painel de preços está aberto; nulo = nenhum.</summary>
+    private string? _abertoPara;
+    private string _buscaEquip = "";
+    private int _paginaEquip;
+    private const int PorPaginaEquip = 20;
+
     /// <summary>Lista em foco; vazio mostra todas.</summary>
     private string _grupoFiltro = "";
 
@@ -501,7 +580,142 @@
     private void DepoisDeImportar(string resumo)
     {
         Recarregar();
+        if (_abertoPara is not null &&
+            _todas.FirstOrDefault(c => c.Id == _abertoPara) is { } opcao)
+        {
+            _equipamentos = Equipamentos.Todos();
+            _precos = Precos.Da(opcao.Grupo, opcao.Valor);
+        }
         Aviso(resumo);
+    }
+
+    // ---------- preço por equipamento ----------
+
+    /// <summary>
+    /// O botão que abre a lista de equipamentos da opção. Mostra quantos já têm
+    /// preço próprio, para dar para ver de relance onde há exceção cadastrada.
+    /// </summary>
+    private RenderFragment PorEquipamento(Caracteristica item) => @<text>
+        @if (_abertoPara == item.Id)
+        {
+            <button class="btn-link" @onclick="@(() => _abertoPara = null)">▾ fechar</button>
+        }
+        else
+        {
+            <button class="btn-link" title="Preço diferente por equipamento"
+                    @onclick="() => AbrirPrecos(item)">
+                ▸ por equipamento
+                @if (ComPrecoProprio(item) is var n && n > 0)
+                {
+                    <span class="val-count">@n</span>
+                }
+            </button>
+        }
+    </text>;
+
+    private void AbrirPrecos(Caracteristica item)
+    {
+        _abertoPara = item.Id;
+        _buscaEquip = "";
+        _paginaEquip = 0;
+        _equipamentos = Equipamentos.Todos();
+        _precos = Precos.Da(item.Grupo, item.Valor);
+    }
+
+    private int ComPrecoProprio(Caracteristica item) => _abertoPara == item.Id
+        ? _precos.Count
+        : Precos.Todos().Count(p => p.Grupo == item.Grupo && p.Valor == item.Valor);
+
+    private string Resumo(Caracteristica item)
+    {
+        var partes = new List<string>();
+        if (item.PrecoUsd.Length > 0) partes.Add("USD " + item.PrecoUsd);
+        if (item.PrecoClp.Length > 0) partes.Add("CLP " + item.PrecoClp);
+        if (item.Preco.Length > 0) partes.Add("R$ " + item.Preco);
+        return partes.Count == 0 ? "que também está em branco" : string.Join(" · ", partes);
+    }
+
+    private List<Equipamento> EquipamentosFiltrados()
+    {
+        var busca = _buscaEquip.Trim();
+        if (busca.Length == 0) return _equipamentos;
+
+        return _equipamentos
+            .Where(e => new[] { e.Serie, e.Diametro, e.Cubo }
+                .Any(t => t.Contains(busca, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+    }
+
+    private void FiltrarEquipamentos(string texto)
+    {
+        _buscaEquip = texto;
+        _paginaEquip = 0;
+    }
+
+    private int PrimeiraLinha => _paginaEquip * PorPaginaEquip;
+
+    private int UltimaLinha(int total) => Math.Min(PrimeiraLinha + PorPaginaEquip, total);
+
+    private static string ValorDe(PrecoEquipamento? p, Moeda m) => p is null ? "" : m switch
+    {
+        Moeda.Usd => p.PrecoUsd, Moeda.Clp => p.PrecoClp, _ => p.Preco,
+    };
+
+    /// <summary>Um dos três campos de preço de um equipamento, dentro da opção.</summary>
+    private RenderFragment PrecoDoEquipamento(Caracteristica opcao, Equipamento eq, Moeda moeda) => @<text>
+        @{
+            var chave = PrecoEquipamentoRepository.Chave(eq.Serie, eq.Diametro, eq.Cubo);
+            _precos.TryGetValue(chave, out var atual);
+        }
+        <input class="cell" style="max-width:110px; text-align:right" placeholder="—"
+               value="@ValorDe(atual, moeda)"
+               @onchange="a => DefinirPrecoDoEquipamento(opcao, eq, moeda, a.Value?.ToString() ?? string.Empty)" />
+    </text>;
+
+    private void DefinirPrecoDoEquipamento(Caracteristica opcao, Equipamento eq, Moeda moeda, string texto)
+    {
+        var preco = texto.Trim();
+        var chave = PrecoEquipamentoRepository.Chave(eq.Serie, eq.Diametro, eq.Cubo);
+        _precos.TryGetValue(chave, out var atual);
+
+        if (preco == ValorDe(atual, moeda)) return;
+
+        if (preco.Length > 0 && DadosExcel.Numero(preco) is null)
+        {
+            Aviso($"\"{preco}\" não parece um preço. Use 1234,56 ou 1234.56.", erro: true);
+            return;
+        }
+
+        var linha = atual ?? new PrecoEquipamento
+        {
+            Grupo = opcao.Grupo, Valor = opcao.Valor,
+            Serie = eq.Serie, Diametro = eq.Diametro, Cubo = eq.Cubo,
+        };
+
+        switch (moeda)
+        {
+            case Moeda.Usd: linha.PrecoUsd = preco; break;
+            case Moeda.Clp: linha.PrecoClp = preco; break;
+            default: linha.Preco = preco; break;
+        }
+
+        Precos.Salvar(linha);
+
+        // a linha some do cadastro quando fica sem nenhum preço: é o mesmo que
+        // não ter exceção, e deixar um registro vazio só atrapalharia a contagem
+        if (linha.Vazio) _precos.Remove(chave);
+        else _precos[chave] = linha;
+
+        Aviso(preco.Length == 0
+            ? $"{eq.Serie} {eq.Diametro} / {eq.Cubo}: volta a usar o preço de \"{opcao.Valor}\"."
+            : $"{eq.Serie} {eq.Diametro} / {eq.Cubo} · {opcao.Valor}: {Rotulo(moeda)} {preco}.");
+    }
+
+    private string SubirPrecos(Stream fluxo)
+    {
+        var (linhas, avisos) = DadosExcel.ImportarPrecosPorEquipamento(fluxo, Precos);
+        var texto = linhas > 0 ? $"{linhas} preço(s) por equipamento gravado(s)." : "Nada foi gravado.";
+        return avisos.Count > 0 ? texto + " " + string.Join(" ", avisos) : texto;
     }
 
     private void Aviso(string texto, bool erro = false)

@@ -84,6 +84,7 @@ public static class BackendHost
         builder.Services.AddScoped<MotorRepository>();
         builder.Services.AddScoped<LimiteMotorRepository>();
         builder.Services.AddScoped<CaracteristicaRepository>();
+        builder.Services.AddScoped<PrecoEquipamentoRepository>();
 
         var app = builder.Build();
 
@@ -118,6 +119,7 @@ public static class BackendHost
             escopo.ServiceProvider.GetRequiredService<LimiteMotorRepository>().Todos();
             caracteristicas.Todas();
             caracteristicas.Grupos();
+            escopo.ServiceProvider.GetRequiredService<PrecoEquipamentoRepository>().Todos();
         }
 
         if (!app.Environment.IsDevelopment())

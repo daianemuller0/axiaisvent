@@ -17,6 +17,7 @@ public static class DadosExcel
     public const string AbaModelos = "Modelos";
     public const string AbaVentiladores = "Ventiladores";
     public const string AbaCubos = "Cubos";
+    public const string AbaPrecosEquipamento = "Preços por equipamento";
     public const string AbaLimites = "Limites de motor";
     public const string AbaMotores = "Motores";
     public const string AbaCaracteristicas = "Características";
@@ -164,6 +165,93 @@ public static class DadosExcel
 
     public static byte[] ExportarMotores(List<Motor> motores) =>
         Exportar(new(), new(), new(), motores, new(), new(), AbaMotores);
+
+    /// <summary>
+    /// Os preços de uma opção que mudam com o equipamento. Uma linha por
+    /// exceção cadastrada — o que não está aqui usa o preço da própria opção.
+    /// </summary>
+    public static byte[] ExportarPrecosPorEquipamento(List<PrecoEquipamento> precos)
+    {
+        using var wb = new XLWorkbook();
+        Montar(wb, AbaPrecosEquipamento,
+            new[]
+            {
+                "Item", "Subitem", "Série", "Ventilador", "Cubo",
+                "Preço USD", "Preço CLP", "Preço R$",
+            },
+            precos
+                .OrderBy(p => p.Grupo).ThenBy(p => p.Valor).ThenBy(p => p.Serie)
+                .ThenBy(p => Medida.Numero(p.Diametro)).ThenBy(p => Medida.Numero(p.Cubo))
+                .Select(p => new object?[]
+                {
+                    p.Grupo, p.Valor, p.Serie, p.Diametro, p.Cubo,
+                    Numero(p.PrecoUsd), Numero(p.PrecoClp), Numero(p.Preco),
+                }));
+        return Bytes(wb);
+    }
+
+    public static (int Linhas, List<string> Avisos) ImportarPrecosPorEquipamento(
+        Stream arquivo, PrecoEquipamentoRepository repo)
+    {
+        using var wb = new XLWorkbook(arquivo);
+        var avisos = new List<string>();
+
+        if (!Achar(wb, AbaPrecosEquipamento, out var ws))
+        {
+            avisos.Add($"O arquivo não tem a aba \"{AbaPrecosEquipamento}\". " +
+                       "Exporte esta tabela primeiro para ver o formato esperado.");
+            return (0, avisos);
+        }
+
+        var (cab, linhas) = Ler(ws);
+        var iItem = Coluna(cab, "item", "grupo", "lista");
+        var iSub = Coluna(cab, "subitem", "valor", "opção", "opcao");
+        var iSerie = Coluna(cab, "série", "serie");
+        var iVent = Coluna(cab, "ventilador", "diâmetro", "diametro", "fan diameter");
+        var iCubo = Coluna(cab, "cubo", "fan hub diameter");
+        var iPreco = Coluna(cab, "preço r$", "preco r$", "preço", "preco");
+        var iUsd = Coluna(cab, "preço usd", "preco usd", "usd");
+        var iClp = Coluna(cab, "preço clp", "preco clp", "clp");
+
+        if (iItem < 0 || iSub < 0 || iSerie < 0 || iVent < 0 || iCubo < 0)
+        {
+            avisos.Add($"Aba \"{AbaPrecosEquipamento}\": faltam colunas " +
+                       "(Item, Subitem, Série, Ventilador e Cubo).");
+            return (0, avisos);
+        }
+
+        var existentes = repo.Todos();
+        var gravadas = 0;
+
+        foreach (var l in linhas)
+        {
+            var grupo = T(l, iItem);
+            var valor = T(l, iSub);
+            var serie = T(l, iSerie);
+            var vent = T(l, iVent);
+            var cubo = T(l, iCubo);
+            if (grupo.Length == 0 || valor.Length == 0 || serie.Length == 0 ||
+                vent.Length == 0 || cubo.Length == 0)
+            {
+                continue;
+            }
+
+            var id = PrecoEquipamento.MontarId(grupo, valor, serie, vent, cubo);
+            var atual = existentes.FirstOrDefault(p => p.Id == id);
+
+            repo.Salvar(new PrecoEquipamento
+            {
+                Id = id, Grupo = grupo, Valor = valor,
+                Serie = serie, Diametro = vent, Cubo = cubo,
+                Preco = iPreco >= 0 ? PrecoNormalizado(T(l, iPreco)) : atual?.Preco ?? "",
+                PrecoUsd = iUsd >= 0 ? PrecoNormalizado(T(l, iUsd)) : atual?.PrecoUsd ?? "",
+                PrecoClp = iClp >= 0 ? PrecoNormalizado(T(l, iClp)) : atual?.PrecoClp ?? "",
+            });
+            gravadas++;
+        }
+
+        return (gravadas, avisos);
+    }
 
     public static byte[] ExportarCaracteristicas(
         List<GrupoCaracteristica> grupos, List<Caracteristica> caracteristicas) =>

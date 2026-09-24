@@ -598,6 +598,34 @@ O limite por cubo não sumiu do sistema: `limites_motor`, a aba do Excel e o tre
 continuam, e `RegraMotor` ainda cai neles quando a combinação não tem frame máximo próprio.
 Só não há mais tela para editá-los.
 
+### Acessório não tem preço único
+
+O difusor de um ventilador de 24" não custa o que custa o de 85". O preço solto da opção
+("Difusor › Com") continua existindo e vale como **padrão**; as exceções vivem numa
+entidade própria, `precos_equipamento`, com a chave
+
+```
+{item}|{subitem}|{série}|{ventilador}|{cubo}
+```
+
+e os três preços. Na tela, a opção ganhou um botão **▸ por equipamento** que abre, logo
+abaixo dela, a lista dos equipamentos com USD/CLP/R$ em cada linha — com filtro e páginas
+de 20, porque são 98. O botão mostra quantas exceções já existem, então dá para ver de
+relance onde há preço próprio sem abrir nada.
+
+Duas decisões que valem registrar:
+
+- **Linha em branco não é gravada.** Esvaziar os três campos apaga o registro, porque "sem
+  preço próprio" e "registro vazio" são a mesma coisa — e um registro vazio estragaria a
+  contagem de exceções.
+- **O painel não é uma lista à parte.** As linhas saem do cadastro de equipamentos e o
+  preço é procurado por chave, então um equipamento apagado simplesmente deixa de aparecer,
+  em vez de virar uma linha órfã que ninguém entende.
+
+O Excel desta tabela é a aba `Preços por equipamento` (Item · Subitem · Série · Ventilador ·
+Cubo · os três preços), com o seu próprio par de botões dentro do painel. Uma exceção por
+linha: o que não estiver lá usa o preço da opção.
+
 ### Juntar os arquivinhos (compactação)
 
 Cada gravação cria um arquivo Parquet novo — é o que deixa vários usuários escreverem ao
