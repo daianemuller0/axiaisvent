@@ -68,17 +68,10 @@ public sealed class ParquetStore
     /// parecer gravada. Remontar a partir do texto é barato — o caro é abrir o
     /// banco e ler os arquivos.
     /// </summary>
-    private static readonly ConcurrentDictionary<string, (long Versao, long Ate, List<string?[]> Linhas)> _cache = new();
+    private static readonly ConcurrentDictionary<string, (long Versao, List<string?[]> Linhas)> _cache = new();
 
     /// <summary>Quantas vezes cada entidade mudou nesta execução.</summary>
     private static readonly ConcurrentDictionary<string, long> _versao = new();
-
-    /// <summary>
-    /// Por quanto tempo uma leitura vale sem conferir o disco. Gravação daqui
-    /// invalida na hora; este prazo é só para a gravação de OUTRA pessoa, que
-    /// aparece na navegação seguinte — como já era antes do cache.
-    /// </summary>
-    private static readonly long ValidadePorTicks = TimeSpan.FromSeconds(5).Ticks;
 
     private static long VersaoDe(string entity) => _versao.TryGetValue(entity, out var v) ? v : 0;
 
@@ -296,19 +289,28 @@ COPY (
     /// </summary>
     private List<string?[]> LerCruas(string entity, string selectCols, string orderBy)
     {
-        var chave = entity + "\n" + selectCols + "\n" + orderBy;
+        var chave = Folder + "\n" + entity + "\n" + selectCols + "\n" + orderBy;
         var versao = VersaoDe(entity);
-        var agora = DateTime.UtcNow.Ticks;
 
-        if (_cache.TryGetValue(chave, out var guardado) &&
-            guardado.Versao == versao && agora < guardado.Ate)
-        {
+        if (_cache.TryGetValue(chave, out var guardado) && guardado.Versao == versao)
             return guardado.Linhas;
-        }
 
         var linhas = LerDoDisco(entity, selectCols, orderBy);
-        _cache[chave] = (versao, agora + ValidadePorTicks, linhas);
+        _cache[chave] = (versao, linhas);
         return linhas;
+    }
+
+    /// <summary>
+    /// Joga fora tudo o que está na memória, para a próxima leitura ir ao disco.
+    ///
+    /// É o botão <em>Atualizar</em> da tela. O cache não vence sozinho: a
+    /// gravação feita aqui o invalida na hora, mas a de OUTRA pessoa, na mesma
+    /// pasta de rede, só aparece quando alguém pede.
+    /// </summary>
+    public void Esquecer()
+    {
+        _cache.Clear();
+        foreach (var entidade in _versao.Keys) Invalidar(entidade);
     }
 
     private List<string?[]> LerDoDisco(string entity, string selectCols, string orderBy)

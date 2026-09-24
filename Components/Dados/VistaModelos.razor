@@ -213,7 +213,7 @@
 
     <span style="flex:1"></span>
     <input class="cell" style="width:190px" placeholder="filtrar…" value="@_filtro"
-           @oninput="e => _filtro = e.Value?.ToString() ?? string.Empty" />
+           @oninput="e => Filtrar(e.Value?.ToString() ?? string.Empty)" />
     @Limpeza(AlvoListaCruzada)
     <ExcelDaTabela Nome="equipamentos"
                    Exportar="@(() => DadosExcel.ExportarModelos(_todos, _itens))"
@@ -230,6 +230,29 @@
         }
     </datalist>
 }
+
+@*
+    A lista sai por páginas. Com a tabela inteira no HTML, 98 linhas × 13 colunas
+    davam mais de mil campos numa página só — o navegador levava quase um segundo
+    para montar aquilo, e piorava a cada linha nova.
+
+    (O componente Virtualize seria o caminho natural, mas dentro de <table> ele
+    não recorta: o espaçador precisa ser um <tr>, e um <tr> não segura a altura
+    que ele calcula. Paginar é previsível e funciona em qualquer navegador.)
+*@
+<div class="toolbar" style="flex-wrap:wrap">
+    <span class="subtitle" style="margin:0">
+        @(Combinacoes().Count == 0 ? "nenhuma linha" : $"mostrando {Primeira + 1}–{Ultima} de {Combinacoes().Count}")
+    </span>
+    <button class="btn-link" disabled="@(_pagina == 0)" @onclick="() => _pagina--">◀</button>
+    <button class="btn-link" disabled="@(Ultima >= Combinacoes().Count)" @onclick="() => _pagina++">▶</button>
+    <select class="cell" style="max-width:130px" value="@_porPagina"
+            @onchange="e => TrocarTamanho(e.Value?.ToString() ?? string.Empty)">
+        <option value="30" selected="@(_porPagina == 30)">30 por página</option>
+        <option value="60" selected="@(_porPagina == 60)">60 por página</option>
+        <option value="0" selected="@(_porPagina == 0)">todas</option>
+    </select>
+</div>
 
 <div class="panel" style="padding:0; overflow-x:auto">
     <table class="grid" style="min-width:1780px">
@@ -251,7 +274,7 @@
             </tr>
         </thead>
         <tbody>
-            @foreach (var e in Combinacoes())
+            @foreach (var e in DaPagina())
             {
                 var eq = e;
                 <tr @key="eq.Id">
@@ -382,6 +405,9 @@
     private int _combRpm = 1800;
     /// <summary>Filtro de texto da lista cruzada.</summary>
     private string _filtro = "";
+    /// <summary>Página da lista cruzada (0 = a primeira) e quantas linhas por página.</summary>
+    private int _pagina;
+    private int _porPagina = 30;
     /// <summary>Id da combinação aguardando confirmação para ser apagada.</summary>
     private string? _apagarComb;
     private string _novoCubo = "";
@@ -860,6 +886,42 @@
             .OrderBy(e => Pos(e.Serie, ItemModelo.TipoVentilador, e.Diametro))
             .ThenBy(e => Pos(e.Serie, ItemModelo.TipoCubo, e.Cubo))
             .ToList();
+    }
+
+    /// <summary>
+    /// A página que realmente dá para mostrar. Filtrar ou apagar encurta a
+    /// lista, e a página guardada pode ter ficado depois do fim — o número
+    /// mostrado e as linhas mostradas têm de sair do mesmo cálculo, senão a
+    /// tela diz "31–1 de 1".
+    /// </summary>
+    private int PaginaValida(int total) => _porPagina == 0
+        ? 0
+        : Math.Clamp(_pagina, 0, Math.Max(0, (total - 1) / _porPagina));
+
+    private int Primeira => PaginaValida(Combinacoes().Count) * _porPagina;
+
+    private int Ultima => _porPagina == 0
+        ? Combinacoes().Count
+        : Math.Min(Primeira + _porPagina, Combinacoes().Count);
+
+    /// <summary>As linhas que a página atual mostra.</summary>
+    private List<Equipamento> DaPagina()
+    {
+        var todas = Combinacoes();
+        return _porPagina == 0 ? todas : todas.Skip(Primeira).Take(_porPagina).ToList();
+    }
+
+    private void TrocarTamanho(string texto)
+    {
+        _porPagina = int.TryParse(texto, out var n) ? n : 30;
+        _pagina = 0;
+    }
+
+    /// <summary>Filtrar volta para a primeira página — senão some tudo da tela.</summary>
+    private void Filtrar(string texto)
+    {
+        _filtro = texto;
+        _pagina = 0;
     }
 
     private static bool Casa(Equipamento e, string filtro) =>

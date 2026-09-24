@@ -107,6 +107,17 @@ public static class BackendHost
             var itens = escopo.ServiceProvider.GetRequiredService<ItemModeloRepository>();
             itens.SemearDaMatriz(equipamentos.Todos());
             itens.NormalizarOrdem();
+
+            // Aquece o cache: lê tudo UMA vez, aqui, enquanto o sistema abre.
+            // A partir daí as telas trabalham em memória — abrir a guia Dados e
+            // trocar de seção não voltam ao disco (nem à pasta de rede).
+            var caracteristicas = escopo.ServiceProvider.GetRequiredService<CaracteristicaRepository>();
+            equipamentos.Todos();
+            itens.Todos();
+            escopo.ServiceProvider.GetRequiredService<MotorRepository>().Todos();
+            escopo.ServiceProvider.GetRequiredService<LimiteMotorRepository>().Todos();
+            caracteristicas.Todas();
+            caracteristicas.Grupos();
         }
 
         if (!app.Environment.IsDevelopment())

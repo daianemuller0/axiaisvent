@@ -10,6 +10,7 @@
 @inject CaracteristicaRepository Caracteristicas
 @inject IJSRuntime JS
 @inject NavigationManager Navegacao
+@inject ParquetStore Banco
 
 <div class="page-head">
     <div>
@@ -20,6 +21,8 @@
         </p>
     </div>
     <div class="page-actions">
+        <button class="btn-ghost" @onclick="Atualizar"
+                title="Buscar no banco o que outra pessoa gravou">🔄 Atualizar</button>
         <button class="btn-ghost" @onclick="Exportar">⬇ Exportar Excel</button>
     </div>
 </div>
@@ -147,6 +150,19 @@ else
     private string _secao = "modelos";
 
     private void Mostrar(string secao) => _secao = secao;
+
+    /// <summary>
+    /// Relê o banco. Depois da abertura o sistema trabalha em memória — é o que
+    /// faz trocar de tela ser instantâneo —, então a gravação de outra pessoa,
+    /// na mesma pasta de rede, só aparece quando alguém pede por aqui.
+    /// </summary>
+    private void Atualizar()
+    {
+        Banco.Esquecer();
+        _versao++;
+        Contar();
+        Aviso("Dados relidos do banco.");
+    }
 
     private bool _lendo;
     private string? _msg;

@@ -41,7 +41,7 @@
         <span style="flex:1"></span>
 
         <input class="cell" style="width:200px" placeholder="filtrar…" value="@_busca"
-               @oninput="e => _busca = e.Value?.ToString() ?? string.Empty" />
+               @oninput="e => Filtrar(e.Value?.ToString() ?? string.Empty)" />
 
         @if (_limpando)
         {
@@ -71,9 +71,23 @@
     <div class="@(_erro ? "aviso aviso-erro" : "aviso aviso-ok")" style="margin-bottom:14px">@_msg</div>
 }
 
+<div class="toolbar" style="flex-wrap:wrap">
+    <span class="subtitle" style="margin:0">
+        @(Mostrados.Count == 0 ? "nenhum motor" : $"mostrando {Primeira + 1}–{Ultima} de {Mostrados.Count}")
+    </span>
+    <button class="btn-link" disabled="@(_pagina == 0)" @onclick="() => _pagina--">◀</button>
+    <button class="btn-link" disabled="@(Ultima >= Mostrados.Count)" @onclick="() => _pagina++">▶</button>
+    <select class="cell" style="max-width:130px" value="@_porPagina"
+            @onchange="e => TrocarTamanho(e.Value?.ToString() ?? string.Empty)">
+        <option value="30" selected="@(_porPagina == 30)">30 por página</option>
+        <option value="60" selected="@(_porPagina == 60)">60 por página</option>
+        <option value="0" selected="@(_porPagina == 0)">todos</option>
+    </select>
+</div>
+
 <div class="panel" style="padding:0; overflow-x:auto">
     <!-- min-width: sem ele a tabela encolhe para caber no painel e as colunas
-         cortam o texto ("< 112M" virava "< 1"); com ele, o painel rola -->
+         cortam o texto ("< 112M" virava "< 1"); com ele, o painel rola. -->
     <table class="grid" style="min-width:2180px">
         <thead>
             <tr>
@@ -97,7 +111,7 @@
             </tr>
         </thead>
         <tbody>
-            @foreach (var m in Mostrados)
+            @foreach (var m in DaPagina())
             {
                 var motor = m;
                 <tr @key="motor.Id">
@@ -166,6 +180,9 @@
     private List<Motor> _todos = new();
     private string _filtro = "";
     private string _busca = "";
+    /// <summary>Página da lista (0 = a primeira) e quantas linhas por página.</summary>
+    private int _pagina;
+    private int _porPagina = 30;
     /// <summary>Verdadeiro enquanto a limpeza espera confirmação.</summary>
     private bool _limpando;
     /// <summary>Id do motor aguardando confirmação para ser apagado.</summary>
@@ -194,6 +211,40 @@
 
             return lista.ToList();
         }
+    }
+
+    /// <summary>
+    /// A página que realmente dá para mostrar — filtrar ou apagar pode ter
+    /// encurtado a lista para além dela.
+    /// </summary>
+    private int PaginaValida(int total) => _porPagina == 0
+        ? 0
+        : Math.Clamp(_pagina, 0, Math.Max(0, (total - 1) / _porPagina));
+
+    private int Primeira => PaginaValida(Mostrados.Count) * _porPagina;
+
+    private int Ultima => _porPagina == 0
+        ? Mostrados.Count
+        : Math.Min(Primeira + _porPagina, Mostrados.Count);
+
+    /// <summary>Os motores que a página atual mostra.</summary>
+    private List<Motor> DaPagina()
+    {
+        var todos = Mostrados;
+        return _porPagina == 0 ? todos : todos.Skip(Primeira).Take(_porPagina).ToList();
+    }
+
+    private void TrocarTamanho(string texto)
+    {
+        _porPagina = int.TryParse(texto, out var n) ? n : 30;
+        _pagina = 0;
+    }
+
+    /// <summary>Filtrar volta para a primeira página — senão some tudo da tela.</summary>
+    private void Filtrar(string texto)
+    {
+        _busca = texto;
+        _pagina = 0;
     }
 
     private static bool Casa(Motor m, string busca) =>

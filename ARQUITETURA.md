@@ -514,12 +514,13 @@ Três medidas explicaram tudo:
 
 | O quê | Antes | Depois |
 |---|---|---|
-| Elementos na página | 11.161 | 4.252 |
-| Campos (input/select/button) | 2.780 | 1.269 |
-| HTML | 539 KB | 212 KB |
-| Leituras do banco por abertura | ~30 | ~11 |
+| Elementos na página | 11.161 | 2.221 |
+| Campos (input/select/button) | 2.780 | 593 |
+| HTML | 539 KB | 107 KB |
+| Leituras do banco por abertura | ~30 | 0 (cache quente) |
+| Tempo do servidor para o HTML | — | 7 ms |
 
-Três causas, três correções:
+Quatro causas, quatro correções:
 
 **1. A página desenhava as três seções de uma vez.** Modelos, Motores e Características
 juntas, mesmo que a pessoa só fosse mexer numa. Viraram **abas de verdade**: só a ativa é
@@ -533,7 +534,18 @@ mil elementos só de `<option>`. Viraram um campo com `list`, apontando para **u
 `datalist` por padrão. Para quem usa é a mesma lista ao clicar; para o Blazor é 40
 elementos em vez de 3.724.
 
-**3. As leituras se repetiam.** Cada tela lia equipamentos, itens, frames e limites, e o
+**3. As tabelas saíam inteiras.** A lista de equipamentos desenhava as 98 linhas × 13
+colunas de uma vez, e ia piorar a cada linha que a equipe cadastrasse. Agora sai por
+**páginas de 30** (60 ou todas, à escolha), com ◀ ▶ e a contagem à vista. O filtro volta
+para a primeira página, e a página guardada é sempre limitada ao tamanho da lista — senão
+a tela diria "31–1 de 1" depois de filtrar. O Excel continua exportando a tabela
+**inteira**, não a página.
+
+> O componente `Virtualize` seria o caminho natural, e foi tentado: dentro de um `<table>`
+> ele não recorta nada, porque o espaçador tem de ser um `<tr>` e um `<tr>` não segura a
+> altura que ele calcula. Ficaram as 98 linhas no DOM. Paginar é previsível.
+
+**4. As leituras se repetiam.** Cada tela lia equipamentos, itens, frames e limites, e o
 Blazor desenha tudo duas vezes (servidor e depois interação). Duas correções: um **cache de
 leitura** no `ParquetStore` (abaixo) e **semear só na abertura** — `SemearSeVazio` e
 `SemearDaMatriz` saíram do `OnInitialized` das telas e foram para o `BackendHost`, que roda
@@ -542,9 +554,14 @@ pode trazer um rótulo novo.
 
 ### O cache de leitura
 
-`ParquetStore` guarda as **linhas cruas** da última leitura de cada consulta, por 5
-segundos, e a gravação daqui invalida na hora. A gravação de outra pessoa aparece na
-navegação seguinte — como já era antes do cache.
+`ParquetStore` guarda as **linhas cruas** de cada consulta e **não as esquece sozinho**: a
+gravação feita aqui invalida na hora, e só. Na abertura o `BackendHost` lê tudo uma vez
+(equipamentos, itens, motores, limites e características), então a partir daí as telas
+trabalham em memória — abrir a guia Dados e trocar de seção não voltam ao disco nem à
+pasta de rede. Medido: o servidor entrega o HTML da guia Dados em **7 ms**.
+
+O preço é que a gravação de **outra pessoa**, na mesma pasta de rede, não aparece sozinha.
+Por isso a guia tem um **🔄 Atualizar**, que chama `Esquecer()` e relê tudo.
 
 Guarda as linhas cruas, não os objetos, de propósito: as telas editam os objetos no lugar,
 e devolver o mesmo objeto duas vezes faria uma edição não salva parecer gravada. Remontar
