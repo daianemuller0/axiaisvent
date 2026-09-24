@@ -209,7 +209,7 @@
 
                 <span style="flex:1"></span>
                 <ExcelDaTabela Nome="@($"precos-{opcao.Valor}")"
-                               Exportar="@(() => DadosExcel.ExportarPrecosPorEquipamento(Precos.Todos()))"
+                               Exportar="@(() => DadosExcel.ExportarPrecosPorEquipamento(Precos.Todos(), _equipamentos))"
                                Importar="SubirPrecos"
                                Importou="DepoisDeImportar" />
                 <button class="btn-link" @onclick="@(() => _abertoPara = null)">fechar</button>
@@ -227,6 +227,8 @@
                             <th class="nowrap" style="width:90px">Série</th>
                             <th class="nowrap">Fan Diameter</th>
                             <th class="nowrap">Fan Hub Diameter</th>
+                            <th class="nowrap" style="width:80px">FB/HB</th>
+                            <th class="nowrap" style="width:80px">Estágios</th>
                             <th class="nowrap" style="width:130px">Preço USD</th>
                             <th class="nowrap" style="width:130px">Preço CLP</th>
                             <th class="nowrap" style="width:130px">Preço R$</th>
@@ -240,6 +242,8 @@
                                 <td class="nowrap"><span class="val-count">@eq.Serie</span></td>
                                 <td class="nowrap"><strong>@eq.Diametro</strong></td>
                                 <td class="nowrap"><strong>@eq.Cubo</strong></td>
+                                <td class="nowrap">@(eq.FbHb.Length > 0 ? eq.FbHb : "—")</td>
+                                <td class="nowrap">@(eq.Estagios.Length > 0 ? eq.Estagios : "—")</td>
                                 <td>@PrecoDoEquipamento(opcao, eq, Moeda.Usd)</td>
                                 <td>@PrecoDoEquipamento(opcao, eq, Moeda.Clp)</td>
                                 <td>@PrecoDoEquipamento(opcao, eq, Moeda.Brl)</td>
@@ -664,8 +668,7 @@
     /// <summary>Um dos três campos de preço de um equipamento, dentro da opção.</summary>
     private RenderFragment PrecoDoEquipamento(Caracteristica opcao, Equipamento eq, Moeda moeda) => @<text>
         @{
-            var chave = PrecoEquipamentoRepository.Chave(eq.Serie, eq.Diametro, eq.Cubo);
-            _precos.TryGetValue(chave, out var atual);
+            _precos.TryGetValue(eq.Id, out var atual);
         }
         <input class="cell" style="max-width:110px; text-align:right" placeholder="—"
                value="@ValorDe(atual, moeda)"
@@ -675,8 +678,7 @@
     private void DefinirPrecoDoEquipamento(Caracteristica opcao, Equipamento eq, Moeda moeda, string texto)
     {
         var preco = texto.Trim();
-        var chave = PrecoEquipamentoRepository.Chave(eq.Serie, eq.Diametro, eq.Cubo);
-        _precos.TryGetValue(chave, out var atual);
+        _precos.TryGetValue(eq.Id, out var atual);
 
         if (preco == ValorDe(atual, moeda)) return;
 
@@ -688,8 +690,7 @@
 
         var linha = atual ?? new PrecoEquipamento
         {
-            Grupo = opcao.Grupo, Valor = opcao.Valor,
-            Serie = eq.Serie, Diametro = eq.Diametro, Cubo = eq.Cubo,
+            Grupo = opcao.Grupo, Valor = opcao.Valor, Equipamento = eq.Id,
         };
 
         switch (moeda)
@@ -703,17 +704,17 @@
 
         // a linha some do cadastro quando fica sem nenhum preço: é o mesmo que
         // não ter exceção, e deixar um registro vazio só atrapalharia a contagem
-        if (linha.Vazio) _precos.Remove(chave);
-        else _precos[chave] = linha;
+        if (linha.Vazio) _precos.Remove(eq.Id);
+        else _precos[eq.Id] = linha;
 
         Aviso(preco.Length == 0
-            ? $"{eq.Serie} {eq.Diametro} / {eq.Cubo}: volta a usar o preço de \"{opcao.Valor}\"."
-            : $"{eq.Serie} {eq.Diametro} / {eq.Cubo} · {opcao.Valor}: {Rotulo(moeda)} {preco}.");
+            ? $"{eq.Rotulo}: volta a usar o preço de \"{opcao.Valor}\"."
+            : $"{eq.Rotulo} · {opcao.Valor}: {Rotulo(moeda)} {preco}.");
     }
 
     private string SubirPrecos(Stream fluxo)
     {
-        var (linhas, avisos) = DadosExcel.ImportarPrecosPorEquipamento(fluxo, Precos);
+        var (linhas, avisos) = DadosExcel.ImportarPrecosPorEquipamento(fluxo, Precos, _equipamentos);
         var texto = linhas > 0 ? $"{linhas} preço(s) por equipamento gravado(s)." : "Nada foi gravado.";
         return avisos.Count > 0 ? texto + " " + string.Join(" ", avisos) : texto;
     }

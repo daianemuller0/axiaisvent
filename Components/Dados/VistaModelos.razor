@@ -2,11 +2,14 @@
 @inject MotorRepository Motores
 @inject LimiteMotorRepository Limites
 @inject ItemModeloRepository Itens
+@inject PrecoEquipamentoRepository Precos
 
 <p class="subtitle">
     Os equipamentos e a relação <strong>ventilador × cubo</strong>. VAX e Joy ficam na
     <strong>mesma lista</strong>: cada linha diz na coluna <em>Série</em> de qual linha de
-    produto ela é. O número de cada célula é a rotação máxima (V-Belt) daquela combinação.
+    produto ela é. O modelo é a linha inteira — <strong>série, ventilador, cubo, FB/HB e
+    nº de estágios</strong> —, então o mesmo par pode aparecer duas vezes se o FB/HB ou o
+    estagiamento for outro: são dois modelos, com código e preço próprios.
 </p>
 
 <!-- ---------- verificador ---------- -->
@@ -128,6 +131,16 @@
             <option value="@c.Rotulo"></option>
         }
     </datalist>
+    <input class="cell" style="width:90px" placeholder="FB/HB"
+           value="@_combFbHb" @onchange="e => _combFbHb = e.Value?.ToString() ?? string.Empty" />
+    <select class="cell" style="width:110px" value="@_combEstagios"
+            @onchange="e => _combEstagios = e.Value?.ToString() ?? string.Empty">
+        <option value="" selected="@(_combEstagios.Length == 0)">estágios</option>
+        @foreach (var n in Equipamento.Estagiamentos)
+        {
+            <option value="@n" selected="@(n == _combEstagios)">@n</option>
+        }
+    </select>
     <input class="cell" style="width:100px" type="number" min="1" placeholder="rpm" @bind="_combRpm" />
     <button class="btn-primary" @onclick="IncluirCombinacao">+ Incluir</button>
 
@@ -201,12 +214,19 @@
                     <td class="nowrap"><span class="val-count">@eq.Serie</span></td>
                     <td class="nowrap"><strong>@eq.Diametro</strong></td>
                     <td class="nowrap"><strong>@eq.Cubo</strong></td>
+                    @* a chave carrega o contador de recusas: quando a gravação
+                       é recusada, o valor renderizado não muda e o Blazor não
+                       reescreveria o campo — a tela ficaria mostrando o que foi
+                       digitado e não o que está gravado. Mudando a chave, o
+                       campo é recriado com o valor de verdade. *@
                     <td>
                         <input class="cell" style="max-width:90px" placeholder="—" value="@eq.FbHb"
+                               @key="@($"{eq.Id}|fb|{_recusas}")"
                                @onchange="a => DefinirFbHb(eq, a.Value?.ToString() ?? string.Empty)" />
                     </td>
                     <td>
                         <select class="cell" style="max-width:110px" value="@eq.Estagios"
+                                @key="@($"{eq.Id}|est|{_recusas}")"
                                 @onchange="a => DefinirEstagios(eq, a.Value?.ToString() ?? string.Empty)">
                             <option value="" selected="@(eq.Estagios.Length == 0)">—</option>
                             @foreach (var n in Equipamento.Estagiamentos)
@@ -218,7 +238,7 @@
                     <td>
                         <input class="cell" style="max-width:130px; text-align:right"
                                value="@eq.RpmMax"
-                               @onchange="a => Editar(eq.Serie, eq.Diametro, eq.Cubo, a.Value?.ToString() ?? string.Empty)" />
+                               @onchange="a => DefinirRpm(eq, a.Value?.ToString() ?? string.Empty)" />
                     </td>
                     <td>@FrameMax(eq, "IEC")</td>
                     <td>@FrameMax(eq, "NEMA")</td>
@@ -262,6 +282,8 @@
     private string _combSerie = ItemModelo.Series[0];
     private string _combVentilador = "";
     private string _combCubo = "";
+    private string _combFbHb = "";
+    private string _combEstagios = "";
     private int _combRpm = 1800;
     /// <summary>Filtro de texto da lista cruzada.</summary>
     private string _filtro = "";
@@ -287,6 +309,9 @@
     private RegraRotacao.Resultado? _rotacao;
     private RegraMotor.Resultado? _motor;
     private string? _msg;
+
+    /// <summary>Quantas gravações já foram recusadas — ver o @key dos campos de identidade.</summary>
+    private int _recusas;
 
     protected override void OnInitialized()
     {
@@ -371,17 +396,32 @@
 
         _rotacao = RegraRotacao.Verificar(_todos, vent.Serie, vent.Rotulo, cubo.Rotulo, _vRpm);
         // o frame máximo da própria combinação, quando houver, manda sobre o do cubo
-        var comb = Achar(vent.Serie, vent.Rotulo, cubo.Rotulo);
+        // o par pode ter mais de um modelo (FB/HB, estagiamento); o verificador
+        // pergunta só por ventilador e cubo, então vale o primeiro frame máximo
+        // que algum deles declarar
+        var frameDoPar = Do(vent.Serie, vent.Rotulo, cubo.Rotulo)
+            .Select(e => e.FrameMaximo(_vPadrao))
+            .FirstOrDefault(f => f.Length > 0) ?? "";
+
         _motor = _vFrame.Length == 0
             ? null
             : RegraMotor.Verificar(_limites, _motores, vent.Serie, cubo.Rotulo, _vPadrao,
-                _vFrame, comb?.FrameMaximo(_vPadrao) ?? "");
+                _vFrame, frameDoPar);
     }
 
     // ---------- a matriz ----------
 
-    private Equipamento? Achar(string serie, string diametro, string cubo) => _todos
-        .FirstOrDefault(e => e.Serie == serie && e.Diametro == diametro && e.Cubo == cubo);
+    /// <summary>Os modelos de um par ventilador × cubo — podem ser vários.</summary>
+    private IEnumerable<Equipamento> Do(string serie, string diametro, string cubo) => _todos
+        .Where(e => e.Serie == serie && e.Diametro == diametro && e.Cubo == cubo);
+
+    /// <summary>
+    /// O modelo com esta identidade — os cinco campos da tabela de referência.
+    /// </summary>
+    private Equipamento? Achar(string serie, string diametro, string cubo,
+                               string fbHb, string estagios) => _todos
+        .FirstOrDefault(e => e.Serie == serie && e.Diametro == diametro && e.Cubo == cubo
+                          && e.FbHb == fbHb && e.Estagios == estagios);
 
     // ---------- limpar uma lista ----------
 
@@ -396,8 +436,9 @@
 
     private Alvo AlvoCombinacoes => new(
         "combinacoes", () => _todos.Count,
-        "combinação(ões) da matriz — o cadastro de ventiladores e de cubos fica de pé",
-        () => Repo.Limpar());
+        "combinação(ões) da matriz — o cadastro de ventiladores e de cubos fica de pé, " +
+        "mas os preços de acessório por equipamento saem junto (são presos ao modelo)",
+        () => { Repo.Limpar(); Precos.Limpar(); });
 
     /// <summary>
     /// Limpar a lista cruzada é limpar as combinações — são a mesma coisa. Com
@@ -407,10 +448,17 @@
     private Alvo AlvoListaCruzada => _filtro.Trim().Length == 0
         ? new("lista", () => _todos.Count,
             "combinação(ões) — a lista inteira; o cadastro de ventiladores e de cubos fica de pé",
-            () => Repo.Limpar())
+            () => { Repo.Limpar(); Precos.Limpar(); })
         : new("lista", () => Combinacoes().Count,
             $"combinação(ões) — só as que o filtro \"{_filtro.Trim()}\" está mostrando",
-            () => { foreach (var e in Combinacoes()) Repo.Apagar(e.Id); });
+            () =>
+            {
+                foreach (var e in Combinacoes())
+                {
+                    Repo.Apagar(e.Id);
+                    Precos.LimparEquipamento(e.Id);
+                }
+            });
 
     /// <summary>O botão 🗑 Limpar de uma lista, com a confirmação no lugar dele.</summary>
     private RenderFragment Limpeza(Alvo alvo) => @<text>
@@ -444,32 +492,24 @@
     }
 
     /// <summary>
-    /// Cria/atualiza a rotação de uma combinação. Texto vazio tira a combinação
-    /// da lista.
+    /// A rotação máxima daquele modelo. Texto vazio tira o modelo da lista —
+    /// é como a equipe apaga uma linha digitando.
     /// </summary>
-    private void Editar(string serie, string diametro, string cubo, string texto)
+    private void DefinirRpm(Equipamento eq, string texto)
     {
-        var existente = Achar(serie, diametro, cubo);
         texto = texto.Trim();
 
         if (texto.Length == 0)
         {
-            if (existente is not null)
-            {
-                Repo.Apagar(existente.Id);
-                _msg = $"{serie} {diametro} / {cubo}: combinação removida.";
-            }
+            Repo.Apagar(eq.Id);
+            Precos.LimparEquipamento(eq.Id);
+            _msg = $"{eq.Rotulo}: modelo removido.";
         }
         else if (int.TryParse(texto, out var rpm) && rpm > 0)
         {
-            Repo.Salvar(new Equipamento
-            {
-                Serie = serie, Diametro = diametro, Cubo = cubo, RpmMax = rpm,
-                // mexer na rotação não pode apagar o resto da linha
-                Codigo = existente?.Codigo ?? "", Preco = existente?.Preco ?? "",
-                FbHb = existente?.FbHb ?? "", Estagios = existente?.Estagios ?? "",
-            });
-            _msg = $"{serie} {diametro} / {cubo}: máx. {rpm} rpm.";
+            eq.RpmMax = rpm;
+            Repo.Salvar(eq);
+            _msg = $"{eq.Rotulo}: máx. {rpm} rpm.";
         }
         else
         {
@@ -498,6 +538,10 @@
             .Where(e => filtro.Length == 0 || Casa(e, filtro))
             .OrderBy(e => Pos(e.Serie, ItemModelo.TipoVentilador, e.Diametro))
             .ThenBy(e => Pos(e.Serie, ItemModelo.TipoCubo, e.Cubo))
+            // o mesmo par pode ter mais de um modelo: FB/HB e estagiamento
+            // desempatam, para as linhas não trocarem de lugar a cada leitura
+            .ThenBy(e => e.FbHb, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(e => e.Estagios, StringComparer.OrdinalIgnoreCase)
             .ToList();
     }
 
@@ -570,9 +614,11 @@
             return;
         }
 
-        if (Achar(_combSerie, vent, cubo) is not null)
+        var fbHb = _combFbHb.Trim();
+
+        if (Achar(_combSerie, vent, cubo, fbHb, _combEstagios) is not null)
         {
-            _msg = $"{_combSerie} {vent} / {cubo} já está na lista.";
+            _msg = $"{_combSerie} {vent} / {cubo} com esse FB/HB e estagiamento já está na lista.";
             return;
         }
 
@@ -587,7 +633,16 @@
         var novos = GarantirRotulo(ItemModelo.TipoVentilador, vent)
                   + GarantirRotulo(ItemModelo.TipoCubo, cubo);
 
-        Editar(_combSerie, vent, cubo, _combRpm.ToString());
+        Repo.Salvar(new Equipamento
+        {
+            Serie = _combSerie, Diametro = vent, Cubo = cubo,
+            FbHb = fbHb, Estagios = _combEstagios,
+            RpmMax = _combRpm,
+        });
+        _msg = $"{_combSerie} {vent} / {cubo}: modelo incluído.";
+
+        Recarregar();
+        Verificar();
 
         if (novos > 0)
             _msg += novos == 1 ? " Um rótulo novo entrou no cadastro." : " Dois rótulos novos entraram no cadastro.";
@@ -704,10 +759,8 @@
         var valor = texto.Trim();
         if (valor == eq.FbHb) return;
 
-        eq.FbHb = valor;
-        Repo.Salvar(eq);
-        _msg = $"{eq.Serie} {eq.Diametro} / {eq.Cubo}: " +
-               (valor.Length > 0 ? $"FB/HB {valor}" : "FB/HB apagado");
+        Rechavear(eq, valor, eq.Estagios,
+            valor.Length > 0 ? $"FB/HB {valor}" : "FB/HB apagado");
     }
 
     private void DefinirEstagios(Equipamento eq, string texto)
@@ -715,15 +768,41 @@
         var valor = texto.Trim();
         if (valor == eq.Estagios) return;
 
-        eq.Estagios = valor;
-        Repo.Salvar(eq);
-        _msg = $"{eq.Serie} {eq.Diametro} / {eq.Cubo}: " +
-               (valor.Length > 0 ? $"{valor} estágio(s)" : "estágios em branco");
+        Rechavear(eq, eq.FbHb, valor,
+            valor.Length > 0 ? $"{valor} estágio(s)" : "estágios em branco");
+    }
+
+    /// <summary>
+    /// FB/HB e nº de estágios fazem parte da identidade do modelo — mexer neles
+    /// não é editar um campo, é virar outro modelo. Então a linha é regravada
+    /// com a chave nova, a antiga sai, e os preços por equipamento vão junto.
+    /// </summary>
+    private void Rechavear(Equipamento eq, string fbHb, string estagios, string oQueMudou)
+    {
+        if (Achar(eq.Serie, eq.Diametro, eq.Cubo, fbHb, estagios) is not null)
+        {
+            _msg = $"{eq.Serie} {eq.Diametro} / {eq.Cubo} já tem um modelo com esse " +
+                    "FB/HB e estagiamento — dois modelos iguais não podem existir.";
+            _recusas++;
+            Recarregar();
+            return;
+        }
+
+        var idAntigo = eq.Id;
+        eq.FbHb = fbHb;
+        eq.Estagios = estagios;
+
+        var idNovo = Repo.Regravar(idAntigo, eq);
+        Precos.Remapear(idAntigo, idNovo);
+
+        _msg = $"{eq.Serie} {eq.Diametro} / {eq.Cubo}: {oQueMudou}";
+        Recarregar();
     }
 
     private void ApagarCombinacao(Equipamento eq)
     {
         Repo.Apagar(eq.Id);
+        Precos.LimparEquipamento(eq.Id);
         _apagarComb = null;
         _msg = $"{eq.Serie} {eq.Diametro} / {eq.Cubo}: combinação removida.";
         Recarregar();

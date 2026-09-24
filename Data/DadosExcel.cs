@@ -170,28 +170,41 @@ public static class DadosExcel
     /// Os preços de uma opção que mudam com o equipamento. Uma linha por
     /// exceção cadastrada — o que não está aqui usa o preço da própria opção.
     /// </summary>
-    public static byte[] ExportarPrecosPorEquipamento(List<PrecoEquipamento> precos)
+    public static byte[] ExportarPrecosPorEquipamento(
+        List<PrecoEquipamento> precos, List<Equipamento> equipamentos)
     {
+        // o preço guarda só o id do modelo; as cinco colunas que identificam o
+        // modelo vêm do cadastro, para a planilha ser legível (e reimportável)
+        var modelos = equipamentos
+            .GroupBy(e => e.Id)
+            .ToDictionary(g => g.Key, g => g.First());
+
         using var wb = new XLWorkbook();
         Montar(wb, AbaPrecosEquipamento,
             new[]
             {
-                "Item", "Subitem", "Série", "Ventilador", "Cubo",
+                "Item", "Subitem", "Série", "Ventilador", "Cubo", "FB/HB", "Nº de estágios",
                 "Preço USD", "Preço CLP", "Preço R$",
             },
             precos
-                .OrderBy(p => p.Grupo).ThenBy(p => p.Valor).ThenBy(p => p.Serie)
-                .ThenBy(p => Medida.Numero(p.Diametro)).ThenBy(p => Medida.Numero(p.Cubo))
-                .Select(p => new object?[]
+                .Select(p => (Preco: p, Modelo: modelos.GetValueOrDefault(p.Equipamento)))
+                .Where(x => x.Modelo is not null)
+                .OrderBy(x => x.Preco.Grupo).ThenBy(x => x.Preco.Valor)
+                .ThenBy(x => x.Modelo!.Serie)
+                .ThenBy(x => Medida.Numero(x.Modelo!.Diametro))
+                .ThenBy(x => Medida.Numero(x.Modelo!.Cubo))
+                .Select(x => new object?[]
                 {
-                    p.Grupo, p.Valor, p.Serie, p.Diametro, p.Cubo,
-                    Numero(p.PrecoUsd), Numero(p.PrecoClp), Numero(p.Preco),
+                    x.Preco.Grupo, x.Preco.Valor,
+                    x.Modelo!.Serie, x.Modelo.Diametro, x.Modelo.Cubo,
+                    x.Modelo.FbHb, Numero(x.Modelo.Estagios),
+                    Numero(x.Preco.PrecoUsd), Numero(x.Preco.PrecoClp), Numero(x.Preco.Preco),
                 }));
         return Bytes(wb);
     }
 
     public static (int Linhas, List<string> Avisos) ImportarPrecosPorEquipamento(
-        Stream arquivo, PrecoEquipamentoRepository repo)
+        Stream arquivo, PrecoEquipamentoRepository repo, List<Equipamento> equipamentos)
     {
         using var wb = new XLWorkbook(arquivo);
         var avisos = new List<string>();
@@ -209,6 +222,9 @@ public static class DadosExcel
         var iSerie = Coluna(cab, "série", "serie");
         var iVent = Coluna(cab, "ventilador", "diâmetro", "diametro", "fan diameter");
         var iCubo = Coluna(cab, "cubo", "fan hub diameter");
+        var iFbHb = Coluna(cab, "fb/hb", "fbhb", "fb / hb");
+        var iEstagios = Coluna(cab, "nº de estágios", "n° de estágios", "no de estagios",
+            "nº estágios", "estágios", "estagios");
         var iPreco = Coluna(cab, "preço r$", "preco r$", "preço", "preco");
         var iUsd = Coluna(cab, "preço usd", "preco usd", "usd");
         var iClp = Coluna(cab, "preço clp", "preco clp", "clp");
@@ -221,6 +237,7 @@ public static class DadosExcel
         }
 
         var existentes = repo.Todos();
+        var naoAchados = new List<string>();
         var gravadas = 0;
 
         foreach (var l in linhas)
@@ -236,13 +253,24 @@ public static class DadosExcel
                 continue;
             }
 
-            var id = PrecoEquipamento.MontarId(grupo, valor, serie, vent, cubo);
+            // o preço é de um MODELO, e o modelo são os cinco campos: sem achar
+            // o modelo a linha não tem onde se prender
+            var modelo = Modelo(equipamentos, serie, vent, cubo,
+                iFbHb >= 0 ? T(l, iFbHb) : null,
+                iEstagios >= 0 ? MedidaNormalizada(T(l, iEstagios)) : null);
+
+            if (modelo is null)
+            {
+                naoAchados.Add($"{serie} {vent} / {cubo}");
+                continue;
+            }
+
+            var id = PrecoEquipamento.MontarId(grupo, valor, modelo.Id);
             var atual = existentes.FirstOrDefault(p => p.Id == id);
 
             repo.Salvar(new PrecoEquipamento
             {
-                Id = id, Grupo = grupo, Valor = valor,
-                Serie = serie, Diametro = vent, Cubo = cubo,
+                Id = id, Grupo = grupo, Valor = valor, Equipamento = modelo.Id,
                 Preco = iPreco >= 0 ? PrecoNormalizado(T(l, iPreco)) : atual?.Preco ?? "",
                 PrecoUsd = iUsd >= 0 ? PrecoNormalizado(T(l, iUsd)) : atual?.PrecoUsd ?? "",
                 PrecoClp = iClp >= 0 ? PrecoNormalizado(T(l, iClp)) : atual?.PrecoClp ?? "",
@@ -250,7 +278,31 @@ public static class DadosExcel
             gravadas++;
         }
 
+        if (naoAchados.Count > 0)
+        {
+            avisos.Add($"{naoAchados.Count} linha(s) sem modelo correspondente na lista de " +
+                       $"equipamentos ({string.Join("; ", naoAchados.Distinct().Take(3))}" +
+                       (naoAchados.Distinct().Count() > 3 ? "…" : "") + ") — ignoradas.");
+        }
+
         return (gravadas, avisos);
+    }
+
+    /// <summary>
+    /// O modelo de uma linha de planilha. FB/HB e estágios só filtram quando a
+    /// coluna veio no arquivo — assim uma planilha antiga, de três colunas,
+    /// continua casando com o primeiro modelo do par.
+    /// </summary>
+    private static Equipamento? Modelo(List<Equipamento> equipamentos,
+        string serie, string vent, string cubo, string? fbHb, string? estagios)
+    {
+        var candidatos = equipamentos
+            .Where(e => e.Serie == serie && e.Diametro == vent && e.Cubo == cubo);
+
+        if (fbHb is not null) candidatos = candidatos.Where(e => e.FbHb == fbHb);
+        if (estagios is not null) candidatos = candidatos.Where(e => e.Estagios == estagios);
+
+        return candidatos.FirstOrDefault();
     }
 
     public static byte[] ExportarCaracteristicas(
@@ -487,24 +539,26 @@ public static class DadosExcel
             if (serie.Length == 0 || vent.Length == 0 || cubo.Length == 0) continue;
             if (!int.TryParse(T(l, iRpm), out var rpm) || rpm <= 0) continue;
 
-            // coluna que não veio no arquivo não apaga o que já está gravado
-            var atual = existentes.FirstOrDefault(e =>
-                e.Serie == serie && e.Diametro == vent && e.Cubo == cubo);
+            // o modelo é a linha inteira da tabela de referência: série,
+            // ventilador, cubo, FB/HB e nº de estágios. O arquivo casa pelos
+            // cinco — e por menos, quando alguma dessas colunas não veio nele.
+            // O Excel devolve "1,00" onde a equipe digitou 1.
+            var fbHb = iFbHb >= 0 ? T(l, iFbHb) : null;
+            var estagios = iEstagios >= 0 ? MedidaNormalizada(T(l, iEstagios)) : null;
+
+            var atual = Modelo(existentes, serie, vent, cubo, fbHb, estagios);
 
             repo.Salvar(new Equipamento
             {
                 Serie = serie, Diametro = vent, Cubo = cubo, RpmMax = rpm,
+                FbHb = fbHb ?? atual?.FbHb ?? "",
+                Estagios = estagios ?? atual?.Estagios ?? "",
                 Codigo = iCodigo >= 0 ? T(l, iCodigo) : atual?.Codigo ?? "",
                 Preco = iPreco >= 0 ? PrecoNormalizado(T(l, iPreco)) : atual?.Preco ?? "",
                 PrecoUsd = iPrecoUsd >= 0 ? PrecoNormalizado(T(l, iPrecoUsd)) : atual?.PrecoUsd ?? "",
                 PrecoClp = iPrecoClp >= 0 ? PrecoNormalizado(T(l, iPrecoClp)) : atual?.PrecoClp ?? "",
                 FrameMaxIec = iFrameIec >= 0 ? T(l, iFrameIec) : atual?.FrameMaxIec ?? "",
                 FrameMaxNema = iFrameNema >= 0 ? T(l, iFrameNema) : atual?.FrameMaxNema ?? "",
-                FbHb = iFbHb >= 0 ? T(l, iFbHb) : atual?.FbHb ?? "",
-                // o Excel devolve "1,00" onde a equipe digitou 1
-                Estagios = iEstagios >= 0
-                    ? MedidaNormalizada(T(l, iEstagios))
-                    : atual?.Estagios ?? "",
             });
             gravadas++;
         }

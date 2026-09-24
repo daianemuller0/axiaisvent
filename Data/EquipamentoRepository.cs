@@ -64,8 +64,35 @@ public sealed class Equipamento
     /// <summary>Os estagiamentos possíveis, como a equipe preenche.</summary>
     public static readonly string[] Estagiamentos = { "1", "2" };
 
-    public static string MontarId(string serie, string diametro, string cubo) =>
-        $"{serie}-{diametro}-{cubo}";
+    /// <summary>
+    /// A identidade do modelo: série + ventilador + cubo + FB/HB + nº de
+    /// estágios. São os cinco campos da tabela de referência da equipe — o
+    /// mesmo ventilador no mesmo cubo pode existir duas vezes, desde que mude
+    /// o FB/HB ou o estagiamento, porque aí é outro modelo (outro código,
+    /// outro preço).
+    /// </summary>
+    public static string MontarId(string serie, string diametro, string cubo,
+                                  string fbHb, string estagios) =>
+        $"{serie}-{diametro}-{cubo}-{fbHb}-{estagios}";
+
+    /// <summary>A identidade que esta linha deveria ter, pelos campos de hoje.</summary>
+    public string Chave => MontarId(Serie, Diametro, Cubo, FbHb, Estagios);
+
+    /// <summary>Como o modelo aparece nas mensagens da tela.</summary>
+    public string Rotulo
+    {
+        get
+        {
+            var extra = string.Join(", ", new[]
+            {
+                FbHb,
+                Estagios.Length > 0 ? Estagios + " est." : "",
+            }.Where(t => t.Length > 0));
+
+            var basico = $"{Serie} {Diametro} / {Cubo}";
+            return extra.Length > 0 ? $"{basico} ({extra})" : basico;
+        }
+    }
 }
 
 /// <summary>
@@ -136,7 +163,7 @@ public sealed class EquipamentoRepository
 
     public void Salvar(Equipamento e)
     {
-        if (string.IsNullOrWhiteSpace(e.Id)) e.Id = Equipamento.MontarId(e.Serie, e.Diametro, e.Cubo);
+        if (string.IsNullOrWhiteSpace(e.Id)) e.Id = e.Chave;
         _store.WriteRow(Entidade, new KeyValuePair<string, object?>[]
         {
             new("id", e.Id), new("serie", e.Serie),
@@ -151,6 +178,40 @@ public sealed class EquipamentoRepository
 
     public void Apagar(string id) => _store.WriteRow(Entidade,
         new KeyValuePair<string, object?>[] { new("id", id) }, deleted: true);
+
+    /// <summary>
+    /// Grava uma linha cuja identidade mudou — mexer no FB/HB ou no nº de
+    /// estágios muda a chave do modelo, e aí a linha antiga precisa sair.
+    /// Devolve o id novo.
+    /// </summary>
+    public string Regravar(string idAntigo, Equipamento e)
+    {
+        e.Id = e.Chave;
+        Salvar(e);
+
+        if (idAntigo.Length > 0 && idAntigo != e.Id) Apagar(idAntigo);
+        return e.Id;
+    }
+
+    /// <summary>
+    /// Banco anterior a esta versão: as linhas foram gravadas com um id de três
+    /// campos (série-ventilador-cubo), de quando FB/HB e estágios ainda eram só
+    /// atributos. Reescreve cada uma com a identidade de cinco campos, uma vez.
+    ///
+    /// Sem isso, uma linha antiga e uma nova com os mesmos cinco campos viveriam
+    /// lado a lado, cada uma com o seu id — dois modelos iguais na lista.
+    /// </summary>
+    private void PadronizarIds()
+    {
+        const string marca = "identidade-5-campos-v1";
+        if (MigracoesAplicadas().Contains(marca)) return;
+
+        foreach (var e in Todos().Where(x => x.Id != x.Chave))
+            Regravar(e.Id, e);
+
+        _store.WriteRow(EntidadeMigracoes,
+            new KeyValuePair<string, object?>[] { new("id", marca) });
+    }
 
     /// <summary>
     /// Rótulos de cubo lidos errado numa transcrição e corrigidos depois.
@@ -240,6 +301,7 @@ public sealed class EquipamentoRepository
     public void SemearSeVazio()
     {
         CorrigirRotulos();
+        PadronizarIds();
         RefazerBlocos();
 
         var jaSemeados = _store
@@ -431,7 +493,6 @@ public static class EquipamentosSeed
          from linha in bloco.Linhas
          select new Equipamento
          {
-             Id = Equipamento.MontarId(serie, linha.Diametro, bloco.Cubo),
              Serie = serie,
              Diametro = linha.Diametro,
              Cubo = bloco.Cubo,

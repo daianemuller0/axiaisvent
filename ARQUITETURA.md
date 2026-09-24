@@ -605,7 +605,7 @@ O difusor de um ventilador de 24" não custa o que custa o de 85". O preço solt
 entidade própria, `precos_equipamento`, com a chave
 
 ```
-{item}|{subitem}|{série}|{ventilador}|{cubo}
+{item}|{subitem}|{id do modelo}
 ```
 
 e os três preços. Na tela, a opção ganhou um botão **▸ por equipamento** que abre, logo
@@ -669,7 +669,7 @@ linhas, o que estava sendo digitado em outro campo se perdia no redesenho.
 
 | O quê | Entidade | Campos |
 |---|---|---|
-| **Equipamento** (ventilador × cubo) | `equipamentos` | `codigo`, `preco`, `fbHb`, `estagios` |
+| **Modelo** (os cinco campos) | `equipamentos` | `codigo`, `preco`, `fbHb`, `estagios` |
 | Frame de motor | `frames` | `codigo`, `preco` |
 | Subitem de característica | `caracteristicas` | `codigo`, `preco` |
 
@@ -684,6 +684,38 @@ Então o código e o preço vivem no `Equipamento`, que já era a combinação, 
 **uma lista só, cruzada**: uma linha por célula amarela, com série, ventilador, cubo,
 **FB/HB**, **nº de estágios**, rotação máxima, código e preço. Estes dois últimos também
 são do par, não das pontas: é o equipamento montado que tem um ou dois estágios.
+
+### O modelo são cinco campos, não três
+
+A equipe foi explícita: *"o modelo é composto de Série, Fan Diameter, Fan Hub Diameter,
+FB/HB e o nº de estágios"*. Isso não é decoração da linha — é a **identidade** dela:
+
+```
+id = {série}-{ventilador}-{cubo}-{fbHb}-{estágios}
+```
+
+Antes a chave era só `{série}-{ventilador}-{cubo}`, e o efeito prático era que o mesmo
+par não podia existir duas vezes: um 2400/1800 FB de 1 estágio e um 2400/1800 HB de 2
+estágios brigavam pela mesma linha, quando são dois modelos, com código e preço próprios.
+Agora convivem, e o que o sistema recusa é o que realmente é repetido: os cinco campos
+iguais.
+
+Três consequências que o código carrega:
+
+- **Mexer no FB/HB ou no estagiamento é trocar de identidade**, não editar um campo. A
+  linha é regravada com a chave nova e a antiga é apagada (`EquipamentoRepository.Regravar`),
+  e os preços por equipamento vão junto (`PrecoEquipamentoRepository.Remapear`). Se a
+  chave nova já existir, a gravação é recusada e a célula volta ao valor gravado — o
+  `@key` dos campos de identidade carrega um contador de recusas, senão o Blazor não
+  reescreveria um campo cujo valor renderizado não mudou e a tela mostraria o que foi
+  digitado em vez do que está no banco.
+- **Um banco anterior é convertido na abertura**, uma vez e com marca: `PadronizarIds`
+  reescreve os ids de três campos, e `PrecoEquipamentoRepository.Converter` troca as
+  colunas soltas de série/ventilador/cubo pelo id do modelo. Preço que não acha modelo é
+  apagado — seria uma linha invisível contando como exceção na tela.
+- **A planilha casa pelos cinco campos.** Quando o arquivo não traz FB/HB ou estágios, o
+  casamento afrouxa para as colunas que vieram (`DadosExcel.Modelo`), para uma exportação
+  antiga continuar reimportando sem duplicar.
 
 `estagios` é `1` ou `2` (um seletor, em branco enquanto não definido). `fbHb` é texto
 livre **por enquanto** — a equipe ainda não disse quais valores entram; quando disser,

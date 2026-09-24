@@ -112,6 +112,11 @@ public static class BackendHost
             // Aquece o cache: lê tudo UMA vez, aqui, enquanto o sistema abre.
             // A partir daí as telas trabalham em memória — abrir a guia Dados e
             // trocar de seção não voltam ao disco (nem à pasta de rede).
+            // Preços por equipamento de um banco anterior guardavam série,
+            // ventilador e cubo soltos; agora apontam para o id do modelo.
+            var precos = escopo.ServiceProvider.GetRequiredService<PrecoEquipamentoRepository>();
+            precos.Converter(equipamentos);
+
             var caracteristicas = escopo.ServiceProvider.GetRequiredService<CaracteristicaRepository>();
             equipamentos.Todos();
             itens.Todos();
@@ -119,7 +124,7 @@ public static class BackendHost
             escopo.ServiceProvider.GetRequiredService<LimiteMotorRepository>().Todos();
             caracteristicas.Todas();
             caracteristicas.Grupos();
-            escopo.ServiceProvider.GetRequiredService<PrecoEquipamentoRepository>().Todos();
+            precos.Todos();
         }
 
         if (!app.Environment.IsDevelopment())
