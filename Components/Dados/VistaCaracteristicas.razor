@@ -208,7 +208,7 @@
 
     protected override void OnInitialized()
     {
-        Repo.SemearSeVazio();
+        // a tabela de fábrica é carregada na abertura do sistema (BackendHost)
         Recarregar();
         _novoGrupo = _grupos.FirstOrDefault() ?? "";
     }

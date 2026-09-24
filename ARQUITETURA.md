@@ -508,6 +508,50 @@ A correção tem duas partes:
 > A lição, para o resto do sistema: um carimbo de tempo não é uma chave de ordenação
 > confiável enquanto não for **estritamente crescente por construção**.
 
+### Por que a guia Dados demorava a abrir
+
+Três medidas explicaram tudo:
+
+| O quê | Antes | Depois |
+|---|---|---|
+| Elementos na página | 11.161 | 4.252 |
+| Campos (input/select/button) | 2.780 | 1.269 |
+| HTML | 539 KB | 212 KB |
+| Leituras do banco por abertura | ~30 | ~11 |
+
+Três causas, três correções:
+
+**1. A página desenhava as três seções de uma vez.** Modelos, Motores e Características
+juntas, mesmo que a pessoa só fosse mexer numa. Viraram **abas de verdade**: só a ativa é
+desenhada, e trocar de aba não recarrega a página — é um redesenho do pedaço, medido em
+50–345 ms. As rotas `/axiais/motores` e `/axiais/caracteristicas` continuam valendo e
+abrem já na seção certa.
+
+**2. Cada linha repetia a escada de carcaças.** As colunas *Frame máx IEC/NEMA* eram um
+`select` por linha: com 98 linhas, a escada de 19 frames aparecia 196 vezes — quase quatro
+mil elementos só de `<option>`. Viraram um campo com `list`, apontando para **um**
+`datalist` por padrão. Para quem usa é a mesma lista ao clicar; para o Blazor é 40
+elementos em vez de 3.724.
+
+**3. As leituras se repetiam.** Cada tela lia equipamentos, itens, frames e limites, e o
+Blazor desenha tudo duas vezes (servidor e depois interação). Duas correções: um **cache de
+leitura** no `ParquetStore` (abaixo) e **semear só na abertura** — `SemearSeVazio` e
+`SemearDaMatriz` saíram do `OnInitialized` das telas e foram para o `BackendHost`, que roda
+uma vez. `SemearDaMatriz` volta a rodar depois de uma importação, que é quando a planilha
+pode trazer um rótulo novo.
+
+### O cache de leitura
+
+`ParquetStore` guarda as **linhas cruas** da última leitura de cada consulta, por 5
+segundos, e a gravação daqui invalida na hora. A gravação de outra pessoa aparece na
+navegação seguinte — como já era antes do cache.
+
+Guarda as linhas cruas, não os objetos, de propósito: as telas editam os objetos no lugar,
+e devolver o mesmo objeto duas vezes faria uma edição não salva parecer gravada. Remontar
+a partir do texto é barato; o caro é abrir o DuckDB e ler a pasta. Um
+`IDataReader` de fachada (`LinhaComoReader`) deixa os mapeadores dos repositórios escritos
+do mesmo jeito.
+
 ### Juntar os arquivinhos (compactação)
 
 Cada gravação cria um arquivo Parquet novo — é o que deixa vários usuários escreverem ao

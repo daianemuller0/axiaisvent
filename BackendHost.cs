@@ -99,6 +99,14 @@ public static class BackendHost
             escopo.ServiceProvider.GetRequiredService<MotorRepository>().SemearSeVazio();
             escopo.ServiceProvider.GetRequiredService<LimiteMotorRepository>().SemearSeVazio();
             escopo.ServiceProvider.GetRequiredService<CaracteristicaRepository>().SemearSeVazio();
+
+            // A lista de ventiladores e cubos nasce da matriz de equipamentos.
+            // Aqui, uma vez na abertura — antes ela era refeita a cada desenho
+            // de tela, e isso custava três leituras por página.
+            var equipamentos = escopo.ServiceProvider.GetRequiredService<EquipamentoRepository>();
+            var itens = escopo.ServiceProvider.GetRequiredService<ItemModeloRepository>();
+            itens.SemearDaMatriz(equipamentos.Todos());
+            itens.NormalizarOrdem();
         }
 
         if (!app.Environment.IsDevelopment())

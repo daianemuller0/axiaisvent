@@ -54,6 +54,38 @@ public sealed class ParquetStore
     private static readonly ConcurrentDictionary<string, int> _desdeCompactacao = new();
 
     /// <summary>
+    /// As linhas cruas da última leitura de cada consulta, para não abrir o
+    /// DuckDB de novo a cada chamada.
+    ///
+    /// Desenhar uma página da aba Dados fazia ~30 leituras: cada tela lê os
+    /// equipamentos, os itens, os frames, os limites… e o Blazor ainda desenha
+    /// tudo duas vezes (uma no servidor, outra ao ligar a interação). Cada
+    /// leitura abre um DuckDB novo e relê a pasta inteira — somadas, davam mais
+    /// de um segundo só para abrir.
+    ///
+    /// Guarda as linhas <b>cruas</b>, não os objetos: as telas editam os objetos
+    /// no lugar, e devolver o mesmo objeto duas vezes faria uma edição não salva
+    /// parecer gravada. Remontar a partir do texto é barato — o caro é abrir o
+    /// banco e ler os arquivos.
+    /// </summary>
+    private static readonly ConcurrentDictionary<string, (long Versao, long Ate, List<string?[]> Linhas)> _cache = new();
+
+    /// <summary>Quantas vezes cada entidade mudou nesta execução.</summary>
+    private static readonly ConcurrentDictionary<string, long> _versao = new();
+
+    /// <summary>
+    /// Por quanto tempo uma leitura vale sem conferir o disco. Gravação daqui
+    /// invalida na hora; este prazo é só para a gravação de OUTRA pessoa, que
+    /// aparece na navegação seguinte — como já era antes do cache.
+    /// </summary>
+    private static readonly long ValidadePorTicks = TimeSpan.FromSeconds(5).Ticks;
+
+    private static long VersaoDe(string entity) => _versao.TryGetValue(entity, out var v) ? v : 0;
+
+    private static void Invalidar(string entity) =>
+        _versao.AddOrUpdate(entity, 1, (_, v) => v + 1);
+
+    /// <summary>
     /// A partir de quantos arquivos vale a pena juntar tudo num só. Abaixo
     /// disso a leitura é rápida e compactar só daria trabalho.
     /// </summary>
@@ -138,6 +170,8 @@ public sealed class ParquetStore
             cmd.ExecuteNonQuery();
         }
 
+        Invalidar(entity);
+
         // Sem isto a pasta cresce para sempre e cada leitura fica mais lenta —
         // é o que fazia a tela travar depois de uma tarde de digitação.
         if (_desdeCompactacao.AddOrUpdate(entity, 1, (_, n) => n + 1) >= LimiteDeArquivos)
@@ -216,6 +250,8 @@ COPY (
         {
             try { File.Delete(antigo); } catch { /* outro processo pode estar lendo */ }
         }
+
+        Invalidar(entity);
     }
 
     /// <summary>Compacta todas as entidades que já passaram do limite de arquivos.</summary>
@@ -241,9 +277,45 @@ COPY (
     /// </summary>
     public List<T> ReadLatest<T>(string entity, string selectCols, Func<IDataReader, T> map, string orderBy = "")
     {
+        var quantas = selectCols.Split(',').Length;
+        var linhas = LerCruas(entity, selectCols, orderBy);
+
+        var lista = new List<T>(linhas.Count);
+        var leitor = new LinhaComoReader(quantas);
+        foreach (var linha in linhas)
+        {
+            leitor.Apontar(linha);
+            lista.Add(map(leitor));
+        }
+        return lista;
+    }
+
+    /// <summary>
+    /// As linhas da consulta como texto — do cache quando ele ainda vale, do
+    /// disco quando não.
+    /// </summary>
+    private List<string?[]> LerCruas(string entity, string selectCols, string orderBy)
+    {
+        var chave = entity + "\n" + selectCols + "\n" + orderBy;
+        var versao = VersaoDe(entity);
+        var agora = DateTime.UtcNow.Ticks;
+
+        if (_cache.TryGetValue(chave, out var guardado) &&
+            guardado.Versao == versao && agora < guardado.Ate)
+        {
+            return guardado.Linhas;
+        }
+
+        var linhas = LerDoDisco(entity, selectCols, orderBy);
+        _cache[chave] = (versao, agora + ValidadePorTicks, linhas);
+        return linhas;
+    }
+
+    private List<string?[]> LerDoDisco(string entity, string selectCols, string orderBy)
+    {
         var dir = EntityDir(entity);
         if (!Directory.EnumerateFiles(dir, "*.parquet").Any())
-            return new List<T>();
+            return new List<string?[]>();
 
         var glob = Duck(Path.Combine(dir, "*.parquet"));
         using var conn = Open();
@@ -281,9 +353,67 @@ WHERE _rn = 1 AND NOT _deleted{order};";
         using var cmd = conn.CreateCommand();
         cmd.CommandText = sql;
         using var r = cmd.ExecuteReader();
-        var list = new List<T>();
-        while (r.Read()) list.Add(map(r));
-        return list;
+
+        var quantas = selectCols.Split(',').Length;
+        var linhas = new List<string?[]>();
+        while (r.Read())
+        {
+            var linha = new string?[quantas];
+            for (var i = 0; i < quantas; i++) linha[i] = r.IsDBNull(i) ? null : r.GetString(i);
+            linhas.Add(linha);
+        }
+        return linhas;
+    }
+
+    /// <summary>
+    /// Um <see cref="IDataReader"/> de fachada sobre uma linha já lida, para os
+    /// mapeadores dos repositórios continuarem escritos do mesmo jeito. Eles só
+    /// usam <c>IsDBNull</c> e <c>GetString</c>; o resto não é chamado.
+    /// </summary>
+    private sealed class LinhaComoReader : IDataReader
+    {
+        private readonly int _campos;
+        private string?[] _linha = Array.Empty<string?>();
+
+        public LinhaComoReader(int campos) => _campos = campos;
+
+        public void Apontar(string?[] linha) => _linha = linha;
+
+        public bool IsDBNull(int i) => _linha[i] is null;
+        public string GetString(int i) => _linha[i] ?? "";
+        public object GetValue(int i) => (object?)_linha[i] ?? DBNull.Value;
+        public int FieldCount => _campos;
+
+        // o resto da interface não é usado pelos mapeadores
+        public bool Read() => throw new NotSupportedException();
+        public void Close() { }
+        public void Dispose() { }
+        public int Depth => 0;
+        public bool IsClosed => false;
+        public int RecordsAffected => -1;
+        public System.Data.DataTable? GetSchemaTable() => null;
+        public bool NextResult() => false;
+        public bool GetBoolean(int i) => bool.Parse(GetString(i));
+        public byte GetByte(int i) => byte.Parse(GetString(i));
+        public long GetBytes(int i, long o, byte[]? b, int bo, int l) => throw new NotSupportedException();
+        public char GetChar(int i) => GetString(i)[0];
+        public long GetChars(int i, long o, char[]? b, int bo, int l) => throw new NotSupportedException();
+        public IDataReader GetData(int i) => throw new NotSupportedException();
+        public string GetDataTypeName(int i) => "VARCHAR";
+        public DateTime GetDateTime(int i) => DateTime.Parse(GetString(i));
+        public decimal GetDecimal(int i) => decimal.Parse(GetString(i));
+        public double GetDouble(int i) => double.Parse(GetString(i));
+        public Type GetFieldType(int i) => typeof(string);
+        public float GetFloat(int i) => float.Parse(GetString(i));
+        public Guid GetGuid(int i) => Guid.Parse(GetString(i));
+        public short GetInt16(int i) => short.Parse(GetString(i));
+        public int GetInt32(int i) => int.Parse(GetString(i));
+        public long GetInt64(int i) => long.Parse(GetString(i));
+        public string GetName(int i) => i.ToString();
+        public int GetOrdinal(string name) => throw new NotSupportedException();
+        public int GetValues(object[] valores) => throw new NotSupportedException();
+        public object this[int i] => GetValue(i);
+        public object this[string name] => throw new NotSupportedException();
     }
 
     public bool IsEmpty(string entity)
@@ -300,5 +430,7 @@ WHERE _rn = 1 AND NOT _deleted{order};";
         var dir = EntityDir(entity);
         foreach (var f in Directory.EnumerateFiles(dir, "*.parquet"))
             File.Delete(f);
+
+        Invalidar(entity);
     }
 }

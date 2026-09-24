@@ -9,6 +9,7 @@
 @inject MotorRepository Motores
 @inject CaracteristicaRepository Caracteristicas
 @inject IJSRuntime JS
+@inject NavigationManager Navegacao
 
 <div class="page-head">
     <div>
@@ -101,17 +102,32 @@
     </p>
 </div>
 
-<!-- ---------------- modelos ---------------- -->
-<h2 style="margin:28px 0 4px">Modelos</h2>
-<VistaModelos @key="@("modelos-" + _versao)" />
+<!-- ----------------------------------------------------------------
+     Uma seção de cada vez. Desenhar as três juntas dava 11 mil elementos
+     e 2.780 campos numa página só — o Blazor Server monta e compara essa
+     árvore inteira a cada evento, e abrir a guia levava mais de um
+     segundo. Trocar de seção agora não recarrega a página: é só o pedaço.
+     ---------------------------------------------------------------- -->
+<div class="tabs" style="margin-top:22px">
+    @foreach (var (chave, titulo) in Secoes)
+    {
+        var s = chave;
+        <button class="tab @(_secao == s ? "active" : "")" @onclick="() => Mostrar(s)">@titulo</button>
+    }
+</div>
 
-<!-- ---------------- motores ---------------- -->
-<h2 style="margin:34px 0 4px">Motores</h2>
-<VistaMotores @key="@("motores-" + _versao)" />
-
-<!-- ---------------- características ---------------- -->
-<h2 style="margin:34px 0 4px">Características</h2>
-<VistaCaracteristicas @key="@("caract-" + _versao)" />
+@if (_secao == "modelos")
+{
+    <VistaModelos @key="@("modelos-" + _versao)" />
+}
+else if (_secao == "motores")
+{
+    <VistaMotores @key="@("motores-" + _versao)" />
+}
+else
+{
+    <VistaCaracteristicas @key="@("caract-" + _versao)" />
+}
 
 @code {
     private const long TamanhoMaximo = 30L * 1024 * 1024;
@@ -121,6 +137,16 @@
     /// trocá-la recria as três e cada uma relê o que gravou.
     /// </summary>
     private int _versao;
+
+    private static readonly (string Chave, string Titulo)[] Secoes =
+    {
+        ("modelos", "Modelos"), ("motores", "Motores"), ("caracteristicas", "Características"),
+    };
+
+    /// <summary>A seção à vista. Começa pela que a rota pediu.</summary>
+    private string _secao = "modelos";
+
+    private void Mostrar(string secao) => _secao = secao;
 
     private bool _lendo;
     private string? _msg;
@@ -137,7 +163,16 @@
 
     private bool AlgoSelecionado => _limparModelos || _limparMotores || _limparCaracteristicas;
 
-    protected override void OnInitialized() => Contar();
+    protected override void OnInitialized()
+    {
+        // /axiais/motores e /axiais/caracteristicas continuam valendo: abrem a
+        // guia já na seção certa
+        var rota = Navegacao.ToBaseRelativePath(Navegacao.Uri).ToLowerInvariant();
+        if (rota.Contains("motores")) _secao = "motores";
+        else if (rota.Contains("caracteristicas")) _secao = "caracteristicas";
+
+        Contar();
+    }
 
     private void Contar()
     {

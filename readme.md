@@ -32,7 +32,8 @@ sem encostar no que está gravado.
 
 ## A aba Dados
 
-Uma guia só, com tudo na mesma página:
+Uma guia com três seções, em abas — só a que está aberta é desenhada, e trocar entre elas
+não recarrega a página:
 
 - **Modelos** — a matriz ventilador × cubo (que é também o cadastro dos dois), a lista
   cruzada dos equipamentos com código e preço, o alerta de rotação e o motor máximo por

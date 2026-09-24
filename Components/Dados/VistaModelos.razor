@@ -221,6 +221,16 @@
                    Importou="DepoisDeImportar" />
 </div>
 
+@foreach (var padrao in MotorRepository.Padroes)
+{
+    <datalist id="@("escada-" + padrao)">
+        @foreach (var f in MotorRepository.Escada(_motores, padrao))
+        {
+            <option value="@f"></option>
+        }
+    </datalist>
+}
+
 <div class="panel" style="padding:0; overflow-x:auto">
     <table class="grid" style="min-width:1780px">
         <thead>
@@ -399,9 +409,8 @@
 
     protected override void OnInitialized()
     {
-        Repo.SemearSeVazio();
-        Motores.SemearSeVazio();
-        Limites.SemearSeVazio();
+        // as tabelas de fábrica são carregadas na abertura do sistema
+        // (BackendHost), não a cada desenho de tela
         Recarregar();
 
         _vVentilador = _diametros.FirstOrDefault()?.Id ?? "";
@@ -415,9 +424,6 @@
         _motores = Motores.Todos();
         _limites = Limites.Todos();
 
-        Itens.SemearDaMatriz(_todos);
-        // junta as duas séries numa sequência só; depois da primeira vez não faz nada
-        Itens.NormalizarOrdem();
         _itens = Itens.Todos();
 
         _series = ItemModelo.Series
@@ -960,24 +966,19 @@
     }
 
     /// <summary>
-    /// O frame máximo desta combinação, num padrão. As opções são a escada da
-    /// aba Motores; "— do cubo —" deixa valer o limite mais grosso, o da tabela
-    /// <em>Motor máximo por cubo</em>.
+    /// O frame máximo desta combinação, num padrão. Em branco vale o limite
+    /// mais grosso, o da tabela <em>Motor máximo por cubo</em>.
+    ///
+    /// É um campo com <c>list</c>, não um <c>select</c>: com 98 linhas na tela,
+    /// dois selects por linha repetiam a escada inteira 196 vezes — quase quatro
+    /// mil elementos só de opção, que o Blazor tinha de montar e comparar a cada
+    /// desenho. O <c>datalist</c> aparece uma vez só e todas as linhas apontam
+    /// para ele; para quem usa, continua abrindo a mesma lista ao clicar.
     /// </summary>
     private RenderFragment FrameMax(Equipamento eq, string padrao) => @<text>
-        <select class="cell" style="max-width:135px" value="@eq.FrameMaximo(padrao)"
-                @onchange="a => DefinirFrameMax(eq, padrao, a.Value?.ToString() ?? string.Empty)">
-            <option value="" selected="@(eq.FrameMaximo(padrao).Length == 0)">— do cubo —</option>
-            @foreach (var f in MotorRepository.Escada(_motores, padrao))
-            {
-                <option value="@f" selected="@(f == eq.FrameMaximo(padrao))">@f</option>
-            }
-            @if (eq.FrameMaximo(padrao).Length > 0 &&
-                 !MotorRepository.Escada(_motores, padrao).Contains(eq.FrameMaximo(padrao)))
-            {
-                <option value="@eq.FrameMaximo(padrao)" selected>@eq.FrameMaximo(padrao) (fora da lista)</option>
-            }
-        </select>
+        <input class="cell" style="max-width:130px" list="@("escada-" + padrao)"
+               placeholder="do cubo" value="@eq.FrameMaximo(padrao)"
+               @onchange="a => DefinirFrameMax(eq, padrao, a.Value?.ToString() ?? string.Empty)" />
     </text>;
 
     private void DefinirFrameMax(Equipamento eq, string padrao, string frame)
@@ -1054,6 +1055,11 @@
     /// <summary>Depois de subir uma planilha, relê tudo e mostra o resumo.</summary>
     private void DepoisDeImportar(string resumo)
     {
+        // a planilha pode ter trazido combinação com rótulo que ainda não
+        // existe na lista — é o único momento em que semear faz diferença
+        Itens.SemearDaMatriz(Repo.Todos());
+        Itens.NormalizarOrdem();
+
         Recarregar();
         if (_diametros.All(d => d.Id != _vVentilador))
             _vVentilador = _diametros.FirstOrDefault()?.Id ?? "";
