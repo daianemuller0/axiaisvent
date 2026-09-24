@@ -12,7 +12,7 @@ namespace HowdenAxiais.Poc.Data;
 public sealed class Caracteristica
 {
     public string Id { get; set; } = "";
-    /// <summary>Nome da lista: "Solidez", "Base", "PARTIDORES"…</summary>
+    /// <summary>Nome da lista: "Base", "Difusor", "PARTIDORES"…</summary>
     public string Grupo { get; set; } = "";
     /// <summary>A opção, como a equipe escreve: "Com TRENÓ", "VDF IP65".</summary>
     public string Valor { get; set; } = "";
@@ -59,6 +59,23 @@ public sealed class CaracteristicaRepository
     private const string EntidadeSemeados = "caracteristica_grupos_semeados";
     /// <summary>Id reservado, dentro das marcas, para "as listas já foram criadas".</summary>
     private const string MarcaDasListas = "(listas)";
+
+    /// <summary>
+    /// Listas que saíram do cadastro de fábrica porque a equipe passou a tratar
+    /// esses dados em outras tabelas: solidez e estágios viraram colunas do
+    /// equipamento (FB/HB e Nº de estágios), e polaridade, potência e fornecedor
+    /// do motor viraram colunas do catálogo de motores.
+    ///
+    /// Num banco que já as tem, são apagadas uma única vez — se a equipe criar
+    /// de novo alguma com o mesmo nome, ela fica.
+    /// </summary>
+    private static readonly string[] ListasAposentadas =
+    {
+        "Solidez", "# Estágios", "Polaridade e freq Motor",
+        "Potencia Motor CV [kW]", "Forn. Motor e Flange",
+    };
+
+    private const string MarcaDaAposentadoria = "(listas aposentadas v1)";
 
     private readonly ParquetStore _store;
     public CaracteristicaRepository(ParquetStore store) => _store = store;
@@ -170,6 +187,8 @@ public sealed class CaracteristicaRepository
     /// </summary>
     public void SemearSeVazio()
     {
+        AposentarListas();
+
         // 1) as listas, uma única vez. A marca (e não "está vazio, então
         //    carrega") é o que permite apagar todas as listas e subir as suas.
         var listasSemeadas = _store
@@ -209,6 +228,23 @@ public sealed class CaracteristicaRepository
             _store.WriteRow(EntidadeSemeados,
                 new KeyValuePair<string, object?>[] { new("id", lista.Key) });
         }
+    }
+
+    /// <summary>
+    /// Apaga, uma vez só, as listas que deixaram de ser de fábrica.
+    /// </summary>
+    private void AposentarListas()
+    {
+        var marcas = _store
+            .ReadLatest(EntidadeSemeados, "id", r => r.IsDBNull(0) ? "" : r.GetString(0))
+            .ToHashSet();
+
+        if (marcas.Contains(MarcaDaAposentadoria)) return;
+
+        foreach (var lista in ListasAposentadas) ApagarGrupo(lista);
+
+        _store.WriteRow(EntidadeSemeados,
+            new KeyValuePair<string, object?>[] { new("id", MarcaDaAposentadoria) });
     }
 
     /// <summary>
@@ -255,14 +291,9 @@ public static class CaracteristicasSeed
     /// <summary>Os grupos na ordem do documento.</summary>
     public static readonly string[] Grupos =
     {
-        "Solidez",
-        "# Estágios",
         "Base",
         "Lubrificação",
         "Contrarrecuo",
-        "Polaridade e freq Motor",
-        "Potencia Motor CV [kW]",
-        "Forn. Motor e Flange",
         "Cone de entrada",
         "Silenciador entrada",
         "Silenciador descarga",
@@ -288,37 +319,11 @@ public static class CaracteristicasSeed
     {
         var tabela = new (string Grupo, string[] Valores)[]
         {
-            ("Solidez", new[] { "FB", "HB" }),
-
-            ("# Estágios", new[] { "1STG", "2STG" }),
-
             ("Base", new[] { "SEM Base", "Com BASE", "Com TRENÓ" }),
 
             ("Lubrificação", new[] { "SEM lubrif. automatico", "com LUBRIF. automatico" }),
 
             ("Contrarrecuo", new[] { "Sem Contrarrecuo", "Freio" }),
-
-            ("Polaridade e freq Motor", new[]
-            {
-                "3000 rpm / 50 Hz", "1500 rpm / 50 Hz", "1000 rpm / 50 Hz", "750 rpm / 50 Hz",
-                "600 rpm / 50 Hz", "500 rpm / 50 Hz", "428,6 rpm / 50 Hz",
-                "3600 rpm / 60 Hz", "1800 rpm / 60 Hz", "1200 rpm / 60 Hz", "900 rpm / 60 Hz",
-                "720 rpm / 60 Hz", "600 rpm / 60 Hz", "514,3 rpm / 60 Hz",
-            }),
-
-            ("Potencia Motor CV [kW]", new[]
-            {
-                "< 5 [3,7]", "5 [3,7]", "5,5 [4,1]", "6 [4,5]", "7,5 [5,5]", "10 [7,5]",
-                "12,5 [9,2]", "15 [11]", "20 [15]", "25 [18,5]", "30 [22]", "40 [30]",
-                "50 [37]", "60 [45]", "75 [55]", "100 [75]", "125 [90]", "150 [110]",
-                "175 [132]", "200 [150]", "250 [185]", "300 [220]", "350 [260]", "380 [285]",
-                "400 [300]", "430 [320]", "450 [330]", "480 [360]", "500 [370]", "550 [400]",
-            }),
-
-            ("Forn. Motor e Flange", new[]
-            {
-                "WEG FC", "WEG FF", "OMEC", "ABLE", "ABB", "SIEMENS", "WOLONG",
-            }),
 
             ("Cone de entrada", new[] { "Sem", "Com Cone", "Com Conexão para Manga" }),
 

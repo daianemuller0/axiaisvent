@@ -79,7 +79,6 @@
     }
 </div>
 
-<!-- ---------- cadastro de ventiladores e cubos ---------- -->
 <div class="toolbar" style="flex-wrap:wrap">
     <span class="subtitle" style="margin:0">
         @_todos.Count combinação(ões) · @_diametros.Count ventilador(es) · @_cubos.Count cubo(s)
@@ -90,92 +89,6 @@
         <span class="saved-flag">@_msg</span>
     }
 </div>
-
-<div class="prop-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start">
-    @foreach (var tipo in new[] { ItemModelo.TipoVentilador, ItemModelo.TipoCubo })
-    {
-        var t = tipo;
-        var ventilador = t == ItemModelo.TipoVentilador;
-        var lista = ventilador ? _diametros : _cubos;
-
-        <div>
-            <div class="toolbar" style="margin-bottom:8px; flex-wrap:wrap">
-                <strong>@(ventilador ? "Fan Diameter" : "Fan Hub Diameter")</strong>
-                <span class="val-count">@lista.Count</span>
-                <select class="cell" style="max-width:88px"
-                        value="@(ventilador ? _novaSerieVentilador : _novaSerieCubo)"
-                        @onchange="e => GuardarNovaSerie(t, e.Value?.ToString() ?? string.Empty)">
-                    @foreach (var x in _series)
-                    {
-                        <option value="@x" selected="@(x == (ventilador ? _novaSerieVentilador : _novaSerieCubo))">@x</option>
-                    }
-                </select>
-                <input class="cell" style="width:130px" placeholder="@(ventilador ? "novo ventilador" : "novo cubo")"
-                       value="@(ventilador ? _novoVentilador : _novoCubo)"
-                       @onchange="e => GuardarNovo(t, e.Value?.ToString() ?? string.Empty)" />
-                <button class="btn-primary" @onclick="() => IncluirRotulo(t)"
-                        disabled="@((ventilador ? _novoVentilador : _novoCubo).Trim().Length == 0)">
-                    + Incluir
-                </button>
-                @Limpeza(ventilador ? AlvoVentiladores : AlvoCubos)
-                <ExcelDaTabela Nome="@(ventilador ? "ventiladores" : "cubos")"
-                               Exportar="@(() => DadosExcel.ExportarItens(_itens, t))"
-                               Importar="@(fluxo => SubirItens(fluxo, t))"
-                               Importou="DepoisDeImportar" />
-            </div>
-
-            @if (lista.Count == 0)
-            {
-                <div class="panel empty" style="padding:18px">
-                    Nenhum @(ventilador ? "ventilador" : "cubo") cadastrado — inclua acima ou
-                    suba a sua planilha pelo <em>Importar Excel</em>.
-                </div>
-            }
-            else
-            {
-                <div class="panel" style="padding:0; overflow:auto; max-height:420px">
-                    <table class="grid">
-                        <thead>
-                            <tr>
-                                <th class="nowrap" style="width:116px">Série</th>
-                                <th class="nowrap">@t</th>
-                                <th class="nowrap" style="width:116px"></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach (var i in lista)
-                            {
-                                var item = i;
-                                <tr @key="item.Id">
-                                    <td>
-                                        <select class="cell" style="width:84px" value="@item.Serie"
-                                                @onchange="e => TrocarSerieItem(item, e.Value?.ToString() ?? string.Empty)">
-                                            @foreach (var x in _series)
-                                            {
-                                                <option value="@x" selected="@(x == item.Serie)">@x</option>
-                                            }
-                                        </select>
-                                    </td>
-                                    <td>
-                                        <input class="cell" style="font-weight:600; max-width:170px" value="@item.Rotulo"
-                                               @onchange="e => RenomearRotulo(item, e.Value?.ToString() ?? string.Empty)" />
-                                    </td>
-                                    <td class="nowrap center">@Controles(item)</td>
-                                </tr>
-                            }
-                        </tbody>
-                    </table>
-                </div>
-            }
-        </div>
-    }
-</div>
-
-<p class="subtitle" style="margin-top:12px">
-    Estas são as duas listas que alimentam os seletores da lista de equipamentos abaixo.
-    É aqui que se renomeia, muda de série, reordena (↑ ↓) e apaga um ventilador ou um cubo —
-    apagar leva junto as combinações dele.
-</p>
 
 <!-- ---------- a lista cruzada: código e preço ---------- -->
 <h3 style="margin:26px 0 6px">Equipamentos — código e preço</h3>
@@ -195,19 +108,26 @@
             <option value="@x" selected="@(x == _combSerie)">@x</option>
         }
     </select>
-    <select class="cell" style="max-width:150px" @bind="_combVentilador">
+    <input class="cell" style="width:140px" list="ventiladores-da-serie" placeholder="ventilador"
+           value="@_combVentilador" @onchange="e => _combVentilador = e.Value?.ToString() ?? string.Empty" />
+    <span class="subtitle" style="margin:0">no cubo</span>
+    <input class="cell" style="width:160px" list="cubos-da-serie" placeholder="cubo"
+           value="@_combCubo" @onchange="e => _combCubo = e.Value?.ToString() ?? string.Empty" />
+
+    @* os rótulos que a série escolhida já tem, para escolher clicando;
+       digitar um que não existe cria o cadastro dele na hora *@
+    <datalist id="ventiladores-da-serie">
         @foreach (var d in _diametros.Where(i => i.Serie == _combSerie))
         {
-            <option value="@d.Rotulo">@d.Rotulo</option>
+            <option value="@d.Rotulo"></option>
         }
-    </select>
-    <span class="subtitle" style="margin:0">no cubo</span>
-    <select class="cell" style="max-width:170px" @bind="_combCubo">
+    </datalist>
+    <datalist id="cubos-da-serie">
         @foreach (var c in _cubos.Where(i => i.Serie == _combSerie))
         {
-            <option value="@c.Rotulo">@c.Rotulo</option>
+            <option value="@c.Rotulo"></option>
         }
-    </select>
+    </datalist>
     <input class="cell" style="width:100px" type="number" min="1" placeholder="rpm" @bind="_combRpm" />
     <button class="btn-primary" @onclick="IncluirCombinacao">+ Incluir</button>
 
@@ -332,72 +252,12 @@
     Apagar aqui é o mesmo que apagar o número da célula lá em cima.
 </p>
 
-<!-- ---------- motor máximo por cubo ---------- -->
-<div class="toolbar" style="margin:26px 0 6px; flex-wrap:wrap">
-    <h3 style="margin:0">Motor máximo por cubo</h3>
-    @Limpeza(AlvoLimites)
-    <ExcelDaTabela Nome="limites-de-motor"
-                   Exportar="@(() => DadosExcel.ExportarLimites(_limites))"
-                   Importar="SubirLimites"
-                   Importou="DepoisDeImportar" />
-</div>
-<p class="subtitle">
-    O maior frame que cabe dentro de cada cubo (a linha <em>Maximum Internal Motor</em> da
-    planilha). A comparação é feita pela posição do frame na escada de tamanho da aba
-    <a href="/axiais/motores">Motores</a> — por isso a ordem de lá importa.
-</p>
-
-<div class="panel" style="padding:0; overflow-x:auto">
-    <table class="grid">
-        <thead>
-            <tr>
-                <th class="nowrap" style="width:96px">Série</th>
-                <th class="nowrap">Cubo</th>
-                @foreach (var p in MotorRepository.Padroes)
-                {
-                    <th class="nowrap">@p</th>
-                }
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var c in _cubos)
-            {
-                var cubo = c;
-                <tr @key="cubo.Id">
-                    <td class="nowrap"><span class="val-count">@cubo.Serie</span></td>
-                    <td class="nowrap"><strong>@cubo.Rotulo</strong></td>
-                    @foreach (var p in MotorRepository.Padroes)
-                    {
-                        var padrao = p;
-                        var atual = FrameLimite(cubo.Serie, cubo.Rotulo, padrao);
-                        <td>
-                            <select class="cell" style="max-width:200px" value="@atual"
-                                    @onchange="e => DefinirLimite(cubo.Serie, cubo.Rotulo, padrao, e.Value?.ToString() ?? string.Empty)">
-                                <option value="">— não cadastrado —</option>
-                                @foreach (var f in MotorRepository.Escada(_motores, padrao))
-                                {
-                                    <option value="@f" selected="@(f == atual)">@f</option>
-                                }
-                                @if (atual.Length > 0 && !MotorRepository.Escada(_motores, padrao).Contains(atual))
-                                {
-                                    <option value="@atual" selected>@atual (fora da lista)</option>
-                                }
-                            </select>
-                        </td>
-                    }
-                </tr>
-            }
-        </tbody>
-    </table>
-</div>
-
 @code {
     private List<Equipamento> _todos = new();
     private List<Motor> _motores = new();
     private List<LimiteMotor> _limites = new();
     private List<ItemModelo> _itens = new();
 
-    private string _novoVentilador = "";
     /// <summary>A combinação que está sendo montada na barra "Nova combinação".</summary>
     private string _combSerie = ItemModelo.Series[0];
     private string _combVentilador = "";
@@ -410,11 +270,6 @@
     private int _porPagina = 30;
     /// <summary>Id da combinação aguardando confirmação para ser apagada.</summary>
     private string? _apagarComb;
-    private string _novoCubo = "";
-    private string _novaSerieVentilador = ItemModelo.Series[0];
-    private string _novaSerieCubo = ItemModelo.Series[0];
-    /// <summary>Id do item aguardando confirmação para ser apagado.</summary>
-    private string? _apagarRotulo;
 
     /// <summary>As séries que aparecem na coluna Série (VAX, Joy e o que mais houver).</summary>
     private List<string> _series = new();
@@ -539,19 +394,6 @@
     /// <summary>Chave do alvo aguardando confirmação; nulo = ninguém perguntou nada.</summary>
     private string? _limpando;
 
-    // Apagar o cadastro de ventiladores (ou de cubos) obriga a apagar também as
-    // combinações: toda combinação tem os dois lados, e a lista é semeada de
-    // volta a partir da matriz — sobrar combinação recriaria o rótulo apagado.
-    private Alvo AlvoVentiladores => new(
-        "ventiladores", () => _diametros.Count,
-        "ventilador(es) — e, com eles, todas as combinações da matriz",
-        () => { Repo.Limpar(); Itens.LimparTipo(ItemModelo.TipoVentilador); });
-
-    private Alvo AlvoCubos => new(
-        "cubos", () => _cubos.Count,
-        "cubo(s) — e, com eles, todas as combinações e os limites de motor",
-        () => { Repo.Limpar(); Limites.Limpar(); Itens.LimparTipo(ItemModelo.TipoCubo); });
-
     private Alvo AlvoCombinacoes => new(
         "combinacoes", () => _todos.Count,
         "combinação(ões) da matriz — o cadastro de ventiladores e de cubos fica de pé",
@@ -569,11 +411,6 @@
         : new("lista", () => Combinacoes().Count,
             $"combinação(ões) — só as que o filtro \"{_filtro.Trim()}\" está mostrando",
             () => { foreach (var e in Combinacoes()) Repo.Apagar(e.Id); });
-
-    private Alvo AlvoLimites => new(
-        "limites", () => _limites.Count,
-        "limite(s) de motor",
-        () => Limites.Limpar());
 
     /// <summary>O botão 🗑 Limpar de uma lista, com a confirmação no lugar dele.</summary>
     private RenderFragment Limpeza(Alvo alvo) => @<text>
@@ -605,22 +442,6 @@
 
         _msg = $"Limpo: {quantos} {alvo.Explica}.";
     }
-
-    /// <summary>Os botões de posição e de exclusão de um ventilador ou de um cubo.</summary>
-    private RenderFragment Controles(ItemModelo item) => @<text>
-        <button class="btn-link" title="Subir" @onclick="() => MoverRotulo(item, -1)">↑</button>
-        <button class="btn-link" title="Descer" @onclick="() => MoverRotulo(item, 1)">↓</button>
-        @if (_apagarRotulo == item.Id)
-        {
-            <button class="btn-link" @onclick="() => ApagarRotulo(item)">Sim</button>
-            <button class="btn-link" @onclick="@(() => _apagarRotulo = null)">Não</button>
-        }
-        else
-        {
-            <button class="btn-link" title="Apagar a linha inteira"
-                    @onclick="@(() => _apagarRotulo = item.Id)">✕</button>
-        }
-    </text>;
 
     /// <summary>
     /// Cria/atualiza a rotação de uma combinação. Texto vazio tira a combinação
@@ -657,214 +478,6 @@
 
         Recarregar();
         Verificar();
-    }
-
-    // ---------- editar a lista de ventiladores e cubos ----------
-
-    private void GuardarNovo(string tipo, string texto)
-    {
-        if (tipo == ItemModelo.TipoVentilador) _novoVentilador = texto;
-        else _novoCubo = texto;
-    }
-
-    private void GuardarNovaSerie(string tipo, string serie)
-    {
-        if (tipo == ItemModelo.TipoVentilador) _novaSerieVentilador = serie;
-        else _novaSerieCubo = serie;
-    }
-
-    private List<ItemModelo> ListaDe(string tipo) =>
-        tipo == ItemModelo.TipoVentilador ? _diametros : _cubos;
-
-    private void IncluirRotulo(string tipo)
-    {
-        var ventilador = tipo == ItemModelo.TipoVentilador;
-        var nome = (ventilador ? _novoVentilador : _novoCubo).Trim();
-        var serie = ventilador ? _novaSerieVentilador : _novaSerieCubo;
-        if (nome.Length == 0) return;
-
-        var lista = ListaDe(tipo);
-        if (Existe(lista, serie, nome))
-        {
-            _msg = $"\"{nome}\" já existe na lista, na série {serie}.";
-            return;
-        }
-
-        Itens.Salvar(new ItemModelo
-        {
-            Serie = serie, Tipo = tipo, Rotulo = nome,
-            Ordem = lista.Count == 0 ? 1 : lista[^1].Ordem + 1,
-        });
-
-        if (ventilador) _novoVentilador = ""; else _novoCubo = "";
-        Recarregar();
-        _msg = $"{tipo} {nome} ({serie}) incluído. A linha já aparece na matriz, à espera das rotações.";
-    }
-
-    /// <summary>Mesmo rótulo pode existir em VAX e em Joy — a dupla é (série, rótulo).</summary>
-    private static bool Existe(List<ItemModelo> lista, string serie, string rotulo, string? exceto = null) =>
-        lista.Any(i => i.Id != exceto && i.Serie == serie &&
-                       i.Rotulo.Equals(rotulo, StringComparison.OrdinalIgnoreCase));
-
-    private void RenomearRotulo(ItemModelo item, string texto)
-    {
-        var para = texto.Trim();
-        if (para.Length == 0 || para == item.Rotulo) { Recarregar(); return; }
-
-        if (Existe(ListaDe(item.Tipo), item.Serie, para, exceto: item.Id))
-        {
-            _msg = $"\"{para}\" já existe na lista, na série {item.Serie}.";
-            Recarregar();
-            return;
-        }
-
-        var (movidas, _, limites) = Mudar(item, item.Serie, para);
-
-        _msg = $"{item.Tipo} \"{item.Rotulo}\" passou a se chamar \"{para}\" — {movidas} combinação(ões)" +
-               (limites > 0 ? $" e {limites} limite(s) de motor" : "") + " foram junto.";
-        DepoisDeMexer();
-    }
-
-    /// <summary>
-    /// Trocar a série leva o rótulo de linha de produto. As combinações vão
-    /// junto, mas só as que continuam fazendo sentido: se o par do outro lado
-    /// não existe na série de destino, a combinação é descartada — e a mensagem
-    /// diz quantas foram.
-    /// </summary>
-    private void TrocarSerieItem(ItemModelo item, string serie)
-    {
-        serie = serie.Trim();
-        if (serie.Length == 0 || serie == item.Serie) { Recarregar(); return; }
-
-        if (Existe(ListaDe(item.Tipo), serie, item.Rotulo, exceto: item.Id))
-        {
-            _msg = $"A série {serie} já tem \"{item.Rotulo}\" na lista.";
-            Recarregar();
-            return;
-        }
-
-        var (movidas, descartadas, limites) = Mudar(item, serie, item.Rotulo);
-
-        _msg = $"{item.Tipo} {item.Rotulo}: {item.Serie} → {serie}" +
-               (movidas > 0 ? $", {movidas} combinação(ões) foram junto" : "") +
-               (descartadas > 0 ? $", {descartadas} não valiam mais na série nova e saíram" : "") +
-               (limites > 0 ? $", {limites} limite(s) de motor foram junto" : "") + ".";
-        DepoisDeMexer();
-    }
-
-    /// <summary>
-    /// Regrava o item com a série e/ou o rótulo novos e leva junto o que aponta
-    /// para ele. Série e rótulo fazem parte do id dos registros — do item, das
-    /// combinações e dos limites —, então cada um é apagado e regravado.
-    /// </summary>
-    private (int Movidas, int Descartadas, int Limites) Mudar(
-        ItemModelo item, string serie, string rotulo)
-    {
-        Itens.Apagar(item.Id);
-        Itens.Salvar(new ItemModelo
-        {
-            Serie = serie, Tipo = item.Tipo, Rotulo = rotulo, Ordem = item.Ordem,
-        });
-
-        var ventilador = item.Tipo == ItemModelo.TipoVentilador;
-        var mudouDeSerie = serie != item.Serie;
-
-        // na série de destino, os rótulos do OUTRO lado: uma combinação só
-        // sobrevive à mudança de série se o par dela também existir lá
-        var pares = _itens
-            .Where(i => i.Serie == serie &&
-                        i.Tipo == (ventilador ? ItemModelo.TipoCubo : ItemModelo.TipoVentilador))
-            .Select(i => i.Rotulo)
-            .ToHashSet();
-
-        int movidas = 0, descartadas = 0, limites = 0;
-
-        foreach (var e in _todos.Where(e => e.Serie == item.Serie &&
-                                            (ventilador ? e.Diametro : e.Cubo) == item.Rotulo))
-        {
-            Repo.Apagar(e.Id);
-
-            if (mudouDeSerie && !pares.Contains(ventilador ? e.Cubo : e.Diametro))
-            {
-                descartadas++;
-                continue;
-            }
-
-            Repo.Salvar(new Equipamento
-            {
-                Serie = serie,
-                Diametro = ventilador ? rotulo : e.Diametro,
-                Cubo = ventilador ? e.Cubo : rotulo,
-                RpmMax = e.RpmMax,
-                Codigo = e.Codigo, Preco = e.Preco,
-                FbHb = e.FbHb, Estagios = e.Estagios,
-            });
-            movidas++;
-        }
-
-        if (!ventilador)
-        {
-            foreach (var l in _limites.Where(l => l.Serie == item.Serie && l.Cubo == item.Rotulo))
-            {
-                Limites.Apagar(l.Id);
-                Limites.Salvar(new LimiteMotor
-                {
-                    Serie = serie, Cubo = rotulo, Padrao = l.Padrao, Frame = l.Frame,
-                });
-                limites++;
-            }
-        }
-
-        return (movidas, descartadas, limites);
-    }
-
-    /// <summary>Apaga o rótulo, as combinações dele na matriz e, se for cubo, os limites.</summary>
-    private void ApagarRotulo(ItemModelo item)
-    {
-        var ventilador = item.Tipo == ItemModelo.TipoVentilador;
-
-        var combinacoes = _todos
-            .Where(e => e.Serie == item.Serie && (ventilador ? e.Diametro : e.Cubo) == item.Rotulo)
-            .ToList();
-        foreach (var e in combinacoes) Repo.Apagar(e.Id);
-
-        var limites = ventilador
-            ? new List<LimiteMotor>()
-            : _limites.Where(l => l.Serie == item.Serie && l.Cubo == item.Rotulo).ToList();
-        foreach (var l in limites) Limites.Apagar(l.Id);
-
-        Itens.Apagar(item.Id);
-        _apagarRotulo = null;
-
-        _msg = $"{item.Tipo} {item.Rotulo} ({item.Serie}) apagado, com {combinacoes.Count} combinação(ões)" +
-               (limites.Count > 0 ? $" e {limites.Count} limite(s) de motor" : "") + ".";
-        DepoisDeMexer();
-    }
-
-    private void MoverRotulo(ItemModelo item, int direcao)
-    {
-        var lista = ListaDe(item.Tipo);
-        var i = lista.FindIndex(x => x.Id == item.Id);
-        var j = i + direcao;
-        if (i < 0 || j < 0 || j >= lista.Count) return;
-
-        var atual = lista[i];
-        var vizinho = lista[j];
-        (atual.Ordem, vizinho.Ordem) = (vizinho.Ordem, atual.Ordem);
-        Itens.Salvar(atual);
-        Itens.Salvar(vizinho);
-
-        Recarregar();
-        _msg = null;
-    }
-
-    /// <summary>Recarrega e conserta o que o verificador tinha escolhido.</summary>
-    private void DepoisDeMexer()
-    {
-        Recarregar();
-        if (_diametros.All(d => d.Id != _vVentilador))
-            _vVentilador = _diametros.FirstOrDefault()?.Id ?? "";
-        TrocarVentilador();
     }
 
     // ---------- a lista cruzada ----------
@@ -948,12 +561,12 @@
 
     private void IncluirCombinacao()
     {
-        var vent = _combVentilador;
-        var cubo = _combCubo;
+        var vent = _combVentilador.Trim();
+        var cubo = _combCubo.Trim();
 
         if (vent.Length == 0 || cubo.Length == 0)
         {
-            _msg = $"A série {_combSerie} ainda não tem ventilador e cubo cadastrados.";
+            _msg = "Digite o ventilador e o cubo — ou escolha na listinha do campo.";
             return;
         }
 
@@ -969,7 +582,36 @@
             return;
         }
 
+        // rótulo digitado que ainda não existe entra no cadastro agora: é o que
+        // permite criar um equipamento sem passar por outra tela
+        var novos = GarantirRotulo(ItemModelo.TipoVentilador, vent)
+                  + GarantirRotulo(ItemModelo.TipoCubo, cubo);
+
         Editar(_combSerie, vent, cubo, _combRpm.ToString());
+
+        if (novos > 0)
+            _msg += novos == 1 ? " Um rótulo novo entrou no cadastro." : " Dois rótulos novos entraram no cadastro.";
+    }
+
+    /// <summary>
+    /// Garante que o rótulo existe no cadastro da série escolhida. Devolve 1 se
+    /// precisou criar.
+    /// </summary>
+    private int GarantirRotulo(string tipo, string rotulo)
+    {
+        var lista = _itens.Where(i => i.Tipo == tipo).ToList();
+        if (lista.Any(i => i.Serie == _combSerie &&
+                           i.Rotulo.Equals(rotulo, StringComparison.OrdinalIgnoreCase)))
+        {
+            return 0;
+        }
+
+        Itens.Salvar(new ItemModelo
+        {
+            Serie = _combSerie, Tipo = tipo, Rotulo = rotulo,
+            Ordem = lista.Count == 0 ? 1 : lista.Max(i => i.Ordem) + 1,
+        });
+        return 1;
     }
 
     private void DefinirCodigo(Equipamento eq, string texto)
@@ -1090,22 +732,10 @@
 
     // ---------- Excel de cada tabela ----------
 
-    private string SubirItens(Stream fluxo, string tipo)
-    {
-        var (linhas, avisos) = DadosExcel.ImportarItens(fluxo, Itens, tipo);
-        return Resumo(linhas, tipo == ItemModelo.TipoVentilador ? "ventilador(es)" : "cubo(s)", avisos);
-    }
-
     private string SubirModelos(Stream fluxo)
     {
         var (linhas, avisos) = DadosExcel.ImportarModelos(fluxo, Repo);
         return Resumo(linhas, "equipamento(s)", avisos);
-    }
-
-    private string SubirLimites(Stream fluxo)
-    {
-        var (linhas, avisos) = DadosExcel.ImportarLimites(fluxo, Limites);
-        return Resumo(linhas, "limite(s) de motor", avisos);
     }
 
     private static string Resumo(int linhas, string oQue, List<string> avisos)
@@ -1127,37 +757,6 @@
             _vVentilador = _diametros.FirstOrDefault()?.Id ?? "";
         TrocarVentilador();
         _msg = resumo;
-    }
-
-    // ---------- limite de motor ----------
-
-    private string FrameLimite(string serie, string cubo, string padrao) => _limites
-        .FirstOrDefault(l => l.Serie == serie && l.Cubo == cubo && l.Padrao == padrao)?.Frame ?? "";
-
-    private void DefinirLimite(string serie, string cubo, string padrao, string frame)
-    {
-        var existente = _limites.FirstOrDefault(l =>
-            l.Serie == serie && l.Cubo == cubo && l.Padrao == padrao);
-
-        if (frame.Length == 0)
-        {
-            if (existente is not null)
-            {
-                Limites.Apagar(existente.Id);
-                _msg = $"{serie} · cubo {cubo} · {padrao}: limite de motor removido.";
-            }
-        }
-        else
-        {
-            Limites.Salvar(new LimiteMotor
-            {
-                Serie = serie, Cubo = cubo, Padrao = padrao, Frame = frame,
-            });
-            _msg = $"{serie} · cubo {cubo} · {padrao}: motor máximo {frame}.";
-        }
-
-        Recarregar();
-        Verificar();
     }
 
     // ---------- aparência dos avisos ----------

@@ -19,9 +19,9 @@ A tabela técnica dos equipamentos — as linhas **VAX** e **Joy**, transcritas 
 - **Limite de motor** — cada cubo tem um frame máximo em IEC e outro em NEMA (a faixa
   verde da planilha). Escolhendo um motor maior que o que cabe no cubo, o sistema avisa.
   A comparação é pela posição da carcaça na escada de tamanho da aba Motores.
-- **Manutenção** — a própria matriz é o editor: digitar um número numa célula vazia cria
-  a combinação, apagar o número tira. O motor máximo por cubo tem sua própria tabela
-  logo abaixo.
+- **Manutenção** — a lista cruzada é o editor: cada linha é um equipamento, e o
+  **+ Incluir** cria um novo digitando ventilador, cubo e rotação. Digitar um rótulo que
+  ainda não existe cadastra ele na hora.
 
 Cada linha descreve as medidas do seu jeito, e o sistema guarda o rótulo como ele é na
 planilha: o VAX em milímetros (ventilador `2400`, cubo `1800`) e o Joy em polegadas com o
@@ -44,8 +44,8 @@ não recarrega a página:
   observações, além de código e preço.
   A ordem da lista, dentro de cada padrão, é a ordem de tamanho das carcaças.
 - **Características** — **itens** (as listas: solidez, base, partidores, instrumentação…)
-  e seus **subitens** (as opções), cada subitem com um código. De fábrica são 15 itens e
-  99 subitens. Dá para criar item novo — inclusive vazio, para preencher depois —,
+  e seus **subitens** (as opções), cada subitem com um código. De fábrica são 10 itens e
+  44 subitens. Dá para criar item novo — inclusive vazio, para preencher depois —,
   renomear, apagar e reordenar, nos dois níveis; e **subir em massa** por planilha
   (.xlsx/.csv com Grupo, Valor e Código).
 

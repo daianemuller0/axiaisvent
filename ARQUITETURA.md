@@ -447,7 +447,7 @@ embaixo da outra. O menu lateral tem só **Base** e **Dados**.
 
 | Seção | Componente | O que tem |
 |---|---|---|
-| Modelos | `Components/Dados/VistaModelos.razor` | matriz ventilador × cubo, verificador e motor máximo por cubo |
+| Modelos | `Components/Dados/VistaModelos.razor` | verificador e a lista cruzada dos equipamentos |
 | Motores | `Components/Dados/VistaMotores.razor` | os frames IEC/NEMA, com código e preço |
 | Características | `Components/Dados/VistaCaracteristicas.razor` | os itens e subitens, com código e preço |
 
@@ -457,7 +457,7 @@ na mesma página, então nenhum link guardado quebra.
 ### Itens e subitens (`Data/CaracteristicaRepository.cs`)
 
 No vocabulário da equipe, **item** é a lista (Solidez, Base, PARTIDORES…) e **subitem** é
-a opção dentro dela (FB, Com TRENÓ, VDF IP65…). De fábrica são 15 itens e 99 subitens, na
+a opção dentro dela (FB, Com TRENÓ, VDF IP65…). De fábrica são 10 itens e 44 subitens, na
 ordem do documento.
 
 São **duas entidades**:
@@ -568,6 +568,35 @@ e devolver o mesmo objeto duas vezes faria uma edição não salva parecer grava
 a partir do texto é barato; o caro é abrir o DuckDB e ler a pasta. Um
 `IDataReader` de fachada (`LinhaComoReader`) deixa os mapeadores dos repositórios escritos
 do mesmo jeito.
+
+### O que a equipe mandou tirar da tela
+
+Cinco tabelas saíram, todas porque o mesmo dado passou a morar em outro lugar:
+
+| Saiu | Onde o dado está agora |
+|---|---|
+| **Fan Diameter** e **Fan Hub Diameter** (as duas listas de cadastro) | nas próprias colunas da lista de equipamentos |
+| **Motor máximo por cubo** | nas colunas *Frame máx IEC/NEMA* da lista de equipamentos |
+| Listas **Solidez** e **# Estágios** | colunas *FB/HB* e *Nº de estágios* do equipamento |
+| Listas **Polaridade e freq Motor**, **Potencia Motor CV [kW]** e **Forn. Motor e Flange** | colunas do catálogo de motores |
+
+Duas consequências que valem saber:
+
+- **Incluir combinação passou a aceitar rótulo digitado.** Sem as listas de cadastro não
+  haveria mais como criar um ventilador novo, então os dois campos viraram texto com
+  `datalist` (a listinha dos que já existem) e `GarantirRotulo` cria o cadastro na hora
+  quando o que foi digitado ainda não existe. A mensagem avisa: *"Dois rótulos novos
+  entraram no cadastro."*
+- **Renomear, reordenar e apagar um ventilador ou cubo não têm mais lugar na tela.** Quem
+  precisar mexer nisso usa as abas `Ventiladores` e `Cubos` do Excel do conjunto.
+
+As cinco listas de característica saíram do cadastro de fábrica **e** de bancos que já as
+tinham, por uma migração marcada (`(listas aposentadas v1)`) que roda **uma vez só** — se a
+equipe criar de novo uma lista com o mesmo nome, ela fica. Verificado nos dois casos.
+
+O limite por cubo não sumiu do sistema: `limites_motor`, a aba do Excel e o trecho da regra
+continuam, e `RegraMotor` ainda cai neles quando a combinação não tem frame máximo próprio.
+Só não há mais tela para editá-los.
 
 ### Juntar os arquivinhos (compactação)
 
