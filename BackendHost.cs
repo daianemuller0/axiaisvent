@@ -84,7 +84,7 @@ public static class BackendHost
         builder.Services.AddScoped<MotorRepository>();
         builder.Services.AddScoped<LimiteMotorRepository>();
         builder.Services.AddScoped<CaracteristicaRepository>();
-        builder.Services.AddScoped<PrecoDiametroRepository>();
+        builder.Services.AddScoped<PrecoReferenciaRepository>();
 
         var app = builder.Build();
 
@@ -114,8 +114,9 @@ public static class BackendHost
             // trocar de seção não voltam ao disco (nem à pasta de rede).
             // Preço de acessório de um banco anterior era por equipamento
             // montado; agora a referência é o Fan Diameter.
-            var precos = escopo.ServiceProvider.GetRequiredService<PrecoDiametroRepository>();
+            var precos = escopo.ServiceProvider.GetRequiredService<PrecoReferenciaRepository>();
             precos.Converter(equipamentos);
+            precos.JuntarFamiliaDaBase();
 
             var caracteristicas = escopo.ServiceProvider.GetRequiredService<CaracteristicaRepository>();
             equipamentos.Todos();

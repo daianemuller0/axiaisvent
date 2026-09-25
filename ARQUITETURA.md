@@ -598,19 +598,31 @@ O limite por cubo não sumiu do sistema: `limites_motor`, a aba do Excel e o tre
 continuam, e `RegraMotor` ainda cai neles quando a combinação não tem frame máximo próprio.
 Só não há mais tela para editá-los.
 
-### Acessório é precificado pelo Fan Diameter
+### Cada preço acompanha a sua referência
 
 O difusor de um ventilador de 24" não custa o que custa o de 85" — mas também não muda de
 preço porque o cubo mudou. A equipe foi explícita: *"todos os 45 terão o mesmo preço,
 independente se é Joy ou VAX e independente do cubo"*. Então a referência do preço de
 acessório é **o diâmetro do ventilador**, e não o modelo montado.
 
-O preço solto da opção ("Difusor › Com") continua existindo e vale como **padrão**; a
-tabela por diâmetro vive em `precos_diametro`, com a chave
+E foi igualmente direta sobre o partidor: ele acompanha a **potência do motor elétrico**,
+não o ventilador — quem dimensiona um softstarter é o motor que ele vai partir. São dois
+**eixos** (`EixoDePreco`), e o resto — lubrificação, contrarrecuo, instrumentação — é
+**preço único**.
+
+O preço solto da opção ("Difusor › Com") continua existindo e vale como **padrão**; a tabela
+variável vive em `precos_diametro` (o nome da entidade ficou do tempo em que só havia um
+eixo), com a chave
 
 ```
-{família}|{rótulo do Fan Diameter}
+{família}|{referência}
 ```
+
+A referência é texto, e quem diz o que ela significa é o eixo da família: rótulo de Fan
+Diameter ("45", "2400") ou potência em CV ("7,5", "150"). As linhas da tabela **nunca são
+uma lista à parte**: saem do cadastro de equipamentos ou do catálogo de motores, então
+quando o catálogo de motores ainda não tem potência preenchida a tabela dos partidores
+aparece vazia — com o texto dizendo onde preencher, em vez de um vazio sem explicação.
 
 São 36 diâmetros distintos no cadastro (19 do Joy, em polegadas, e 17 do VAX, em mm), contra
 99 modelos montados — a tabela que a equipe preenche encolheu para um terço.
@@ -624,16 +636,20 @@ diferentes, o valor é o mesmo:
 |---|---|---|
 | `Silenciador entrada › L = 1,5D` e `Silenciador descarga › L = 1,5D` | `Silenciador\|L = 1,5D` | mesmo preço na entrada e na descarga, **opção por opção** — L = 1,0D não custa o que custa L = 2,0D |
 | `Cone de entrada › Com Conexão para Manga` e `Conexao manga descarga › Com Conexão para Manga` | `Conexão a manga` | é a mesma peça nas duas pontas; **esta família tem a coluna Diâmetro (mm)** |
-| as outras opções de **Base**, **Cone de entrada**, **Difusor** e **Damper mariposa** | `{lista}\|{opção}` | tabela própria |
+| `Base › Com BASE` e `Base › Com TRENÓ` | `Base` | o trenó custa o mesmo da base normal: uma tabela para a lista inteira |
+| as opções de **Cone de entrada**, **Difusor** e **Damper mariposa** | `{lista}\|{opção}` | tabela própria, por Fan Diameter |
+| as opções de **PARTIDORES** | `{lista}\|{opção}` | tabela própria, **por potência do motor (CV)** — as linhas saem do catálogo de motores |
 | `Sem`, `SEM Base`, `NENHUM`, `Não` | *(nenhuma)* | não é item vendido: não tem tabela, e a coluna mostra "—" |
-| **Lubrificação**, **Contrarrecuo**, **PARTIDORES**, **INSTRUMENTAÇÃO** | *(nenhuma)* | **preço único**: o lubrificador automático custa o mesmo em qualquer tamanho, e partidor e instrumentação seguem o motor, não o ventilador. Uma tabela por diâmetro aqui seria 36 lugares para digitar o mesmo número |
+| **Lubrificação**, **Contrarrecuo**, **INSTRUMENTAÇÃO** | *(nenhuma)* | **preço único**: o lubrificador automático custa o mesmo em qualquer tamanho. Uma tabela por diâmetro aqui seria 36 lugares para digitar o mesmo número |
 
 Quem decide isso é `FamiliaDePreco.De(grupo, valor)`, em um lugar só — a regra do
 silenciador olha o nome da lista, e a da manga olha a palavra "manga" na opção, que é o que
 faz as duas pontas caírem na mesma tabela sem ninguém ter de configurar nada. O padrão é
 **preço único**: só as listas nomeadas pela equipe (`base`, `cone`, `difusor`, `damper`,
 mais silenciador e manga) ganham tabela por diâmetro, e a checagem é por palavra contida no
-nome, então renomear a lista não quebra a regra. A lista
+nome, então renomear a lista não quebra a regra. Um eixo novo é uma linha em
+`ListasPorPotencia`/`ListasPorDiametro` mais o `EixoDePreco` — não mexe em tela nem em
+Excel. A lista
 **Damper mariposa** (Não / Sim) entrou junto: o "Sim" é mais uma família por diâmetro.
 
 Duas decisões que valem registrar:
@@ -647,8 +663,8 @@ Duas decisões que valem registrar:
   cadastro simplesmente deixa de aparecer, em vez de virar linha órfã. Cada linha mostra
   quantos equipamentos usam aquele diâmetro, que é o alcance daquele preço.
 
-O Excel desta tabela é a aba `Preços por diâmetro` (Item · Subitem · Fan Diameter ·
-[Diâmetro (mm)] · os três preços), com o seu próprio par de botões dentro do painel. O
+O Excel desta tabela é a aba `Preços por referência` (Item · Subitem · Fan Diameter **ou**
+Potência (CV) · [Diâmetro (mm)] · os três preços), com o seu próprio par de botões dentro do painel. O
 download traz **uma linha por diâmetro**, preenchida onde já houver preço — exportar só o
 que existe fazia a planilha sair vazia justamente na primeira vez, quando ela é mais útil.
 Na volta, a família é deduzida de Item + Subitem, então preencher pela lista da descarga

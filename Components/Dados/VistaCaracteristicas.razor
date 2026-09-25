@@ -1,6 +1,7 @@
 @inject CaracteristicaRepository Repo
-@inject PrecoDiametroRepository Precos
+@inject PrecoReferenciaRepository Precos
 @inject EquipamentoRepository Equipamentos
+@inject MotorRepository Motores
 
 <p class="subtitle">
     As características do equipamento. Cada <strong>item</strong> é uma lista (Solidez,
@@ -153,7 +154,7 @@
                     <th class="nowrap" style="width:120px">Preço USD</th>
                     <th class="nowrap" style="width:120px">Preço CLP</th>
                     <th class="nowrap" style="width:120px">Preço R$</th>
-                    <th class="nowrap" style="width:190px">Preço por diâmetro</th>
+                    <th class="nowrap" style="width:190px">Preço variável</th>
                     <th class="nowrap" style="width:130px"></th>
                 </tr>
             </thead>
@@ -189,43 +190,76 @@
     @* ---------- preço por Fan Diameter da opção aberta ---------- *@
     @if (itens.FirstOrDefault(i => i.Id == _abertoPara) is { } opcao && _familia is { } familia)
     {
-        var diametros = DiametrosFiltrados();
+        var referencias = ReferenciasFiltradas();
 
         <div class="panel" style="margin-top:10px; border-left:3px solid var(--azul, #0b3d6b)">
             <div class="toolbar" style="flex-wrap:wrap">
-                <strong>@familia.Rotulo — preço por Fan Diameter</strong>
+                <strong>@familia.Rotulo — preço por @familia.RotuloDoEixo</strong>
                 <span class="val-count">@_precos.Count com preço</span>
 
-                <input class="cell" style="width:170px" placeholder="filtrar diâmetro…"
-                       value="@_buscaDiam"
-                       @oninput="e => _buscaDiam = e.Value?.ToString() ?? string.Empty" />
+                <input class="cell" style="width:170px" placeholder="filtrar…"
+                       value="@_buscaRef"
+                       @oninput="e => _buscaRef = e.Value?.ToString() ?? string.Empty" />
 
                 <span class="subtitle" style="margin:0">
-                    @(diametros.Count == 0 ? "nenhum" : $"{diametros.Count} diâmetro(s)")
+                    @(referencias.Count == 0 ? "nenhuma" : $"{referencias.Count} linha(s)")
                 </span>
 
                 <span style="flex:1"></span>
                 <ExcelDaTabela Nome="@($"precos-{opcao.Grupo}-{opcao.Valor}")"
-                               Exportar="@(() => DadosExcel.ExportarPrecosPorDiametro(
-                                   opcao.Grupo, opcao.Valor, familia.UsaMedida,
-                                   DiametrosFiltrados(), _precos))"
+                               Exportar="@(() => DadosExcel.ExportarPrecosPorReferencia(
+                                   opcao.Grupo, opcao.Valor, familia,
+                                   ReferenciasFiltradas(), _precos))"
                                Importar="SubirPrecos"
                                Importou="DepoisDeImportar" />
                 <button class="btn-link" @onclick="@(() => _abertoPara = null)">fechar</button>
             </div>
 
             <p class="subtitle" style="margin:0 0 10px">
-                O preço vale para <strong>todos os equipamentos daquele Fan Diameter</strong> —
-                VAX ou Joy, em qualquer cubo. Linha em branco usa o preço da própria opção
-                (@(Resumo(opcao))). @familia.Aviso
+                @if (familia.Eixo == EixoDePreco.PotenciaMotor)
+                {
+                    <text>
+                        O preço vale para <strong>todos os motores daquela potência</strong>, em
+                        qualquer fabricante ou frame.
+                    </text>
+                }
+                else
+                {
+                    <text>
+                        O preço vale para <strong>todos os equipamentos daquele Fan Diameter</strong>
+                        — VAX ou Joy, em qualquer cubo.
+                    </text>
+                }
+                Linha em branco usa o preço da própria opção (@(Resumo(opcao))). @familia.Aviso
             </p>
 
-            <div class="panel" style="padding:0; overflow-x:auto">
+            @if (_referencias.Count == 0)
+            {
+                <div class="panel empty" style="padding:18px">
+                    @if (familia.Eixo == EixoDePreco.PotenciaMotor)
+                    {
+                        <text>
+                            As linhas desta tabela saem do <strong>catálogo de motores</strong>, e
+                            nenhum motor tem a <strong>Potência CV</strong> preenchida ainda.
+                            Preencha a coluna na guia <em>Motores</em> — ou suba a planilha dela —
+                            e as potências aparecem aqui, uma linha cada.
+                        </text>
+                    }
+                    else
+                    {
+                        <text>
+                            As linhas desta tabela saem do cadastro de equipamentos, que está vazio.
+                        </text>
+                    }
+                </div>
+            }
+
+            <div class="panel" style="padding:0; overflow-x:auto; @(_referencias.Count == 0 ? "display:none" : "")">
                 <table class="grid">
                     <thead>
                         <tr>
-                            <th class="nowrap">Fan Diameter</th>
-                            <th class="nowrap" style="width:150px">Equipamentos</th>
+                            <th class="nowrap">@familia.RotuloDoEixo</th>
+                            <th class="nowrap" style="width:170px">Onde vale</th>
                             @if (familia.UsaMedida)
                             {
                                 <th class="nowrap" style="width:150px">Diâmetro (mm)</th>
@@ -236,7 +270,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var x in diametros)
+                        @foreach (var x in referencias)
                         {
                             var d = x;
                             <tr @key="@(familia.Chave + "|" + d)">
@@ -244,11 +278,11 @@
                                 <td class="nowrap"><span class="subtitle">@Usos(d)</span></td>
                                 @if (familia.UsaMedida)
                                 {
-                                    <td>@MedidaDoDiametro(familia, d)</td>
+                                    <td>@MedidaDaLinha(familia, d)</td>
                                 }
-                                <td>@PrecoDoDiametro(opcao, familia, d, Moeda.Usd)</td>
-                                <td>@PrecoDoDiametro(opcao, familia, d, Moeda.Clp)</td>
-                                <td>@PrecoDoDiametro(opcao, familia, d, Moeda.Brl)</td>
+                                <td>@PrecoDaLinha(opcao, familia, d, Moeda.Usd)</td>
+                                <td>@PrecoDaLinha(opcao, familia, d, Moeda.Clp)</td>
+                                <td>@PrecoDaLinha(opcao, familia, d, Moeda.Brl)</td>
                             </tr>
                         }
                     </tbody>
@@ -264,17 +298,19 @@
 
     private string _busca = "";
 
-    // ---------- preço por Fan Diameter ----------
-    /// <summary>Os rótulos de Fan Diameter do cadastro, na ordem do tamanho.</summary>
-    private List<string> _diametros = new();
-    /// <summary>Quantos equipamentos usam cada diâmetro — só para dar contexto na tela.</summary>
+    // ---------- preço por referência (diâmetro ou potência) ----------
+    /// <summary>Os valores de referência do cadastro, na ordem do tamanho.</summary>
+    private List<string> _referencias = new();
+    /// <summary>Quantos registros cada referência alcança — contexto na tela.</summary>
     private Dictionary<string, int> _usos = new();
-    private Dictionary<string, PrecoDiametro> _precos = new();
+    /// <summary>"equipamento/equipamentos" ou "motor/motores", conforme o eixo.</summary>
+    private (string Um, string Vários) _unidade = ("equipamento", "equipamentos");
+    private Dictionary<string, PrecoReferencia> _precos = new();
     /// <summary>Id da opção cujo painel de preços está aberto; nulo = nenhum.</summary>
     private string? _abertoPara;
     /// <summary>A família de preço da opção aberta.</summary>
     private FamiliaDePreco? _familia;
-    private string _buscaDiam = "";
+    private string _buscaRef = "";
 
     /// <summary>Lista em foco; vazio mostra todas.</summary>
     private string _grupoFiltro = "";
@@ -613,9 +649,9 @@
             }
             else
             {
-                <button class="btn-link" title="Preço por Fan Diameter"
+                <button class="btn-link" title="@($"Preço por {familia.RotuloDoEixo}")"
                         @onclick="() => AbrirPrecos(item, familia)">
-                    ▸ por diâmetro
+                    ▸ @familia.RotuloDoBotao
                     @if (Precos.Quantos(familia.Chave) is var n && n > 0)
                     {
                         <span class="val-count">@n</span>
@@ -625,7 +661,7 @@
         }
         else
         {
-            <span class="subtitle" title="Preço único: não muda com o Fan Diameter">—</span>
+            <span class="subtitle" title="Preço único: o mesmo para todos os equipamentos">—</span>
         }
     </text>;
 
@@ -633,15 +669,29 @@
     {
         _abertoPara = item.Id;
         _familia = familia;
-        _buscaDiam = "";
+        _buscaRef = "";
 
-        // os diâmetros saem do cadastro de equipamentos e são únicos: "45" é 45
-        // em qualquer série e em qualquer cubo, que é exatamente a regra do preço
-        var equipamentos = Equipamentos.Todos();
-        _usos = equipamentos
-            .GroupBy(e => e.Diametro)
-            .ToDictionary(g => g.Key, g => g.Count());
-        _diametros = _usos.Keys
+        // as linhas da tabela saem do cadastro, nunca de uma lista à parte: os
+        // diâmetros, do cadastro de equipamentos (e são únicos — "45" é 45 em
+        // qualquer série e em qualquer cubo, que é a regra do preço); as
+        // potências, do catálogo de motores
+        if (familia.Eixo == EixoDePreco.PotenciaMotor)
+        {
+            _unidade = ("motor", "motores");
+            _usos = Motores.Todos()
+                .Where(m => m.PotenciaCv.Length > 0)
+                .GroupBy(m => m.PotenciaCv)
+                .ToDictionary(g => g.Key, g => g.Count());
+        }
+        else
+        {
+            _unidade = ("equipamento", "equipamentos");
+            _usos = Equipamentos.Todos()
+                .GroupBy(e => e.Diametro)
+                .ToDictionary(g => g.Key, g => g.Count());
+        }
+
+        _referencias = _usos.Keys
             .OrderBy(d => Medida.Numero(d))
             .ThenBy(d => d, StringComparer.OrdinalIgnoreCase)
             .ToList();
@@ -649,19 +699,19 @@
         _precos = Precos.Da(familia.Chave);
     }
 
-    private List<string> DiametrosFiltrados()
+    private List<string> ReferenciasFiltradas()
     {
-        var busca = _buscaDiam.Trim();
+        var busca = _buscaRef.Trim();
         return busca.Length == 0
-            ? _diametros
-            : _diametros.Where(d => d.Contains(busca, StringComparison.OrdinalIgnoreCase)).ToList();
+            ? _referencias
+            : _referencias.Where(d => d.Contains(busca, StringComparison.OrdinalIgnoreCase)).ToList();
     }
 
-    /// <summary>"3 equipamentos" — o quanto aquele diâmetro pesa no cadastro.</summary>
-    private string Usos(string diametro) => _usos.GetValueOrDefault(diametro) switch
+    /// <summary>"3 equipamentos", "5 motores" — o alcance daquele preço.</summary>
+    private string Usos(string referencia) => _usos.GetValueOrDefault(referencia) switch
     {
-        1 => "1 equipamento",
-        var n => $"{n} equipamentos",
+        1 => $"1 {_unidade.Um}",
+        var n => $"{n} {_unidade.Vários}",
     };
 
     private string Resumo(Caracteristica item)
@@ -673,37 +723,37 @@
         return partes.Count == 0 ? "que também está em branco" : string.Join(" · ", partes);
     }
 
-    private static string ValorDe(PrecoDiametro? p, Moeda m) => p is null ? "" : m switch
+    private static string ValorDe(PrecoReferencia? p, Moeda m) => p is null ? "" : m switch
     {
         Moeda.Usd => p.PrecoUsd, Moeda.Clp => p.PrecoClp, _ => p.Preco,
     };
 
-    /// <summary>Um dos três campos de preço de um diâmetro.</summary>
-    private RenderFragment PrecoDoDiametro(
-        Caracteristica opcao, FamiliaDePreco familia, string diametro, Moeda moeda) => @<text>
+    /// <summary>Um dos três campos de preço de uma linha da tabela.</summary>
+    private RenderFragment PrecoDaLinha(
+        Caracteristica opcao, FamiliaDePreco familia, string referencia, Moeda moeda) => @<text>
         @{
-            _precos.TryGetValue(diametro, out var atual);
+            _precos.TryGetValue(referencia, out var atual);
         }
         <input class="cell" style="max-width:110px; text-align:right" placeholder="—"
                value="@ValorDe(atual, moeda)"
-               @onchange="a => DefinirPreco(opcao, familia, diametro, moeda, a.Value?.ToString() ?? string.Empty)" />
+               @onchange="a => DefinirPreco(opcao, familia, referencia, moeda, a.Value?.ToString() ?? string.Empty)" />
     </text>;
 
     /// <summary>O diâmetro em mm da peça — dado técnico, só a conexão a manga usa.</summary>
-    private RenderFragment MedidaDoDiametro(FamiliaDePreco familia, string diametro) => @<text>
+    private RenderFragment MedidaDaLinha(FamiliaDePreco familia, string referencia) => @<text>
         @{
-            _precos.TryGetValue(diametro, out var linha);
+            _precos.TryGetValue(referencia, out var linha);
         }
         <input class="cell" style="max-width:120px; text-align:right" placeholder="—"
                value="@(linha?.Medida ?? "")"
-               @onchange="a => DefinirMedida(familia, diametro, a.Value?.ToString() ?? string.Empty)" />
+               @onchange="a => DefinirMedida(familia, referencia, a.Value?.ToString() ?? string.Empty)" />
     </text>;
 
     private void DefinirPreco(Caracteristica opcao, FamiliaDePreco familia,
-        string diametro, Moeda moeda, string texto)
+        string referencia, Moeda moeda, string texto)
     {
         var preco = texto.Trim();
-        _precos.TryGetValue(diametro, out var atual);
+        _precos.TryGetValue(referencia, out var atual);
 
         if (preco == ValorDe(atual, moeda)) return;
 
@@ -713,7 +763,7 @@
             return;
         }
 
-        var linha = atual ?? new PrecoDiametro { Familia = familia.Chave, Diametro = diametro };
+        var linha = atual ?? new PrecoReferencia { Familia = familia.Chave, Referencia = referencia };
 
         switch (moeda)
         {
@@ -722,28 +772,28 @@
             default: linha.Preco = preco; break;
         }
 
-        Gravar(linha, diametro);
+        Gravar(linha, referencia);
 
         Aviso(preco.Length == 0
-            ? $"Fan Diameter {diametro}: volta a usar o preço de \"{opcao.Valor}\"."
-            : $"Fan Diameter {diametro} · {familia.Rotulo}: {Rotulo(moeda)} {preco} " +
-              $"— vale para {Usos(diametro)}.");
+            ? $"{familia.RotuloDoEixo} {referencia}: volta a usar o preço de \"{opcao.Valor}\"."
+            : $"{familia.RotuloDoEixo} {referencia} · {familia.Rotulo}: {Rotulo(moeda)} {preco} " +
+              $"— vale para {Usos(referencia)}.");
     }
 
-    private void DefinirMedida(FamiliaDePreco familia, string diametro, string texto)
+    private void DefinirMedida(FamiliaDePreco familia, string referencia, string texto)
     {
         var valor = texto.Trim();
-        _precos.TryGetValue(diametro, out var atual);
+        _precos.TryGetValue(referencia, out var atual);
 
         if (valor == (atual?.Medida ?? "")) return;
 
-        var linha = atual ?? new PrecoDiametro { Familia = familia.Chave, Diametro = diametro };
+        var linha = atual ?? new PrecoReferencia { Familia = familia.Chave, Referencia = referencia };
         linha.Medida = valor;
-        Gravar(linha, diametro);
+        Gravar(linha, referencia);
 
         Aviso(valor.Length == 0
-            ? $"Fan Diameter {diametro}: diâmetro em mm apagado."
-            : $"Fan Diameter {diametro}: conexão a manga de {valor} mm.");
+            ? $"Fan Diameter {referencia}: diâmetro em mm apagado."
+            : $"Fan Diameter {referencia}: conexão a manga de {valor} mm.");
     }
 
     /// <summary>
@@ -751,18 +801,18 @@
     /// sem preço e sem medida: é o mesmo que não ter exceção, e um registro vazio
     /// só atrapalharia a contagem.
     /// </summary>
-    private void Gravar(PrecoDiametro linha, string diametro)
+    private void Gravar(PrecoReferencia linha, string referencia)
     {
         Precos.Salvar(linha);
 
-        if (linha.Vazio) _precos.Remove(diametro);
-        else _precos[diametro] = linha;
+        if (linha.Vazio) _precos.Remove(referencia);
+        else _precos[referencia] = linha;
     }
 
     private string SubirPrecos(Stream fluxo)
     {
-        var (linhas, avisos) = DadosExcel.ImportarPrecosPorDiametro(fluxo, Precos, _diametros);
-        var texto = linhas > 0 ? $"{linhas} preço(s) por diâmetro gravado(s)." : "Nada foi gravado.";
+        var (linhas, avisos) = DadosExcel.ImportarPrecosPorReferencia(fluxo, Precos, _referencias);
+        var texto = linhas > 0 ? $"{linhas} preço(s) gravado(s)." : "Nada foi gravado.";
         return avisos.Count > 0 ? texto + " " + string.Join(" ", avisos) : texto;
     }
 
