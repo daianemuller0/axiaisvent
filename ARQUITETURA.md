@@ -927,16 +927,58 @@ A primeira aba que **consome** o cadastro em vez de mantê-lo. Ela tem quatro bl
 ordem do documento da equipe: **Cliente**, **Cabeçalho**, **Contato (no documento)** e
 **Escopo do ventilador**, mais um **Resumo** que soma.
 
+### Uma proposta, vários equipamentos
+
+A folha de dados da equipe é uma coluna por equipamento, então a proposta é uma lista de
+`ItemProposta`: quantidade, modelo, arranjo e as escolhas daquele equipamento. Dois
+equipamentos iguais são **um item com quantidade 2**; dois diferentes são dois itens, e na
+tela, duas abas. O resumo mostra o unitário de cada um, multiplica pela quantidade e soma.
+
+A lista é gravada como JSON numa coluna só — é de tamanho variável e nunca é consultada
+sozinha, então uma entidade à parte custaria uma leitura a mais em cada tela sem servir
+para nada. Um banco anterior, com um equipamento só em colunas soltas, vira o primeiro item
+da lista na leitura.
+
+### A folha de dados
+
+`FolhaDeDados` lê a planilha que a equipe já preenche hoje. É um **formulário**, não uma
+tabela, então as posições são fixas:
+
+| Onde | O quê |
+|---|---|
+| `D4` · `D6` · `D13` · `D14` · `D15` | número da proposta, cliente, aos cuidados de, e-mail, telefone |
+| linha **31**, colunas **D** em diante | a quantidade de cada equipamento — **número** quer dizer "existe, e são tantos"; "preencher" (ou qualquer não-número) quer dizer que aquela coluna não tem equipamento |
+| linha **40** | arranjo / instalação |
+| linha **42** | difusor |
+| linha **44** | damper mariposa |
+| linha **51** | contrarrecuo ou freio |
+
+O texto da planilha casa com a opção do cadastro em dois passos: primeiro pelo **nome** da
+opção ("Freio", "Contrarrecuo", "Teto"), depois pelo **sentido** — "sem"/"não" é a opção de
+ausência da lista, "com"/"sim" é a opção real quando só existe uma. Por isso `Sim` casa com
+o damper (Não/Sim) e `Com` casa com o difusor (Sem/Com) sem nenhuma tabela de tradução. O
+que não casar vira aviso nomeando a célula, em vez de uma escolha errada em silêncio.
+
+Foi essa regra que trouxe o subitem **Contrarrecuo** para a lista de mesmo nome: a planilha
+marca três estados (sem / contrarrecuo / freio), e antes a lista só tinha dois.
+
+### O que a planilha não traz
+
+Cada campo da tela diz de onde vem: a célula (`D6`, `linha 42`) ou **"preencher manual"**.
+Depois de importar, um quadro lista o que veio e o que ficou faltando — inclusive o
+**modelo de cada equipamento**, que a folha não diz: ela dá a quantidade, não qual
+ventilador. É o que evita mandar proposta pela metade achando que a planilha cuidou de tudo.
+
 ### A proposta guarda a escolha, nunca o preço
 
-`Proposta` (entidade `propostas`) guarda a moeda, o id do modelo, o arranjo e **a opção
-marcada em cada lista** — e nenhum valor. O preço é resolvido na hora de desenhar a tela,
+`Proposta` (entidade `propostas`) guarda a moeda e, por equipamento, a quantidade, o id do
+modelo, o arranjo e **a opção marcada em cada lista** — e nenhum valor. O preço é resolvido na hora de desenhar a tela,
 pelo cadastro. É de propósito: corrigir uma tabela de preço passa a valer para as propostas
 abertas, em vez de deixar cada uma com uma cópia velha de um preço errado.
 
-As escolhas são um texto `lista\tvalor` por linha, e não uma tabela à parte, porque o que a
-proposta guarda é uma **foto**: se alguém renomear uma lista depois, a proposta antiga não
-é reescrita em silêncio — a escolha órfã some à vista, na tela.
+As escolhas são uma foto do que foi marcado, e não um vínculo: se alguém renomear uma lista
+depois, a proposta antiga não é reescrita em silêncio — a escolha órfã some à vista, na
+tela.
 
 ### Como o preço de cada linha é decidido
 

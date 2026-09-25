@@ -88,6 +88,15 @@ public sealed class CaracteristicaRepository
         ("(lista nova: Damper mariposa)", "Damper mariposa", "Conexao manga descarga"),
     };
 
+    /// <summary>
+    /// Subitens que passaram a ser de fábrica depois de o banco existir. Entram
+    /// uma vez cada, na posição pedida; apagados depois, ficam apagados.
+    /// </summary>
+    private static readonly (string Marca, string Lista, string Valor, string DepoisDe)[] SubitensNovos =
+    {
+        ("(subitem novo: Contrarrecuo)", "Contrarrecuo", "Contrarrecuo", "Sem Contrarrecuo"),
+    };
+
     private readonly ParquetStore _store;
     public CaracteristicaRepository(ParquetStore store) => _store = store;
 
@@ -200,6 +209,7 @@ public sealed class CaracteristicaRepository
     {
         AposentarListas();
         CriarListasNovas();
+        CriarSubitensNovos();
 
         // 1) as listas, uma única vez. A marca (e não "está vazio, então
         //    carrega") é o que permite apagar todas as listas e subir as suas.
@@ -270,6 +280,39 @@ public sealed class CaracteristicaRepository
                 }
 
                 SalvarGrupo(new GrupoCaracteristica { Nome = nome, Ordem = posicao });
+            }
+
+            _store.WriteRow(EntidadeSemeados,
+                new KeyValuePair<string, object?>[] { new("id", marca) });
+        }
+    }
+
+    /// <summary>Cria, uma vez cada, os subitens que entraram na fábrica depois.</summary>
+    private void CriarSubitensNovos()
+    {
+        var marcas = _store
+            .ReadLatest(EntidadeSemeados, "id", r => r.IsDBNull(0) ? "" : r.GetString(0))
+            .ToHashSet();
+
+        foreach (var (marca, lista, valor, depoisDe) in SubitensNovos)
+        {
+            if (marcas.Contains(marca)) continue;
+
+            var daLista = Todas().Where(c => c.Grupo == lista).OrderBy(c => c.Ordem).ToList();
+
+            if (daLista.Count > 0 &&
+                daLista.All(c => !c.Valor.Equals(valor, StringComparison.OrdinalIgnoreCase)))
+            {
+                var anterior = daLista.FirstOrDefault(c => c.Valor == depoisDe);
+                var posicao = (anterior?.Ordem ?? daLista[^1].Ordem) + 1;
+
+                foreach (var c in daLista.Where(c => c.Ordem >= posicao).OrderByDescending(c => c.Ordem))
+                {
+                    c.Ordem++;
+                    Salvar(c);
+                }
+
+                Salvar(new Caracteristica { Grupo = lista, Valor = valor, Ordem = posicao });
             }
 
             _store.WriteRow(EntidadeSemeados,
@@ -371,7 +414,10 @@ public static class CaracteristicasSeed
 
             ("Lubrificação", new[] { "SEM lubrif. automatico", "com LUBRIF. automatico" }),
 
-            ("Contrarrecuo", new[] { "Sem Contrarrecuo", "Freio" }),
+            // a folha de dados marca esta lista com três estados: sem,
+            // contrarrecuo ou freio — por isso "Contrarrecuo" é uma opção, e
+            // não só o nome da lista
+            ("Contrarrecuo", new[] { "Sem Contrarrecuo", "Contrarrecuo", "Freio" }),
 
             ("Cone de entrada", new[] { "Sem", "Com Cone", "Com Conexão para Manga" }),
 

@@ -1,4 +1,36 @@
+using System.Text.Json;
+
 namespace HowdenAxiais.Poc.Data;
+
+/// <summary>
+/// UM equipamento dentro da proposta: qual modelo, quantos, e o escopo dele.
+///
+/// A proposta tem uma lista deles porque a folha de dados da equipe é assim:
+/// cada coluna a partir da D é um equipamento, e a linha 31 diz a quantidade.
+/// Dois equipamentos iguais são UMA linha com quantidade 2; dois diferentes são
+/// duas colunas, e aqui, dois itens.
+/// </summary>
+public sealed class ItemProposta
+{
+    public string Quantidade { get; set; } = "1";
+
+    /// <summary>O id do modelo escolhido (ver <see cref="Equipamento.Chave"/>).</summary>
+    public string EquipamentoId { get; set; } = "";
+
+    /// <summary>Arranjo / instalação: "Teto" ou "Piso".</summary>
+    public string Arranjo { get; set; } = "";
+
+    /// <summary>A opção marcada em cada lista de característica.</summary>
+    public Dictionary<string, string> Escolhas { get; set; } = new();
+
+    /// <summary>
+    /// A coluna da planilha de onde este item veio ("D", "E"…), quando veio de
+    /// uma. Serve para a tela dizer de onde cada coisa saiu.
+    /// </summary>
+    public string Coluna { get; set; } = "";
+
+    public int Quantos => int.TryParse(Quantidade.Trim(), out var n) && n > 0 ? n : 1;
+}
 
 /// <summary>
 /// Uma proposta: o cabeçalho do documento, os dados do cliente e o escopo do
@@ -54,37 +86,60 @@ public sealed class Proposta
     // ---------- escopo do ventilador ----------
     /// <summary>"USD", "CLP" ou "BRL" — manda em todos os preços da proposta.</summary>
     public string MoedaCodigo { get; set; } = "USD";
-    /// <summary>O id do modelo escolhido (ver <see cref="Equipamento.Chave"/>).</summary>
-    public string EquipamentoId { get; set; } = "";
-    /// <summary>Arranjo / instalação: "Teto" ou "Piso".</summary>
-    public string Arranjo { get; set; } = "";
 
     /// <summary>
-    /// A opção marcada em cada lista, como "lista\tvalor" por linha. É texto, e
-    /// não uma tabela à parte, porque a proposta guarda uma FOTO da escolha:
-    /// renomear uma lista depois não pode reescrever propostas antigas em
-    /// silêncio — o que some some à vista, na tela.
+    /// Os equipamentos da proposta, cada um com a sua quantidade e o seu escopo.
+    ///
+    /// Guardados como JSON numa coluna só: é uma lista de tamanho variável, e
+    /// uma entidade à parte custaria uma leitura a mais em cada tela para
+    /// nunca ser consultada sozinha.
     /// </summary>
-    public string Escolhas { get; set; } = "";
+    public List<ItemProposta> Itens { get; set; } = new();
 
     public Moeda Moeda => Moedas.Ler(MoedaCodigo);
 
-    public Dictionary<string, string> EscolhasLidas()
-    {
-        var mapa = new Dictionary<string, string>();
+    public string ItensComoTexto() => JsonSerializer.Serialize(Itens);
 
-        foreach (var linha in Escolhas.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+    /// <summary>
+    /// Lê a lista gravada. Um banco anterior guardava um equipamento só, em
+    /// colunas soltas — vira o primeiro item da lista, para nenhuma proposta
+    /// antiga abrir vazia.
+    /// </summary>
+    public static List<ItemProposta> LerItens(string json, string equipamentoLegado,
+        string arranjoLegado, string escolhasLegadas)
+    {
+        if (json.Trim().Length > 0)
+        {
+            try
+            {
+                var lista = JsonSerializer.Deserialize<List<ItemProposta>>(json);
+                if (lista is not null) return lista;
+            }
+            catch (JsonException)
+            {
+                // JSON estragado não pode derrubar a tela: a proposta abre vazia
+                // e a equipe refaz o escopo, que é o que dá para fazer aqui
+            }
+        }
+
+        if (equipamentoLegado.Length == 0 && escolhasLegadas.Length == 0) return new();
+
+        var escolhas = new Dictionary<string, string>();
+        foreach (var linha in escolhasLegadas.Split('\n', StringSplitOptions.RemoveEmptyEntries))
         {
             var partes = linha.Split('\t');
-            if (partes.Length == 2) mapa[partes[0]] = partes[1];
+            if (partes.Length == 2) escolhas[partes[0]] = partes[1];
         }
-        return mapa;
-    }
 
-    public void GravarEscolhas(Dictionary<string, string> mapa) =>
-        Escolhas = string.Join("\n", mapa
-            .Where(kv => kv.Value.Length > 0)
-            .Select(kv => $"{kv.Key}\t{kv.Value}"));
+        return new List<ItemProposta>
+        {
+            new()
+            {
+                Quantidade = "1", EquipamentoId = equipamentoLegado,
+                Arranjo = arranjoLegado, Escolhas = escolhas,
+            },
+        };
+    }
 
     /// <summary>Como a proposta aparece numa lista.</summary>
     public string Titulo =>
@@ -149,7 +204,7 @@ public sealed class PropostaRepository
         "ano", "numero", "revisao", "bu", "idioma", "vendaPara", "destino",
         "paisDestino", "categoria", "produto", "marketSegment", "portal",
         "contatoNome", "contatoCargo", "contatoEmail", "contatoTelefones",
-        "moeda", "equipamento", "arranjo", "escolhas",
+        "moeda", "equipamento", "arranjo", "escolhas", "itens",
     };
 
     private readonly ParquetStore _store;
@@ -169,8 +224,8 @@ public sealed class PropostaRepository
             MarketSegment = S(r, 24), Portal = S(r, 25),
             ContatoNome = S(r, 26), ContatoCargo = S(r, 27),
             ContatoEmail = S(r, 28), ContatoTelefones = S(r, 29),
-            MoedaCodigo = S(r, 30), EquipamentoId = S(r, 31), Arranjo = S(r, 32),
-            Escolhas = S(r, 33),
+            MoedaCodigo = S(r, 30),
+            Itens = Proposta.LerItens(S(r, 34), S(r, 31), S(r, 32), S(r, 33)),
         })
         .OrderByDescending(p => p.Numero)
         .ToList();
@@ -190,7 +245,10 @@ public sealed class PropostaRepository
             p.Ano, p.Numero, p.Revisao, p.Bu, p.Idioma, p.VendaPara, p.Destino,
             p.PaisDestino, p.Categoria, p.Produto, p.MarketSegment, p.Portal,
             p.ContatoNome, p.ContatoCargo, p.ContatoEmail, p.ContatoTelefones,
-            p.MoedaCodigo, p.EquipamentoId, p.Arranjo, p.Escolhas,
+            // as três colunas do formato antigo continuam sendo gravadas vazias:
+            // o esquema do Parquet é por arquivo, e tirá-las não apagaria as que
+            // já estão lá
+            p.MoedaCodigo, "", "", "", p.ItensComoTexto(),
         };
 
         _store.WriteRow(Entidade, Campos
