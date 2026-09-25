@@ -49,8 +49,23 @@ public sealed class PrecoDiametro
 public sealed record FamiliaDePreco(string Chave, string Rotulo, bool UsaMedida, string Aviso)
 {
     /// <summary>
-    /// A família de uma opção, ou nulo quando a opção não tem preço próprio —
-    /// "Sem", "NENHUM", "Não": não é item vendido, não tem tabela.
+    /// As listas cujo preço muda com o Fan Diameter — as que a equipe nomeou.
+    /// Basta a palavra aparecer no nome da lista, então renomear "Damper
+    /// mariposa" para "Damper mariposa saída" não quebra nada.
+    ///
+    /// Silenciador e conexão a manga têm regra própria (dividem tabela) e estão
+    /// tratados antes desta lista.
+    /// </summary>
+    private static readonly string[] ListasPorDiametro = { "base", "cone", "difusor", "damper" };
+
+    /// <summary>
+    /// A família de uma opção, ou nulo quando ela não tem tabela por diâmetro:
+    ///
+    /// - "Sem", "NENHUM", "Não": não é item vendido;
+    /// - lubrificação, contrarrecuo, partidores, instrumentação: <b>preço único</b>,
+    ///   o mesmo para todo tamanho de equipamento — quem manda é o preço da
+    ///   própria opção, e uma tabela por diâmetro só daria 36 lugares para
+    ///   digitar o mesmo número.
     /// </summary>
     public static FamiliaDePreco? De(string grupo, string valor)
     {
@@ -73,6 +88,9 @@ public sealed record FamiliaDePreco(string Chave, string Rotulo, bool UsaMedida,
             return new($"Silenciador|{v}", $"Silenciador · {v}", false,
                 "Mesma tabela para o silenciador de entrada e o de descarga.");
         }
+
+        var lista = grupo.ToLowerInvariant();
+        if (!ListasPorDiametro.Any(chave => lista.Contains(chave))) return null;
 
         return new($"{grupo}|{v}", $"{grupo} · {v}", false, "");
     }

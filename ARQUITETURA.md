@@ -624,12 +624,16 @@ diferentes, o valor é o mesmo:
 |---|---|---|
 | `Silenciador entrada › L = 1,5D` e `Silenciador descarga › L = 1,5D` | `Silenciador\|L = 1,5D` | mesmo preço na entrada e na descarga, **opção por opção** — L = 1,0D não custa o que custa L = 2,0D |
 | `Cone de entrada › Com Conexão para Manga` e `Conexao manga descarga › Com Conexão para Manga` | `Conexão a manga` | é a mesma peça nas duas pontas; **esta família tem a coluna Diâmetro (mm)** |
-| qualquer outra opção | `{lista}\|{opção}` | tabela própria |
+| as outras opções de **Base**, **Cone de entrada**, **Difusor** e **Damper mariposa** | `{lista}\|{opção}` | tabela própria |
 | `Sem`, `SEM Base`, `NENHUM`, `Não` | *(nenhuma)* | não é item vendido: não tem tabela, e a coluna mostra "—" |
+| **Lubrificação**, **Contrarrecuo**, **PARTIDORES**, **INSTRUMENTAÇÃO** | *(nenhuma)* | **preço único**: o lubrificador automático custa o mesmo em qualquer tamanho, e partidor e instrumentação seguem o motor, não o ventilador. Uma tabela por diâmetro aqui seria 36 lugares para digitar o mesmo número |
 
 Quem decide isso é `FamiliaDePreco.De(grupo, valor)`, em um lugar só — a regra do
 silenciador olha o nome da lista, e a da manga olha a palavra "manga" na opção, que é o que
-faz as duas pontas caírem na mesma tabela sem ninguém ter de configurar nada. A lista
+faz as duas pontas caírem na mesma tabela sem ninguém ter de configurar nada. O padrão é
+**preço único**: só as listas nomeadas pela equipe (`base`, `cone`, `difusor`, `damper`,
+mais silenciador e manga) ganham tabela por diâmetro, e a checagem é por palavra contida no
+nome, então renomear a lista não quebra a regra. A lista
 **Damper mariposa** (Não / Sim) entrou junto: o "Sim" é mais uma família por diâmetro.
 
 Duas decisões que valem registrar:
