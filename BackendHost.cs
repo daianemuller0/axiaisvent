@@ -84,7 +84,7 @@ public static class BackendHost
         builder.Services.AddScoped<MotorRepository>();
         builder.Services.AddScoped<LimiteMotorRepository>();
         builder.Services.AddScoped<CaracteristicaRepository>();
-        builder.Services.AddScoped<PrecoEquipamentoRepository>();
+        builder.Services.AddScoped<PrecoDiametroRepository>();
 
         var app = builder.Build();
 
@@ -112,9 +112,9 @@ public static class BackendHost
             // Aquece o cache: lê tudo UMA vez, aqui, enquanto o sistema abre.
             // A partir daí as telas trabalham em memória — abrir a guia Dados e
             // trocar de seção não voltam ao disco (nem à pasta de rede).
-            // Preços por equipamento de um banco anterior guardavam série,
-            // ventilador e cubo soltos; agora apontam para o id do modelo.
-            var precos = escopo.ServiceProvider.GetRequiredService<PrecoEquipamentoRepository>();
+            // Preço de acessório de um banco anterior era por equipamento
+            // montado; agora a referência é o Fan Diameter.
+            var precos = escopo.ServiceProvider.GetRequiredService<PrecoDiametroRepository>();
             precos.Converter(equipamentos);
 
             var caracteristicas = escopo.ServiceProvider.GetRequiredService<CaracteristicaRepository>();

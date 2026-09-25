@@ -17,7 +17,7 @@ public static class DadosExcel
     public const string AbaModelos = "Modelos";
     public const string AbaVentiladores = "Ventiladores";
     public const string AbaCubos = "Cubos";
-    public const string AbaPrecosEquipamento = "Preços por equipamento";
+    public const string AbaPrecosDiametro = "Preços por diâmetro";
     public const string AbaLimites = "Limites de motor";
     public const string AbaMotores = "Motores";
     public const string AbaCaracteristicas = "Características";
@@ -167,79 +167,51 @@ public static class DadosExcel
         Exportar(new(), new(), new(), motores, new(), new(), AbaMotores);
 
     /// <summary>
-    /// A planilha de preço por equipamento de UMA opção: uma linha por modelo,
-    /// com o preço já cadastrado onde houver e em branco onde não houver.
+    /// A planilha de preço por Fan Diameter de uma opção: uma linha por
+    /// diâmetro, com o que já está gravado. É por diâmetro porque é assim que a
+    /// equipe precifica acessório — todos os 45 pelo mesmo valor, em qualquer
+    /// cubo e nas duas séries.
     ///
-    /// É a linha inteira de propósito. Exportar só as exceções fazia a planilha
-    /// sair vazia justamente quando ela é mais útil — na primeira vez, quando a
-    /// equipe quer preencher os 98 preços no Excel em vez de digitar na tela.
-    /// Linha em branco continua querendo dizer "usa o preço da opção", então
-    /// deixar em branco no Excel também apaga a exceção que existia.
+    /// As duas primeiras colunas dizem de qual opção a planilha é; na volta, é
+    /// por elas que se descobre a família — e é o que faz o silenciador de
+    /// entrada e o de descarga caírem na mesma tabela sem precisar explicar.
     /// </summary>
-    public static byte[] ExportarPrecosDaOpcao(string grupo, string valor,
-        List<Equipamento> equipamentos, Dictionary<string, PrecoEquipamento> precos)
+    public static byte[] ExportarPrecosPorDiametro(string grupo, string valor,
+        bool usaMedida, List<string> diametros, Dictionary<string, PrecoDiametro> precos)
     {
+        var colunas = new List<string> { "Item", "Subitem", "Fan Diameter" };
+        if (usaMedida) colunas.Add("Diâmetro (mm)");
+        colunas.AddRange(new[] { "Preço USD", "Preço CLP", "Preço R$" });
+
         using var wb = new XLWorkbook();
-        Montar(wb, AbaPrecosEquipamento, ColunasPrecoEquipamento,
-            equipamentos.Select(e =>
+        Montar(wb, AbaPrecosDiametro, colunas.ToArray(),
+            diametros.Select(d =>
             {
-                var p = precos.GetValueOrDefault(e.Id);
-                return new object?[]
+                var p = precos.GetValueOrDefault(d);
+                var linha = new List<object?> { grupo, valor, d };
+                if (usaMedida) linha.Add(Numero(p?.Medida ?? ""));
+                linha.AddRange(new object?[]
                 {
-                    grupo, valor, e.Serie, e.Diametro, e.Cubo, e.FbHb, Numero(e.Estagios),
                     Numero(p?.PrecoUsd ?? ""), Numero(p?.PrecoClp ?? ""), Numero(p?.Preco ?? ""),
-                };
+                });
+                return linha.ToArray();
             }));
         return Bytes(wb);
     }
 
-    private static readonly string[] ColunasPrecoEquipamento =
-    {
-        "Item", "Subitem", "Série", "Ventilador", "Cubo", "FB/HB", "Nº de estágios",
-        "Preço USD", "Preço CLP", "Preço R$",
-    };
-
     /// <summary>
-    /// Todas as exceções cadastradas, de todas as opções — o retrato do que está
-    /// gravado. Para preencher preço, ver <see cref="ExportarPrecosDaOpcao"/>.
+    /// A volta da planilha. Linha em branco apaga o preço daquele diâmetro — em
+    /// branco quer dizer "usa o preço da opção", na tela e aqui.
     /// </summary>
-    public static byte[] ExportarPrecosPorEquipamento(
-        List<PrecoEquipamento> precos, List<Equipamento> equipamentos)
-    {
-        // o preço guarda só o id do modelo; as cinco colunas que identificam o
-        // modelo vêm do cadastro, para a planilha ser legível (e reimportável)
-        var modelos = equipamentos
-            .GroupBy(e => e.Id)
-            .ToDictionary(g => g.Key, g => g.First());
-
-        using var wb = new XLWorkbook();
-        Montar(wb, AbaPrecosEquipamento, ColunasPrecoEquipamento,
-            precos
-                .Select(p => (Preco: p, Modelo: modelos.GetValueOrDefault(p.Equipamento)))
-                .Where(x => x.Modelo is not null)
-                .OrderBy(x => x.Preco.Grupo).ThenBy(x => x.Preco.Valor)
-                .ThenBy(x => x.Modelo!.Serie)
-                .ThenBy(x => Medida.Numero(x.Modelo!.Diametro))
-                .ThenBy(x => Medida.Numero(x.Modelo!.Cubo))
-                .Select(x => new object?[]
-                {
-                    x.Preco.Grupo, x.Preco.Valor,
-                    x.Modelo!.Serie, x.Modelo.Diametro, x.Modelo.Cubo,
-                    x.Modelo.FbHb, Numero(x.Modelo.Estagios),
-                    Numero(x.Preco.PrecoUsd), Numero(x.Preco.PrecoClp), Numero(x.Preco.Preco),
-                }));
-        return Bytes(wb);
-    }
-
-    public static (int Linhas, List<string> Avisos) ImportarPrecosPorEquipamento(
-        Stream arquivo, PrecoEquipamentoRepository repo, List<Equipamento> equipamentos)
+    public static (int Linhas, List<string> Avisos) ImportarPrecosPorDiametro(
+        Stream arquivo, PrecoDiametroRepository repo, List<string> diametrosValidos)
     {
         using var wb = new XLWorkbook(arquivo);
         var avisos = new List<string>();
 
-        if (!Achar(wb, AbaPrecosEquipamento, out var ws))
+        if (!Achar(wb, AbaPrecosDiametro, out var ws))
         {
-            avisos.Add($"O arquivo não tem a aba \"{AbaPrecosEquipamento}\". " +
+            avisos.Add($"O arquivo não tem a aba \"{AbaPrecosDiametro}\". " +
                        "Exporte esta tabela primeiro para ver o formato esperado.");
             return (0, avisos);
         }
@@ -247,25 +219,22 @@ public static class DadosExcel
         var (cab, linhas) = Ler(ws);
         var iItem = Coluna(cab, "item", "grupo", "lista");
         var iSub = Coluna(cab, "subitem", "valor", "opção", "opcao");
-        var iSerie = Coluna(cab, "série", "serie");
-        var iVent = Coluna(cab, "ventilador", "diâmetro", "diametro", "fan diameter");
-        var iCubo = Coluna(cab, "cubo", "fan hub diameter");
-        var iFbHb = Coluna(cab, "fb/hb", "fbhb", "fb / hb");
-        var iEstagios = Coluna(cab, "nº de estágios", "n° de estágios", "no de estagios",
-            "nº estágios", "estágios", "estagios");
+        var iDiam = Coluna(cab, "fan diameter", "ventilador", "diâmetro", "diametro");
+        var iMedida = Coluna(cab, "diâmetro (mm)", "diametro (mm)", "mm");
         var iPreco = Coluna(cab, "preço r$", "preco r$", "preço", "preco");
         var iUsd = Coluna(cab, "preço usd", "preco usd", "usd");
         var iClp = Coluna(cab, "preço clp", "preco clp", "clp");
 
-        if (iItem < 0 || iSub < 0 || iSerie < 0 || iVent < 0 || iCubo < 0)
+        if (iItem < 0 || iSub < 0 || iDiam < 0)
         {
-            avisos.Add($"Aba \"{AbaPrecosEquipamento}\": faltam colunas " +
-                       "(Item, Subitem, Série, Ventilador e Cubo).");
+            avisos.Add($"Aba \"{AbaPrecosDiametro}\": faltam colunas (Item, Subitem e Fan Diameter).");
             return (0, avisos);
         }
 
+        var validos = diametrosValidos.ToHashSet(StringComparer.OrdinalIgnoreCase);
         var existentes = repo.Todos();
-        var naoAchados = new List<string>();
+        var desconhecidos = new List<string>();
+        var semFamilia = new List<string>();
         var gravadas = 0;
         var apagadas = 0;
 
@@ -273,40 +242,36 @@ public static class DadosExcel
         {
             var grupo = T(l, iItem);
             var valor = T(l, iSub);
-            var serie = T(l, iSerie);
-            var vent = T(l, iVent);
-            var cubo = T(l, iCubo);
-            if (grupo.Length == 0 || valor.Length == 0 || serie.Length == 0 ||
-                vent.Length == 0 || cubo.Length == 0)
+            var diametro = MedidaNormalizada(T(l, iDiam));
+            if (grupo.Length == 0 || valor.Length == 0 || diametro.Length == 0) continue;
+
+            if (validos.Count > 0 && !validos.Contains(diametro))
             {
+                desconhecidos.Add(diametro);
                 continue;
             }
 
-            // o preço é de um MODELO, e o modelo são os cinco campos: sem achar
-            // o modelo a linha não tem onde se prender
-            var modelo = Modelo(equipamentos, serie, vent, cubo,
-                iFbHb >= 0 ? T(l, iFbHb) : null,
-                iEstagios >= 0 ? MedidaNormalizada(T(l, iEstagios)) : null);
-
-            if (modelo is null)
+            var familia = FamiliaDePreco.De(grupo, valor);
+            if (familia is null)
             {
-                naoAchados.Add($"{serie} {vent} / {cubo}");
+                semFamilia.Add($"{grupo} › {valor}");
                 continue;
             }
 
-            var id = PrecoEquipamento.MontarId(grupo, valor, modelo.Id);
+            var id = PrecoDiametro.MontarId(familia.Chave, diametro);
             var atual = existentes.FirstOrDefault(p => p.Id == id);
 
-            var linha = new PrecoEquipamento
+            var linha = new PrecoDiametro
             {
-                Id = id, Grupo = grupo, Valor = valor, Equipamento = modelo.Id,
+                Id = id, Familia = familia.Chave, Diametro = diametro,
                 Preco = iPreco >= 0 ? PrecoNormalizado(T(l, iPreco)) : atual?.Preco ?? "",
                 PrecoUsd = iUsd >= 0 ? PrecoNormalizado(T(l, iUsd)) : atual?.PrecoUsd ?? "",
                 PrecoClp = iClp >= 0 ? PrecoNormalizado(T(l, iClp)) : atual?.PrecoClp ?? "",
+                Medida = iMedida >= 0 && familia.UsaMedida
+                    ? MedidaNormalizada(T(l, iMedida))
+                    : atual?.Medida ?? "",
             };
 
-            // a planilha traz uma linha por modelo, a maioria em branco: em
-            // branco é "usa o preço da opção", e só conta quando havia exceção
             if (linha.Vazio)
             {
                 if (atual is null) continue;
@@ -320,16 +285,15 @@ public static class DadosExcel
         }
 
         if (apagadas > 0)
-        {
             avisos.Add($"{apagadas} linha(s) vinham em branco e voltaram a usar o preço da opção.");
-        }
 
-        if (naoAchados.Count > 0)
-        {
-            avisos.Add($"{naoAchados.Count} linha(s) sem modelo correspondente na lista de " +
-                       $"equipamentos ({string.Join("; ", naoAchados.Distinct().Take(3))}" +
-                       (naoAchados.Distinct().Count() > 3 ? "…" : "") + ") — ignoradas.");
-        }
+        if (desconhecidos.Count > 0)
+            avisos.Add($"{desconhecidos.Count} linha(s) com Fan Diameter que não está no cadastro " +
+                       $"({string.Join("; ", desconhecidos.Distinct().Take(3))}) — ignoradas.");
+
+        if (semFamilia.Count > 0)
+            avisos.Add($"{semFamilia.Distinct().Count()} opção(ões) sem tabela de preço por " +
+                       $"diâmetro ({string.Join("; ", semFamilia.Distinct().Take(2))}) — ignoradas.");
 
         return (gravadas, avisos);
     }

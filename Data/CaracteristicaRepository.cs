@@ -77,6 +77,17 @@ public sealed class CaracteristicaRepository
 
     private const string MarcaDaAposentadoria = "(listas aposentadas v1)";
 
+    /// <summary>
+    /// Listas que passaram a ser de fábrica DEPOIS de o banco existir. A
+    /// semeadura normal só cria as listas num banco vazio, então num banco com
+    /// dados uma lista nova precisa ser inserida — e na posição certa, porque a
+    /// ordem das listas é a ordem dos pedaços no código do equipamento.
+    /// </summary>
+    private static readonly (string Marca, string Nome, string DepoisDe)[] ListasNovas =
+    {
+        ("(lista nova: Damper mariposa)", "Damper mariposa", "Conexao manga descarga"),
+    };
+
     private readonly ParquetStore _store;
     public CaracteristicaRepository(ParquetStore store) => _store = store;
 
@@ -188,6 +199,7 @@ public sealed class CaracteristicaRepository
     public void SemearSeVazio()
     {
         AposentarListas();
+        CriarListasNovas();
 
         // 1) as listas, uma única vez. A marca (e não "está vazio, então
         //    carrega") é o que permite apagar todas as listas e subir as suas.
@@ -227,6 +239,41 @@ public sealed class CaracteristicaRepository
 
             _store.WriteRow(EntidadeSemeados,
                 new KeyValuePair<string, object?>[] { new("id", lista.Key) });
+        }
+    }
+
+    /// <summary>
+    /// Cria, uma vez cada, as listas que entraram na fábrica depois. Se a equipe
+    /// apagar a lista depois disso, ela fica apagada — a marca já está gravada.
+    /// </summary>
+    private void CriarListasNovas()
+    {
+        var marcas = _store
+            .ReadLatest(EntidadeSemeados, "id", r => r.IsDBNull(0) ? "" : r.GetString(0))
+            .ToHashSet();
+
+        foreach (var (marca, nome, depoisDe) in ListasNovas)
+        {
+            if (marcas.Contains(marca)) continue;
+
+            var grupos = Grupos();
+            if (grupos.Count > 0 && grupos.All(g => g.Nome != nome))
+            {
+                var anterior = grupos.FirstOrDefault(g => g.Nome == depoisDe);
+                var posicao = (anterior?.Ordem ?? grupos.Max(g => g.Ordem)) + 1;
+
+                // abre espaço: quem estava dali para baixo desce uma casa
+                foreach (var g in grupos.Where(g => g.Ordem >= posicao).OrderByDescending(g => g.Ordem))
+                {
+                    g.Ordem++;
+                    SalvarGrupo(g);
+                }
+
+                SalvarGrupo(new GrupoCaracteristica { Nome = nome, Ordem = posicao });
+            }
+
+            _store.WriteRow(EntidadeSemeados,
+                new KeyValuePair<string, object?>[] { new("id", marca) });
         }
     }
 
@@ -299,6 +346,7 @@ public static class CaracteristicasSeed
         "Silenciador descarga",
         "Difusor",
         "Conexao manga descarga",
+        "Damper mariposa",
         "PARTIDORES",
         "INSTRUMENTAÇÃO",
     };
@@ -333,6 +381,8 @@ public static class CaracteristicasSeed
             ("Difusor", new[] { "Sem", "Com" }),
 
             ("Conexao manga descarga", new[] { "Sem", "Com Conexão para Manga" }),
+
+            ("Damper mariposa", new[] { "Não", "Sim" }),
 
             ("PARTIDORES", new[]
             {

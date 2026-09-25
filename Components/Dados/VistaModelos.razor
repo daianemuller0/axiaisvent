@@ -2,7 +2,6 @@
 @inject MotorRepository Motores
 @inject LimiteMotorRepository Limites
 @inject ItemModeloRepository Itens
-@inject PrecoEquipamentoRepository Precos
 
 <p class="subtitle">
     Os equipamentos e a relação <strong>ventilador × cubo</strong>. VAX e Joy ficam na
@@ -436,9 +435,8 @@
 
     private Alvo AlvoCombinacoes => new(
         "combinacoes", () => _todos.Count,
-        "combinação(ões) da matriz — o cadastro de ventiladores e de cubos fica de pé, " +
-        "mas os preços de acessório por equipamento saem junto (são presos ao modelo)",
-        () => { Repo.Limpar(); Precos.Limpar(); });
+        "combinação(ões) da matriz — o cadastro de ventiladores e de cubos fica de pé",
+        () => Repo.Limpar());
 
     /// <summary>
     /// Limpar a lista cruzada é limpar as combinações — são a mesma coisa. Com
@@ -448,17 +446,10 @@
     private Alvo AlvoListaCruzada => _filtro.Trim().Length == 0
         ? new("lista", () => _todos.Count,
             "combinação(ões) — a lista inteira; o cadastro de ventiladores e de cubos fica de pé",
-            () => { Repo.Limpar(); Precos.Limpar(); })
+            () => Repo.Limpar())
         : new("lista", () => Combinacoes().Count,
             $"combinação(ões) — só as que o filtro \"{_filtro.Trim()}\" está mostrando",
-            () =>
-            {
-                foreach (var e in Combinacoes())
-                {
-                    Repo.Apagar(e.Id);
-                    Precos.LimparEquipamento(e.Id);
-                }
-            });
+            () => { foreach (var e in Combinacoes()) Repo.Apagar(e.Id); });
 
     /// <summary>O botão 🗑 Limpar de uma lista, com a confirmação no lugar dele.</summary>
     private RenderFragment Limpeza(Alvo alvo) => @<text>
@@ -502,7 +493,6 @@
         if (texto.Length == 0)
         {
             Repo.Apagar(eq.Id);
-            Precos.LimparEquipamento(eq.Id);
             _msg = $"{eq.Rotulo}: modelo removido.";
         }
         else if (int.TryParse(texto, out var rpm) && rpm > 0)
@@ -775,7 +765,7 @@
     /// <summary>
     /// FB/HB e nº de estágios fazem parte da identidade do modelo — mexer neles
     /// não é editar um campo, é virar outro modelo. Então a linha é regravada
-    /// com a chave nova, a antiga sai, e os preços por equipamento vão junto.
+    /// com a chave nova e a antiga sai.
     /// </summary>
     private void Rechavear(Equipamento eq, string fbHb, string estagios, string oQueMudou)
     {
@@ -792,8 +782,7 @@
         eq.FbHb = fbHb;
         eq.Estagios = estagios;
 
-        var idNovo = Repo.Regravar(idAntigo, eq);
-        Precos.Remapear(idAntigo, idNovo);
+        Repo.Regravar(idAntigo, eq);
 
         _msg = $"{eq.Serie} {eq.Diametro} / {eq.Cubo}: {oQueMudou}";
         Recarregar();
@@ -802,7 +791,6 @@
     private void ApagarCombinacao(Equipamento eq)
     {
         Repo.Apagar(eq.Id);
-        Precos.LimparEquipamento(eq.Id);
         _apagarComb = null;
         _msg = $"{eq.Serie} {eq.Diametro} / {eq.Cubo}: combinação removida.";
         Recarregar();

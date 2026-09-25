@@ -598,33 +598,63 @@ O limite por cubo não sumiu do sistema: `limites_motor`, a aba do Excel e o tre
 continuam, e `RegraMotor` ainda cai neles quando a combinação não tem frame máximo próprio.
 Só não há mais tela para editá-los.
 
-### Acessório não tem preço único
+### Acessório é precificado pelo Fan Diameter
 
-O difusor de um ventilador de 24" não custa o que custa o de 85". O preço solto da opção
-("Difusor › Com") continua existindo e vale como **padrão**; as exceções vivem numa
-entidade própria, `precos_equipamento`, com a chave
+O difusor de um ventilador de 24" não custa o que custa o de 85" — mas também não muda de
+preço porque o cubo mudou. A equipe foi explícita: *"todos os 45 terão o mesmo preço,
+independente se é Joy ou VAX e independente do cubo"*. Então a referência do preço de
+acessório é **o diâmetro do ventilador**, e não o modelo montado.
+
+O preço solto da opção ("Difusor › Com") continua existindo e vale como **padrão**; a
+tabela por diâmetro vive em `precos_diametro`, com a chave
 
 ```
-{item}|{subitem}|{id do modelo}
+{família}|{rótulo do Fan Diameter}
 ```
 
-e os três preços. Na tela, a opção ganhou um botão **▸ por equipamento** que abre, logo
-abaixo dela, a lista dos equipamentos com USD/CLP/R$ em cada linha — com filtro e páginas
-de 20, porque são 98. O botão mostra quantas exceções já existem, então dá para ver de
-relance onde há preço próprio sem abrir nada.
+São 36 diâmetros distintos no cadastro (19 do Joy, em polegadas, e 17 do VAX, em mm), contra
+99 modelos montados — a tabela que a equipe preenche encolheu para um terço.
+
+#### A família é quem divide a tabela
+
+Duas listas podem dividir o mesmo preço sem deixar de ser duas listas — os códigos são
+diferentes, o valor é o mesmo:
+
+| Opção | Família | Por quê |
+|---|---|---|
+| `Silenciador entrada › L = 1,5D` e `Silenciador descarga › L = 1,5D` | `Silenciador\|L = 1,5D` | mesmo preço na entrada e na descarga, **opção por opção** — L = 1,0D não custa o que custa L = 2,0D |
+| `Cone de entrada › Com Conexão para Manga` e `Conexao manga descarga › Com Conexão para Manga` | `Conexão a manga` | é a mesma peça nas duas pontas; **esta família tem a coluna Diâmetro (mm)** |
+| qualquer outra opção | `{lista}\|{opção}` | tabela própria |
+| `Sem`, `SEM Base`, `NENHUM`, `Não` | *(nenhuma)* | não é item vendido: não tem tabela, e a coluna mostra "—" |
+
+Quem decide isso é `FamiliaDePreco.De(grupo, valor)`, em um lugar só — a regra do
+silenciador olha o nome da lista, e a da manga olha a palavra "manga" na opção, que é o que
+faz as duas pontas caírem na mesma tabela sem ninguém ter de configurar nada. A lista
+**Damper mariposa** (Não / Sim) entrou junto: o "Sim" é mais uma família por diâmetro.
 
 Duas decisões que valem registrar:
 
-- **Linha em branco não é gravada.** Esvaziar os três campos apaga o registro, porque "sem
-  preço próprio" e "registro vazio" são a mesma coisa — e um registro vazio estragaria a
-  contagem de exceções.
-- **O painel não é uma lista à parte.** As linhas saem do cadastro de equipamentos e o
-  preço é procurado por chave, então um equipamento apagado simplesmente deixa de aparecer,
-  em vez de virar uma linha órfã que ninguém entende.
+- **Linha em branco não é gravada.** Esvaziar os campos apaga o registro, porque "sem preço
+  próprio" e "registro vazio" são a mesma coisa — e um registro vazio estragaria a contagem.
+  O `Diâmetro (mm)` conta como conteúdo: uma linha só com a medida sobrevive, porque é dado
+  técnico, não preço.
+- **O painel não é uma lista à parte.** Os diâmetros saem do cadastro de equipamentos
+  (`Distinct()` dos rótulos) e o preço é procurado por chave, então um diâmetro que sai do
+  cadastro simplesmente deixa de aparecer, em vez de virar linha órfã. Cada linha mostra
+  quantos equipamentos usam aquele diâmetro, que é o alcance daquele preço.
 
-O Excel desta tabela é a aba `Preços por equipamento` (Item · Subitem · Série · Ventilador ·
-Cubo · os três preços), com o seu próprio par de botões dentro do painel. Uma exceção por
-linha: o que não estiver lá usa o preço da opção.
+O Excel desta tabela é a aba `Preços por diâmetro` (Item · Subitem · Fan Diameter ·
+[Diâmetro (mm)] · os três preços), com o seu próprio par de botões dentro do painel. O
+download traz **uma linha por diâmetro**, preenchida onde já houver preço — exportar só o
+que existe fazia a planilha sair vazia justamente na primeira vez, quando ela é mais útil.
+Na volta, a família é deduzida de Item + Subitem, então preencher pela lista da descarga
+alimenta a mesma tabela da entrada; diâmetro fora do cadastro e opção sem família são
+recusados com aviso, em vez de criarem linha que ninguém vê.
+
+Um banco anterior, que guardava preço por equipamento montado, é convertido na abertura uma
+vez (`PrecoDiametroRepository.Converter`): cada preço passa a valer para o diâmetro daquele
+modelo e, quando dois modelos do mesmo diâmetro tinham valores diferentes, o primeiro é o
+que fica — não há como adivinhar qual era o certo, e a equipe vê o resultado na tela.
 
 ### Juntar os arquivinhos (compactação)
 
@@ -703,16 +733,13 @@ iguais.
 Três consequências que o código carrega:
 
 - **Mexer no FB/HB ou no estagiamento é trocar de identidade**, não editar um campo. A
-  linha é regravada com a chave nova e a antiga é apagada (`EquipamentoRepository.Regravar`),
-  e os preços por equipamento vão junto (`PrecoEquipamentoRepository.Remapear`). Se a
-  chave nova já existir, a gravação é recusada e a célula volta ao valor gravado — o
+  linha é regravada com a chave nova e a antiga é apagada (`EquipamentoRepository.Regravar`).
+  Se a chave nova já existir, a gravação é recusada e a célula volta ao valor gravado — o
   `@key` dos campos de identidade carrega um contador de recusas, senão o Blazor não
   reescreveria um campo cujo valor renderizado não mudou e a tela mostraria o que foi
   digitado em vez do que está no banco.
 - **Um banco anterior é convertido na abertura**, uma vez e com marca: `PadronizarIds`
-  reescreve os ids de três campos, e `PrecoEquipamentoRepository.Converter` troca as
-  colunas soltas de série/ventilador/cubo pelo id do modelo. Preço que não acha modelo é
-  apagado — seria uma linha invisível contando como exceção na tela.
+  reescreve os ids de três campos.
 - **A planilha casa pelos cinco campos.** Quando o arquivo não traz FB/HB ou estágios, o
   casamento afrouxa para as colunas que vieram (`DadosExcel.Modelo`), para uma exportação
   antiga continuar reimportando sem duplicar.
