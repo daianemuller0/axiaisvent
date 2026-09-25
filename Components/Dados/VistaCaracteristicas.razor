@@ -208,8 +208,9 @@
                         @onclick="() => _paginaEquip++">▶</button>
 
                 <span style="flex:1"></span>
-                <ExcelDaTabela Nome="@($"precos-{opcao.Valor}")"
-                               Exportar="@(() => DadosExcel.ExportarPrecosPorEquipamento(Precos.Todos(), _equipamentos))"
+                <ExcelDaTabela Nome="@($"precos-{opcao.Grupo}-{opcao.Valor}")"
+                               Exportar="@(() => DadosExcel.ExportarPrecosDaOpcao(
+                                   opcao.Grupo, opcao.Valor, EquipamentosFiltrados(), _precos))"
                                Importar="SubirPrecos"
                                Importou="DepoisDeImportar" />
                 <button class="btn-link" @onclick="@(() => _abertoPara = null)">fechar</button>
@@ -217,7 +218,10 @@
 
             <p class="subtitle" style="margin:0 0 10px">
                 Linha em branco usa o preço da própria opção (@(Resumo(opcao))). Preencha só
-                os equipamentos em que o tamanho muda o valor.
+                os equipamentos em que o tamanho muda o valor — aqui na tela ou no Excel:
+                o <strong>⬇</strong> baixa uma linha por equipamento (as que o filtro está
+                mostrando), com os preços que já existem, e o <strong>⬆</strong> devolve
+                tudo preenchido de uma vez.
             </p>
 
             <div class="panel" style="padding:0; overflow-x:auto">

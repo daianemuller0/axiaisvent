@@ -167,8 +167,41 @@ public static class DadosExcel
         Exportar(new(), new(), new(), motores, new(), new(), AbaMotores);
 
     /// <summary>
-    /// Os preços de uma opção que mudam com o equipamento. Uma linha por
-    /// exceção cadastrada — o que não está aqui usa o preço da própria opção.
+    /// A planilha de preço por equipamento de UMA opção: uma linha por modelo,
+    /// com o preço já cadastrado onde houver e em branco onde não houver.
+    ///
+    /// É a linha inteira de propósito. Exportar só as exceções fazia a planilha
+    /// sair vazia justamente quando ela é mais útil — na primeira vez, quando a
+    /// equipe quer preencher os 98 preços no Excel em vez de digitar na tela.
+    /// Linha em branco continua querendo dizer "usa o preço da opção", então
+    /// deixar em branco no Excel também apaga a exceção que existia.
+    /// </summary>
+    public static byte[] ExportarPrecosDaOpcao(string grupo, string valor,
+        List<Equipamento> equipamentos, Dictionary<string, PrecoEquipamento> precos)
+    {
+        using var wb = new XLWorkbook();
+        Montar(wb, AbaPrecosEquipamento, ColunasPrecoEquipamento,
+            equipamentos.Select(e =>
+            {
+                var p = precos.GetValueOrDefault(e.Id);
+                return new object?[]
+                {
+                    grupo, valor, e.Serie, e.Diametro, e.Cubo, e.FbHb, Numero(e.Estagios),
+                    Numero(p?.PrecoUsd ?? ""), Numero(p?.PrecoClp ?? ""), Numero(p?.Preco ?? ""),
+                };
+            }));
+        return Bytes(wb);
+    }
+
+    private static readonly string[] ColunasPrecoEquipamento =
+    {
+        "Item", "Subitem", "Série", "Ventilador", "Cubo", "FB/HB", "Nº de estágios",
+        "Preço USD", "Preço CLP", "Preço R$",
+    };
+
+    /// <summary>
+    /// Todas as exceções cadastradas, de todas as opções — o retrato do que está
+    /// gravado. Para preencher preço, ver <see cref="ExportarPrecosDaOpcao"/>.
     /// </summary>
     public static byte[] ExportarPrecosPorEquipamento(
         List<PrecoEquipamento> precos, List<Equipamento> equipamentos)
@@ -180,12 +213,7 @@ public static class DadosExcel
             .ToDictionary(g => g.Key, g => g.First());
 
         using var wb = new XLWorkbook();
-        Montar(wb, AbaPrecosEquipamento,
-            new[]
-            {
-                "Item", "Subitem", "Série", "Ventilador", "Cubo", "FB/HB", "Nº de estágios",
-                "Preço USD", "Preço CLP", "Preço R$",
-            },
+        Montar(wb, AbaPrecosEquipamento, ColunasPrecoEquipamento,
             precos
                 .Select(p => (Preco: p, Modelo: modelos.GetValueOrDefault(p.Equipamento)))
                 .Where(x => x.Modelo is not null)
@@ -239,6 +267,7 @@ public static class DadosExcel
         var existentes = repo.Todos();
         var naoAchados = new List<string>();
         var gravadas = 0;
+        var apagadas = 0;
 
         foreach (var l in linhas)
         {
@@ -268,14 +297,31 @@ public static class DadosExcel
             var id = PrecoEquipamento.MontarId(grupo, valor, modelo.Id);
             var atual = existentes.FirstOrDefault(p => p.Id == id);
 
-            repo.Salvar(new PrecoEquipamento
+            var linha = new PrecoEquipamento
             {
                 Id = id, Grupo = grupo, Valor = valor, Equipamento = modelo.Id,
                 Preco = iPreco >= 0 ? PrecoNormalizado(T(l, iPreco)) : atual?.Preco ?? "",
                 PrecoUsd = iUsd >= 0 ? PrecoNormalizado(T(l, iUsd)) : atual?.PrecoUsd ?? "",
                 PrecoClp = iClp >= 0 ? PrecoNormalizado(T(l, iClp)) : atual?.PrecoClp ?? "",
-            });
+            };
+
+            // a planilha traz uma linha por modelo, a maioria em branco: em
+            // branco é "usa o preço da opção", e só conta quando havia exceção
+            if (linha.Vazio)
+            {
+                if (atual is null) continue;
+                repo.Apagar(id);
+                apagadas++;
+                continue;
+            }
+
+            repo.Salvar(linha);
             gravadas++;
+        }
+
+        if (apagadas > 0)
+        {
+            avisos.Add($"{apagadas} linha(s) vinham em branco e voltaram a usar o preço da opção.");
         }
 
         if (naoAchados.Count > 0)
