@@ -1,0 +1,607 @@
+@page "/axiais/proposta"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject PropostaRepository Repo
+@inject EquipamentoRepository Equipamentos
+@inject CaracteristicaRepository Caracteristicas
+@inject PrecoReferenciaRepository Precos
+
+<div class="page-head">
+    <div>
+        <h1>Proposta</h1>
+        <p class="subtitle">
+            O cabeçalho do documento, o cliente e o escopo do ventilador. O preço e o código
+            de cada item saem do cadastro da guia <strong>Dados</strong> — a proposta guarda a
+            escolha, e o valor é lido na hora.
+        </p>
+    </div>
+    <div class="page-actions">
+        <button class="btn-ghost" @onclick="Nova">+ Nova</button>
+        <button class="btn-primary" @onclick="Salvar">💾 Salvar</button>
+    </div>
+</div>
+
+@if (_msg is not null)
+{
+    <div class="@(_erro ? "aviso aviso-erro" : "aviso aviso-ok")" style="margin-bottom:14px">@_msg</div>
+}
+
+<!-- ---------- propostas gravadas ---------- -->
+<div class="panel" style="margin-bottom:18px">
+    <div class="toolbar" style="margin-bottom:0; flex-wrap:wrap">
+        <strong>Propostas</strong>
+        <select class="cell" style="min-width:320px" value="@_proposta.Id"
+                @onchange="e => Abrir(e.Value?.ToString() ?? string.Empty)">
+            <option value="">— nova proposta —</option>
+            @foreach (var p in _gravadas)
+            {
+                <option value="@p.Id" selected="@(p.Id == _proposta.Id)">@p.Titulo</option>
+            }
+        </select>
+        <span class="subtitle" style="margin:0">@_gravadas.Count gravada(s)</span>
+
+        @if (_proposta.Id.Length > 0)
+        {
+            @if (_apagando)
+            {
+                <span class="aviso aviso-alerta" style="margin:0; padding:5px 9px">
+                    Apagar a proposta @_proposta.Numero?
+                </span>
+                <button class="btn-link" @onclick="Apagar">Sim, apagar</button>
+                <button class="btn-link" @onclick="@(() => _apagando = false)">Cancelar</button>
+            }
+            else
+            {
+                <button class="btn-link" @onclick="@(() => _apagando = true)">✕ apagar</button>
+            }
+        }
+    </div>
+</div>
+
+<!-- ---------- cliente ---------- -->
+<div class="panel" style="margin-bottom:18px">
+    <h2 style="margin:0 0 14px; font-size:15px">Cliente</h2>
+    <div class="form3">
+        <label>Cliente
+            <input class="cell" placeholder="Empresa cliente" @bind="_proposta.Cliente" /></label>
+        <label>Aos cuidados de
+            <input class="cell" placeholder="Nome do contato" @bind="_proposta.AosCuidados" /></label>
+        <label>País
+            <select class="cell" @bind="_proposta.Pais">
+                @foreach (var x in ListasDaProposta.Paises)
+                {
+                    <option value="@x">@x</option>
+                }
+            </select></label>
+
+        <label>E-mail
+            <input class="cell" placeholder="contato@@empresa.com" @bind="_proposta.Email" /></label>
+        <label>Telefone
+            <input class="cell" placeholder="+55 …" @bind="_proposta.Telefone" /></label>
+        <label>Projeto
+            <input class="cell" @bind="_proposta.Projeto" /></label>
+
+        @* a data é guardada como texto (aaaa-mm-dd), que é o formato do próprio
+           campo — por isso value/onchange em vez de @@bind com DateTime *@
+        <label>Data
+            <input class="cell" type="date" value="@_proposta.Data"
+                   @onchange="e => _proposta.Data = e.Value?.ToString() ?? string.Empty" /></label>
+        <label>Data de fechamento
+            <input class="cell" type="date" value="@_proposta.DataFechamento"
+                   @onchange="e => _proposta.DataFechamento = e.Value?.ToString() ?? string.Empty" /></label>
+        <label>Fase da proposta
+            <select class="cell" @bind="_proposta.Fase">
+                @foreach (var x in ListasDaProposta.Fases)
+                {
+                    <option value="@x">@x</option>
+                }
+            </select></label>
+
+        <label>Preparada por
+            <input class="cell" @bind="_proposta.PreparadaPor" /></label>
+        <label>Estado / Província
+            <input class="cell" @bind="_proposta.Estado" /></label>
+        <label>Validade (dias)
+            <input class="cell num" type="number" min="0" @bind="_proposta.ValidadeDias" /></label>
+
+        <label>Prazo de entrega (dias)
+            <input class="cell num" type="number" min="0" @bind="_proposta.PrazoEntregaDias" /></label>
+    </div>
+</div>
+
+<!-- ---------- cabeçalho ---------- -->
+<div class="panel" style="margin-bottom:18px">
+    <h2 style="margin:0 0 14px; font-size:15px">Cabeçalho</h2>
+    <div class="form3">
+        <label>Ano
+            <input class="cell num" @bind="_proposta.Ano" /></label>
+        <label>Número da proposta
+            <input class="cell" placeholder="@($"Ex.: {Repo.ProximoNumero(_proposta.Ano)} (gera sozinho se vazio)")"
+                   @bind="_proposta.Numero" /></label>
+        <label>Revisão
+            <input class="cell" @bind="_proposta.Revisao" /></label>
+
+        <label>BU (empresa emissora)
+            <select class="cell" @bind="_proposta.Bu">
+                @foreach (var x in ListasDaProposta.Bus)
+                {
+                    <option value="@x">@x</option>
+                }
+            </select></label>
+        <label>Idioma da proposta
+            <select class="cell" @bind="_proposta.Idioma">
+                @foreach (var x in ListasDaProposta.Idiomas)
+                {
+                    <option value="@x">@x</option>
+                }
+            </select></label>
+        <label>Venda para
+            <select class="cell" @bind="_proposta.VendaPara">
+                @foreach (var x in ListasDaProposta.VendaPara)
+                {
+                    <option value="@x">@x</option>
+                }
+            </select></label>
+
+        <label>Destino
+            <select class="cell" @bind="_proposta.Destino">
+                @foreach (var x in ListasDaProposta.Destinos)
+                {
+                    <option value="@x">@x</option>
+                }
+            </select></label>
+        <label>País
+            <select class="cell" @bind="_proposta.PaisDestino">
+                @foreach (var x in ListasDaProposta.Paises)
+                {
+                    <option value="@x">@x</option>
+                }
+            </select></label>
+        <label>Categoria
+            <select class="cell" @bind="_proposta.Categoria">
+                @foreach (var x in ListasDaProposta.Categorias)
+                {
+                    <option value="@x">@x</option>
+                }
+            </select></label>
+
+        <label>Product
+            <select class="cell" @bind="_proposta.Produto">
+                @foreach (var x in ListasDaProposta.Produtos)
+                {
+                    <option value="@x">@x</option>
+                }
+            </select></label>
+        <label>Market Segments
+            <select class="cell" @bind="_proposta.MarketSegment">
+                @foreach (var x in ListasDaProposta.Segmentos)
+                {
+                    <option value="@x">@x</option>
+                }
+            </select></label>
+        <label>Portal
+            <select class="cell" @bind="_proposta.Portal">
+                @foreach (var x in ListasDaProposta.Portais)
+                {
+                    <option value="@x">@x</option>
+                }
+            </select></label>
+    </div>
+</div>
+
+<!-- ---------- contato no documento ---------- -->
+<div class="panel" style="margin-bottom:18px">
+    <h2 style="margin:0 0 14px; font-size:15px">Contato (no documento)</h2>
+
+    <div class="toolbar" style="margin-bottom:14px">
+        <label style="display:flex; flex-direction:column; gap:5px; font-size:12.5px; color:var(--muted)">
+            Selecionar contato
+            <select class="cell" style="min-width:300px" value="@_proposta.ContatoNome"
+                    @onchange="e => EscolherContato(e.Value?.ToString() ?? string.Empty)">
+                <option value="">— escolher —</option>
+                @foreach (var c in ListasDaProposta.Contatos)
+                {
+                    <option value="@c.Nome" selected="@(c.Nome == _proposta.ContatoNome)">
+                        @c.Nome — @c.Cargo
+                    </option>
+                }
+            </select>
+        </label>
+    </div>
+
+    <div class="form3">
+        <label>Nome<input class="cell" @bind="_proposta.ContatoNome" /></label>
+        <label>Cargo<input class="cell" @bind="_proposta.ContatoCargo" /></label>
+        <label>E-mail<input class="cell" @bind="_proposta.ContatoEmail" /></label>
+        <label>Telefones<input class="cell" @bind="_proposta.ContatoTelefones" /></label>
+    </div>
+</div>
+
+<!-- ---------- escopo do ventilador ---------- -->
+<div class="panel" style="margin-bottom:18px">
+    <h2 style="margin:0 0 14px; font-size:15px">Escopo do ventilador</h2>
+
+    <div class="toolbar" style="flex-wrap:wrap">
+        <strong>Moeda</strong>
+        @foreach (var m in Moedas.Todas)
+        {
+            var moeda = m;
+            <button class="@(_proposta.Moeda == moeda ? "btn-primary" : "btn-ghost")"
+                    @onclick="() => TrocarMoeda(moeda)">@moeda.Rotulo()</button>
+        }
+        <span class="subtitle" style="margin:0">
+            manda em todos os preços daqui para baixo
+        </span>
+    </div>
+
+    <div class="toolbar" style="flex-wrap:wrap">
+        <strong>Modelo</strong>
+        <select class="cell" style="min-width:420px" value="@_proposta.EquipamentoId"
+                @onchange="e => TrocarModelo(e.Value?.ToString() ?? string.Empty)">
+            <option value="">— escolher o equipamento —</option>
+            @foreach (var serie in _equipamentos.GroupBy(x => x.Serie))
+            {
+                <optgroup label="@serie.Key">
+                    @foreach (var eq in serie)
+                    {
+                        <option value="@eq.Id" selected="@(eq.Id == _proposta.EquipamentoId)">@eq.Rotulo</option>
+                    }
+                </optgroup>
+            }
+        </select>
+
+        <strong style="margin-left:16px">Arranjo / Instalação</strong>
+        @foreach (var a in ListasDaProposta.Arranjos)
+        {
+            var arranjo = a;
+            <button class="@(_proposta.Arranjo == arranjo ? "btn-primary" : "btn-ghost")"
+                    @onclick="() => _proposta.Arranjo = arranjo">@arranjo</button>
+        }
+    </div>
+
+    @if (Modelo is { } modelo)
+    {
+        <div class="panel" style="padding:0; overflow-x:auto; margin-bottom:14px">
+            <table class="grid">
+                <thead>
+                    <tr>
+                        <th class="nowrap">Série</th>
+                        <th class="nowrap">Fan Diameter</th>
+                        <th class="nowrap">Fan Hub Diameter</th>
+                        <th class="nowrap">FB/HB</th>
+                        <th class="nowrap">Nº de estágios</th>
+                        <th class="nowrap">Código</th>
+                        <th class="nowrap right">Preço @_proposta.Moeda.Rotulo()</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="nowrap"><span class="val-count">@modelo.Serie</span></td>
+                        <td class="nowrap"><strong>@modelo.Diametro</strong></td>
+                        <td class="nowrap"><strong>@modelo.Cubo</strong></td>
+                        <td class="nowrap">@(modelo.FbHb.Length > 0 ? modelo.FbHb : "—")</td>
+                        <td class="nowrap">@(modelo.Estagios.Length > 0 ? modelo.Estagios : "—")</td>
+                        <td class="nowrap">@(modelo.Codigo.Length > 0 ? modelo.Codigo : "—")</td>
+                        <td class="nowrap right">@Dinheiro(PrecoDoModelo)</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    }
+    else
+    {
+        <div class="panel empty" style="padding:16px; margin-bottom:14px">
+            Escolha o modelo: é ele que diz o Fan Diameter, e é pelo Fan Diameter que os
+            preços de base, cone, silenciador, difusor, conexão a manga e damper são puxados.
+        </div>
+    }
+
+    <!-- as listas de característica, em flags -->
+    @foreach (var lista in _listas)
+    {
+        var grupo = lista;
+        var opcoes = _porGrupo.GetValueOrDefault(grupo, new());
+        if (opcoes.Count == 0) { continue; }
+
+        var comOpcoes = opcoes.Where(o => !FamiliaDePreco.EhAusencia(o.Valor)).ToList();
+        var escolhida = _escolhas.GetValueOrDefault(grupo, "");
+        var temItem = escolhida.Length > 0 && !FamiliaDePreco.EhAusencia(escolhida);
+
+        <div class="toolbar" style="flex-wrap:wrap; border-top:1px solid var(--border); padding-top:12px">
+            <strong style="min-width:210px">@grupo</strong>
+
+            <button class="@(escolhida.Length > 0 && !temItem ? "btn-primary" : "btn-ghost")"
+                    @onclick="() => MarcarSem(grupo)">Sem</button>
+            <button class="@(temItem ? "btn-primary" : "btn-ghost")"
+                    @onclick="() => MarcarCom(grupo)">Com</button>
+
+            @if (temItem && comOpcoes.Count > 1)
+            {
+                <select class="cell" style="min-width:250px" value="@escolhida"
+                        @onchange="e => Escolher(grupo, e.Value?.ToString() ?? string.Empty)">
+                    @foreach (var o in comOpcoes)
+                    {
+                        <option value="@o.Valor" selected="@(o.Valor == escolhida)">@o.Valor</option>
+                    }
+                </select>
+            }
+            else if (temItem)
+            {
+                <span class="val-count">@escolhida</span>
+            }
+
+            @if (escolhida.Length > 0)
+            {
+                var item = Resolver(grupo, escolhida);
+                <span style="flex:1"></span>
+                <span class="subtitle" style="margin:0">
+                    @(item.Codigo.Length > 0 ? $"código {item.Codigo}" : "sem código")
+                    ·
+                    @(item.Valor is null ? item.Origem : $"{Dinheiro(item.Valor)} — {item.Origem}")
+                </span>
+            }
+        </div>
+    }
+</div>
+
+<!-- ---------- resumo ---------- -->
+<div class="panel" style="margin-bottom:18px">
+    <div class="toolbar" style="flex-wrap:wrap">
+        <h2 style="margin:0; font-size:15px">Resumo do escopo</h2>
+        <span style="flex:1"></span>
+        <strong>Código do equipamento:</strong>
+        <span class="val-count">@(CodigoMontado.Length > 0 ? CodigoMontado : "—")</span>
+    </div>
+
+    <div class="panel" style="padding:0; overflow-x:auto">
+        <table class="grid">
+            <thead>
+                <tr>
+                    <th class="nowrap">Item</th>
+                    <th class="nowrap">Escolha</th>
+                    <th class="nowrap">Código</th>
+                    <th class="nowrap">De onde vem o preço</th>
+                    <th class="nowrap right">Preço @_proposta.Moeda.Rotulo()</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (Modelo is { } doResumo)
+                {
+                    <tr>
+                        <td class="nowrap"><strong>Equipamento</strong></td>
+                        <td class="nowrap">@doResumo.Rotulo</td>
+                        <td class="nowrap">@(doResumo.Codigo.Length > 0 ? doResumo.Codigo : "—")</td>
+                        <td class="nowrap"><span class="subtitle">lista cruzada de equipamentos</span></td>
+                        <td class="nowrap right">@Dinheiro(PrecoDoModelo)</td>
+                    </tr>
+                }
+                @foreach (var item in Itens())
+                {
+                    <tr>
+                        <td class="nowrap">@item.Lista</td>
+                        <td class="nowrap">@item.Opcao</td>
+                        <td class="nowrap">@(item.Codigo.Length > 0 ? item.Codigo : "—")</td>
+                        <td class="nowrap"><span class="subtitle">@item.Origem</span></td>
+                        <td class="nowrap right">@Dinheiro(item.Valor)</td>
+                    </tr>
+                }
+                <tr>
+                    <td colspan="4" class="right"><strong>Total</strong></td>
+                    <td class="nowrap right"><strong>@Dinheiro(Total)</strong></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    @if (FaltaPreco > 0)
+    {
+        <p class="subtitle" style="margin:10px 0 0">
+            @FaltaPreco item(ns) escolhido(s) ainda sem preço cadastrado — o total conta só o
+            que já tem valor.
+        </p>
+    }
+</div>
+
+@code {
+    private Proposta _proposta = Nascer();
+    private List<Proposta> _gravadas = new();
+
+    private List<Equipamento> _equipamentos = new();
+    private List<string> _listas = new();
+    private Dictionary<string, List<Caracteristica>> _porGrupo = new();
+    private List<PrecoReferencia> _precos = new();
+
+    /// <summary>As escolhas da proposta aberta, lista → opção.</summary>
+    private Dictionary<string, string> _escolhas = new();
+
+    private string? _msg;
+    private bool _erro;
+    private bool _apagando;
+
+    protected override void OnInitialized()
+    {
+        Recarregar();
+        _escolhas = _proposta.EscolhasLidas();
+    }
+
+    /// <summary>
+    /// Uma proposta em branco, já com o que dá para adivinhar: hoje, o ano
+    /// corrente e a primeira opção de cada lista de cabeçalho.
+    /// </summary>
+    private static Proposta Nascer() => new()
+    {
+        Data = DateTime.Now.ToString("yyyy-MM-dd"),
+        Ano = DateTime.Now.Year.ToString(),
+        Fase = ListasDaProposta.Fases[0],
+        Bu = ListasDaProposta.Bus[0],
+        Produto = ListasDaProposta.Produtos[0],
+        MarketSegment = ListasDaProposta.Segmentos[0],
+    };
+
+    private void Recarregar()
+    {
+        _gravadas = Repo.Todas();
+        _equipamentos = Equipamentos.Todos();
+        _precos = Precos.Todos();
+
+        var todas = Caracteristicas.Todas();
+        _porGrupo = todas.GroupBy(c => c.Grupo).ToDictionary(g => g.Key, g => g.ToList());
+
+        // o escopo do ventilador mostra as listas na ordem do cadastro, menos as
+        // que se precificam pelo motor — o partidor entra quando a proposta
+        // escolher o motor, e não o ventilador
+        _listas = Caracteristicas.Grupos()
+            .OrderBy(g => g.Ordem)
+            .Select(g => g.Nome)
+            .Where(nome => _porGrupo.GetValueOrDefault(nome, new())
+                .All(o => FamiliaDePreco.De(o.Grupo, o.Valor)?.Eixo != EixoDePreco.PotenciaMotor))
+            .ToList();
+    }
+
+    private Equipamento? Modelo =>
+        _equipamentos.FirstOrDefault(e => e.Id == _proposta.EquipamentoId);
+
+    private decimal? PrecoDoModelo => Modelo is null
+        ? null
+        : DadosExcel.Numero(EscopoProposta.PrecoDoEquipamento(Modelo, _proposta.Moeda));
+
+    private ItemDoEscopo Resolver(string grupo, string valor)
+    {
+        var opcao = _porGrupo.GetValueOrDefault(grupo, new())
+            .FirstOrDefault(o => o.Valor == valor)
+            ?? new Caracteristica { Grupo = grupo, Valor = valor };
+
+        return EscopoProposta.Resolver(opcao, Modelo, _proposta.Moeda, _precos);
+    }
+
+    /// <summary>As linhas do escopo, na ordem das listas.</summary>
+    private List<ItemDoEscopo> Itens() => _listas
+        .Where(l => _escolhas.ContainsKey(l) && _escolhas[l].Length > 0)
+        .Select(l => Resolver(l, _escolhas[l]))
+        .ToList();
+
+    private decimal Total =>
+        (PrecoDoModelo ?? 0) + Itens().Sum(i => i.Valor ?? 0);
+
+    /// <summary>Escolhas que deveriam ter preço e não têm — para avisar sem travar.</summary>
+    private int FaltaPreco => Itens().Count(i => !i.Ausencia && i.Valor is null);
+
+    private string CodigoMontado => EscopoProposta.Codigo(Modelo, Itens());
+
+    private string Dinheiro(decimal? valor) => valor is null
+        ? "—"
+        : $"{_proposta.Moeda.Rotulo()} {valor.Value.ToString("N2", new System.Globalization.CultureInfo("pt-BR"))}";
+
+    // ---------- escolhas ----------
+
+    private void MarcarSem(string grupo)
+    {
+        var ausencia = _porGrupo.GetValueOrDefault(grupo, new())
+            .FirstOrDefault(o => FamiliaDePreco.EhAusencia(o.Valor));
+
+        if (ausencia is null)
+        {
+            Aviso($"A lista \"{grupo}\" não tem uma opção de \"sem\" cadastrada.", erro: true);
+            return;
+        }
+
+        _escolhas[grupo] = ausencia.Valor;
+    }
+
+    private void MarcarCom(string grupo)
+    {
+        var primeira = _porGrupo.GetValueOrDefault(grupo, new())
+            .FirstOrDefault(o => !FamiliaDePreco.EhAusencia(o.Valor));
+
+        if (primeira is null)
+        {
+            Aviso($"A lista \"{grupo}\" só tem a opção de \"sem\".", erro: true);
+            return;
+        }
+
+        // já marcado "com": mantém a sub-opção escolhida
+        var atual = _escolhas.GetValueOrDefault(grupo, "");
+        if (atual.Length > 0 && !FamiliaDePreco.EhAusencia(atual)) return;
+
+        _escolhas[grupo] = primeira.Valor;
+    }
+
+    private void Escolher(string grupo, string valor) => _escolhas[grupo] = valor;
+
+    private void TrocarMoeda(Moeda moeda) => _proposta.MoedaCodigo = moeda.Codigo();
+
+    private void TrocarModelo(string id)
+    {
+        _proposta.EquipamentoId = id;
+        _apagando = false;
+    }
+
+    private void EscolherContato(string nome)
+    {
+        var c = ListasDaProposta.Contatos.FirstOrDefault(x => x.Nome == nome);
+        if (c.Nome is null) return;
+
+        _proposta.ContatoNome = c.Nome;
+        _proposta.ContatoCargo = c.Cargo;
+        _proposta.ContatoEmail = c.Email;
+        _proposta.ContatoTelefones = c.Telefones;
+    }
+
+    // ---------- gravar / abrir ----------
+
+    private void Salvar()
+    {
+        _proposta.GravarEscolhas(_escolhas);
+        Repo.Salvar(_proposta);
+
+        Recarregar();
+        Aviso($"Proposta {_proposta.Numero} gravada.");
+    }
+
+    private void Nova()
+    {
+        _proposta = Nascer();
+        _escolhas = new();
+        _apagando = false;
+        Aviso("Proposta nova — o número é gerado ao gravar.");
+    }
+
+    private void Abrir(string id)
+    {
+        _apagando = false;
+
+        if (id.Length == 0)
+        {
+            Nova();
+            return;
+        }
+
+        var achada = Repo.Achar(id);
+        if (achada is null)
+        {
+            Aviso("Essa proposta não está mais no banco.", erro: true);
+            return;
+        }
+
+        _proposta = achada;
+        _escolhas = achada.EscolhasLidas();
+        Aviso($"Proposta {achada.Numero} aberta.");
+    }
+
+    private void Apagar()
+    {
+        var numero = _proposta.Numero;
+        Repo.Apagar(_proposta.Id);
+        _apagando = false;
+
+        Nova();
+        Recarregar();
+        Aviso($"Proposta {numero} apagada.");
+    }
+
+    private void Aviso(string texto, bool erro = false)
+    {
+        _msg = texto;
+        _erro = erro;
+    }
+}

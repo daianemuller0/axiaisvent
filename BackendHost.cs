@@ -85,6 +85,7 @@ public static class BackendHost
         builder.Services.AddScoped<LimiteMotorRepository>();
         builder.Services.AddScoped<CaracteristicaRepository>();
         builder.Services.AddScoped<PrecoReferenciaRepository>();
+        builder.Services.AddScoped<PropostaRepository>();
 
         var app = builder.Build();
 

@@ -172,6 +172,7 @@ A pasta vem de `Data:Folder` no `appsettings.json`
 | `/axiais/dados` | Dados | Três vistas na mesma aba: Modelos, Motores e Características |
 | `/axiais/motores` | Dados › Motores | Abre a aba Dados já na vista dos motores (rota antiga, mantida) |
 | `/axiais/caracteristicas` | Dados › Características | Abre a aba Dados já na vista das listas de características |
+| `/axiais/proposta` | Proposta | O documento comercial: cabeçalho, cliente e escopo do ventilador |
 
 ---
 
@@ -916,3 +917,61 @@ Preço sai como **número** quando dá para converter, então o Excel soma e fil
 > **Falta ainda** montar o **código do equipamento** juntando os códigos individuais — a
 > equipe vai subir os códigos primeiro. A estrutura já está pronta para isso: cada item
 > tem `codigo`, cada frame tem `codigo`, e a ordem dos grupos define a montagem.
+
+
+---
+
+## 13. A aba Proposta
+
+A primeira aba que **consome** o cadastro em vez de mantê-lo. Ela tem quatro blocos, na
+ordem do documento da equipe: **Cliente**, **Cabeçalho**, **Contato (no documento)** e
+**Escopo do ventilador**, mais um **Resumo** que soma.
+
+### A proposta guarda a escolha, nunca o preço
+
+`Proposta` (entidade `propostas`) guarda a moeda, o id do modelo, o arranjo e **a opção
+marcada em cada lista** — e nenhum valor. O preço é resolvido na hora de desenhar a tela,
+pelo cadastro. É de propósito: corrigir uma tabela de preço passa a valer para as propostas
+abertas, em vez de deixar cada uma com uma cópia velha de um preço errado.
+
+As escolhas são um texto `lista\tvalor` por linha, e não uma tabela à parte, porque o que a
+proposta guarda é uma **foto**: se alguém renomear uma lista depois, a proposta antiga não
+é reescrita em silêncio — a escolha órfã some à vista, na tela.
+
+### Como o preço de cada linha é decidido
+
+`EscopoProposta.Resolver` é a única regra, e ela repete a da guia Dados:
+
+1. a opção tem família? A tabela por referência manda — **Fan Diameter do modelo escolhido**;
+2. não tem linha, ou a linha está sem valor naquela moeda? Vale o **preço solto da opção**;
+3. é uma opção de ausência ("Sem", "NENHUM", "Não")? Custa nada, e a tela diz *sem custo*.
+
+Cada linha do resumo mostra **de onde o preço veio** — "tabela de Silenciador · L = 1,5D ·
+Fan Diameter 18 1/4", "preço único da opção", "a tabela ainda não tem preço para este Fan
+Diameter". Quem monta a proposta não precisa adivinhar por que um número é aquele, e o que
+falta cadastrar aparece sem travar o trabalho: o total soma o que tem preço e o rodapé diz
+quantos itens ainda estão sem.
+
+### Os flags
+
+Cada lista vira dois botões, **Sem** e **Com**, como a equipe descreveu:
+
+- **Sem** marca a opção de ausência da lista (é ela que empresta o código "sem" ao
+  equipamento);
+- **Com** marca a primeira opção real e, quando a lista tem mais de uma, abre o seletor das
+  sub-opções — Base ou Trenó, Com Cone ou Com Conexão para Manga, os seis comprimentos do
+  silenciador.
+
+O escopo mostra as listas **na ordem do cadastro**, menos as que se precificam pela potência
+do motor: o partidor entra quando a proposta escolher o motor, e não o ventilador.
+
+### Numeração
+
+`PRP-{ano}-{sequencial}`, gerado na gravação quando o campo está vazio, olhando o maior
+número já gravado naquele ano. Dois usuários gravando no mesmo segundo podem pedir o mesmo
+número — a equipe corrige à mão, e isso é melhor do que travar a gravação numa pasta de rede
+compartilhada.
+
+> **Falta ainda**: gerar o documento (PDF/Word) a partir da proposta, o partidor pela
+> potência do motor dentro do escopo e as listas de cabeçalho completas — as de hoje são as
+> que apareceram no documento da equipe.
