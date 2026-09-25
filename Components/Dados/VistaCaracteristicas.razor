@@ -111,6 +111,8 @@
         <span class="val-count">@total subitem(ns)</span>
         <button class="btn-link" title="Subir o item" @onclick="() => MoverItem(grupo, -1)">↑</button>
         <button class="btn-link" title="Descer o item" @onclick="() => MoverItem(grupo, 1)">↓</button>
+        <button class="btn-primary" title="Acrescentar um subitem no fim desta lista"
+                @onclick="() => IncluirLinha(grupo)">+ linha</button>
 
         @if (_limparItem == grupo)
         {
@@ -508,6 +510,36 @@
     }
 
     /// <summary>O valor faz parte do id, então renomear é apagar e regravar.</summary>
+    /// <summary>
+    /// Acrescenta uma linha no fim da lista, para preencher ali mesmo — sem
+    /// subir até o painel "Novo subitem".
+    ///
+    /// O valor é a identidade do subitem, então a linha não pode nascer vazia:
+    /// nasce com um nome provisório, que é a primeira coisa a trocar. Se houver
+    /// busca ativa, ela sai — senão a linha nova nasceria escondida.
+    /// </summary>
+    private void IncluirLinha(string grupo)
+    {
+        var nome = "Novo subitem";
+        for (var n = 2; _todas.Any(c => c.Grupo == grupo &&
+                 c.Valor.Equals(nome, StringComparison.OrdinalIgnoreCase)); n++)
+        {
+            nome = $"Novo subitem {n}";
+        }
+
+        var doGrupo = DoGrupo(grupo);
+        Repo.Salvar(new Caracteristica
+        {
+            Grupo = grupo,
+            Valor = nome,
+            Ordem = doGrupo.Count == 0 ? 1 : doGrupo[^1].Ordem + 1,
+        });
+
+        _busca = "";
+        Recarregar();
+        Aviso($"Linha nova no fim de \"{grupo}\": troque o nome \"{nome}\" e preencha o código.");
+    }
+
     private void Renomear(Caracteristica item, string texto)
     {
         var valor = texto.Trim();
@@ -526,8 +558,15 @@
         Repo.Salvar(new Caracteristica
         {
             Grupo = item.Grupo, Valor = valor, Codigo = item.Codigo,
-            Preco = item.Preco, Ordem = item.Ordem,
+            Preco = item.Preco, PrecoUsd = item.PrecoUsd, PrecoClp = item.PrecoClp,
+            Ordem = item.Ordem,
         });
+
+        // o nome da opção entra na família, então renomear move a tabela de
+        // preço junto — senão ela ficaria presa a uma família que ninguém abre
+        var de = FamiliaDePreco.De(item.Grupo, antigo);
+        var para = FamiliaDePreco.De(item.Grupo, valor);
+        if (de is not null && para is not null) Precos.RenomearFamilia(de.Chave, para.Chave);
 
         Recarregar();
         Aviso($"\"{antigo}\" passou a se chamar \"{valor}\".");
@@ -593,6 +632,18 @@
     private void Apagar(Caracteristica item)
     {
         Repo.Apagar(item.Id);
+
+        // sem a opção, a tabela de preço dela não tem mais onde ser aberta.
+        // Só some se mais ninguém dividir a família (silenciador, manga, base).
+        if (FamiliaDePreco.De(item.Grupo, item.Valor) is { } familia &&
+            !_todas.Any(c => c.Id != item.Id &&
+                             FamiliaDePreco.De(c.Grupo, c.Valor)?.Chave == familia.Chave))
+        {
+            Precos.LimparFamilia(familia.Chave);
+        }
+
+        if (_abertoPara == item.Id) _abertoPara = null;
+
         Recarregar();
         Aviso($"\"{item.Valor}\" apagado da lista {item.Grupo}.");
     }

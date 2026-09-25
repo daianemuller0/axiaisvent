@@ -215,6 +215,33 @@ public sealed class PrecoReferenciaRepository
         foreach (var p in Todos().Where(p => p.Familia == familia)) Apagar(p.Id);
     }
 
+    /// <summary>
+    /// A opção mudou de nome e, com ela, a família — leva os preços junto, senão
+    /// eles ficariam presos a uma família que ninguém mais abre.
+    /// </summary>
+    public void RenomearFamilia(string de, string para)
+    {
+        if (de.Length == 0 || para.Length == 0 || de == para) return;
+
+        var destino = Da(para);
+
+        foreach (var p in Todos().Where(p => p.Familia == de))
+        {
+            Apagar(p.Id);
+
+            // a família de destino já pode ter preço (renomear para um nome que
+            // divide tabela com outra opção): o que já está lá manda
+            if (destino.ContainsKey(p.Referencia)) continue;
+
+            Salvar(new PrecoReferencia
+            {
+                Familia = para, Referencia = p.Referencia,
+                Preco = p.Preco, PrecoUsd = p.PrecoUsd, PrecoClp = p.PrecoClp,
+                Medida = p.Medida,
+            });
+        }
+    }
+
     public void Limpar()
     {
         foreach (var p in Todos()) Apagar(p.Id);
