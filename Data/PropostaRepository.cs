@@ -90,6 +90,20 @@ public sealed class Proposta
     public string Pais { get; set; } = "Brasil";
     public string Email { get; set; } = "";
     public string Telefone { get; set; } = "";
+
+    /// <summary>
+    /// A cidade do cliente. Sai como "Ciudad:" no cabeçalho de todas as
+    /// páginas da proposta comercial.
+    /// </summary>
+    public string Cidade { get; set; } = "";
+
+    /// <summary>
+    /// A referência do CLIENTE — o número que ele deu ao pedido dele. Sai como
+    /// "Su referencia:" na proposta, ao lado da nossa ("Nuestra referencia",
+    /// que é o número daqui).
+    /// </summary>
+    public string ReferenciaCliente { get; set; } = "";
+
     public string Projeto { get; set; } = "";
     public string Data { get; set; } = "";
     public string DataFechamento { get; set; } = "";
@@ -98,6 +112,33 @@ public sealed class Proposta
     public string Estado { get; set; } = "";
     public string ValidadeDias { get; set; } = "30";
     public string PrazoEntregaDias { get; set; } = "12";
+
+    // ---------- como se vende ----------
+
+    /// <summary>
+    /// A condição de pagamento, escrita como sai na proposta. Vem do cadastro
+    /// (<see cref="CondicaoPagamento"/>) ou é digitada na hora.
+    /// </summary>
+    public string CondicaoPagamento { get; set; } = "";
+
+    /// <summary>
+    /// O incoterm da entrega (EXW, FCA, FOB, CIF, DAP, DDP). A proposta
+    /// imprime só a linha escolhida, e não a tabela inteira.
+    ///
+    /// Guarda o CÓDIGO quando é um dos da lista, e o texto inteiro quando a
+    /// equipe digitou outro — a proposta precisa sair com o que foi escolhido,
+    /// mesmo que não esteja na lista.
+    /// </summary>
+    public string Incoterm { get; set; } = "";
+
+    /// <summary>
+    /// Destino do incoterm, quando ele pede um ("Puerto de …", "UBICACIÓN de …").
+    /// Vazio em EXW, FCA e FOB, que já nascem com o lugar de saída.
+    /// </summary>
+    public string IncotermDestino { get; set; } = "";
+
+    /// <summary>Como o equipamento é entregue: "Armado" ou "Desarmado".</summary>
+    public string Armado { get; set; } = "";
 
     // ---------- cabeçalho ----------
     public string Ano { get; set; } = "";
@@ -203,8 +244,18 @@ public sealed class Proposta
     // ---------- contato que sai no documento ----------
     public string ContatoNome { get; set; } = "";
     public string ContatoCargo { get; set; } = "";
+    /// <summary>A área dele ("Pulp &amp; Paper / Steel", "UG Mining"…), quando tem.</summary>
+    public string ContatoArea { get; set; } = "";
     public string ContatoEmail { get; set; } = "";
     public string ContatoTelefones { get; set; } = "";
+
+    // O segundo contato do quadro da proposta. São dois no máximo, e o
+    // segundo pode ficar vazio.
+    public string Contato2Nome { get; set; } = "";
+    public string Contato2Cargo { get; set; } = "";
+    public string Contato2Area { get; set; } = "";
+    public string Contato2Email { get; set; } = "";
+    public string Contato2Telefones { get; set; } = "";
 
     // ---------- escopo do ventilador ----------
     /// <summary>"USD", "CLP" ou "BRL" — manda em todos os preços da proposta.</summary>
@@ -476,12 +527,164 @@ public static class ListasDaProposta
     public static decimal ComissaoDoRepresentante(string nome) => Representantes
         .FirstOrDefault(r => r.Nome == nome)?.Comissao ?? 0m;
 
-    /// <summary>Os contatos que assinam a proposta.</summary>
-    public static readonly (string Nome, string Cargo, string Email, string Telefones)[] Contatos =
+    /// <param name="Area">A área dele. Vazia nos que atendem qualquer uma.</param>
+    public sealed record ContatoHowden(string Nome, string Cargo, string Area, string Telefones, string Email);
+
+    /// <summary>
+    /// Os vendedores que podem assinar a proposta — a lista do quadro
+    /// "Contactos Howden" do modelo. A proposta leva <b>até dois</b>.
+    ///
+    /// O diretor de vendas (<see cref="DiretorDeVendas"/>) não está aqui: ele
+    /// sai sempre, ao lado dos escolhidos.
+    /// </summary>
+    public static readonly ContatoHowden[] Contatos =
     {
-        ("Rodrigo Ugas", "Key Account Manager", "Rodrigo.Ugas@chartindustries.com",
-         "+56 9 3947 3380 / +56 2 3275 3400"),
+        new("André Carvalho", "Key Account", "Pulp & Paper / Steel",
+            "+55 11 4487-6279 / +55 11 99452 5152", "andre.carvalho@chartindustries.com"),
+        new("Bruno Patricio de Castro", "Key Account Sales", "CCUS & Hydrogen",
+            "+55 11 4487-6250 / +55 11 9 8787 1188", "bruno.castro@chartindustries.com"),
+        new("Douglas M. Matavelli", "Key Account Manager", "Water",
+            "+55 11 97144 3085", "douglas.matavelli@chartindustries.com"),
+        new("Emerson Barbosa", "Key Account Manager", "Oil & Gas",
+            "+55 11 99959 7724", "emerson.barbosa@chartindustries.com"),
+        new("José Ovídio Moura", "Key Account", "Cement",
+            "+55 11 9 6858 2183", "jose.moura@chartindustries.com"),
+        new("José Carlos L. Pereira", "Key Account", "Tunnel / Metro",
+            "+55 11 99443 0060", "Jose.pereira@chartindustries.com"),
+        new("Paulo Agostinho", "Key Account", "Fertilizer / Ethanol / Aluminum / Refrigeration",
+            "+55 11 98145 1988", "paulo.agostinho@chartindustries.com"),
+        new("Rafael Ribeiro de Toledo", "Key Account Manager", "Metal Processing & Power Plants",
+            "+56 9 8285 9721 (Chile) / +55 11 9 7183 3687 (Brazil)", "rafael.toledo@chartindustries.com"),
+        new("Thiago César Veiga", "Key Account Manager", "UG Mining",
+            "+55 11 4487 6250 / +55 11 97144 3083", "thiago.veiga@chartindustries.com"),
+        new("Elmer Calle Chumacero", "Sales Engineer", "",
+            "+51 989012650", "elmer.calle@chartindustries.com"),
+        new("Manuel Gutierrez", "Sales Engineer", "",
+            "+51 951175126", "manuel.gutierrez@chartindustries.com"),
+        new("Daniel Nuñez", "Sales Engineer", "",
+            "+51 953887645", "daniel.nunez@chartindustries.com"),
+        new("Rodrigo Ugas", "Sales Engineer", "",
+            "+56 2 3275 3400 / +56 9 3388 5096", "rodrigo.ugas@chartindustries.com"),
+        new("Manuel Gajardo", "Sales Engineer", "",
+            "+56 9 2644 2972", "manuel.gajardo@chartindustries.com"),
+        new("Wagner Ortíz", "Sales Engineer", "",
+            "+51 972 459 337", "wagner.ortiz@chartindustries.com"),
     };
+
+    /// <summary>Acha um contato pelo nome. Nulo se ele não está mais na lista.</summary>
+    public static ContatoHowden? Contato(string nome) =>
+        Contatos.FirstOrDefault(c => Textos.Igual(c.Nome, nome));
+
+    /// <summary>
+    /// O diretor de vendas, que sai em toda proposta — está fixo no quadro de
+    /// contatos do modelo, ao lado dos dois escolhidos.
+    /// </summary>
+    public static readonly ContatoHowden DiretorDeVendas = new(
+        "Edson Luis Geraldini", "Director de Ventas", "",
+        "+55 11 4487 6252 / +55 11 98193-6392", "edson.geraldini@chartindustries.com");
+
+    /// <summary>
+    /// O endereço de cada BU, como sai na proposta. A proposta imprime só o da
+    /// BU escolhida — no modelo em branco os quatro aparecem grifados, e a
+    /// escolha apaga os outros três.
+    /// </summary>
+    public static readonly Dictionary<string, string> EnderecosDasBus = new()
+    {
+        ["HSA-SP"] =
+            "Howden South America Ventiladores e Compressores Indústria e Comércio Ltda,\n" +
+            "Av. Osvaldo Berto, 475, Distrito Industrial Alfredo Rela, 13255-405 – Itatiba - SP,\n" +
+            "Brasil.",
+        ["HSA-ES"] =
+            "Howden South America Ventiladores e Compressores Indústria e Comércio Ltda.\n" +
+            "Rua 4E, 135 - Bairro Civit II – Distrito de Carapina, 29168-082 – Município de Serra –\n" +
+            "ES, Brasil.",
+        ["HCHL"] =
+            "Howden Chile SpA,\n" +
+            "Calle Cordillera 575 Pudahuel, Código Postal:903 1167, Santiago, Chile",
+        ["HPU"] =
+            "Howden Perú SRL\n" +
+            "Calle Guillermo Marconi, 368 Oficina 301 – San Isidro –CP 150131\n" +
+            "Lima- Peru.",
+    };
+
+    /// <summary>O endereço da BU escolhida; o de Itatiba quando a BU não é conhecida.</summary>
+    public static string EnderecoDaBu(string bu) =>
+        EnderecosDasBus.TryGetValue(CodigoDaBu(bu), out var e) ? e : EnderecosDasBus["HSA-SP"];
+
+    // ---------------- entrega ----------------
+
+    /// <param name="Destino">
+    /// true quando o incoterm precisa que alguém diga o lugar — a proposta
+    /// escreve "Puerto de DESTINO (PAÍS DE DESTINO)" e esse pedaço é nosso.
+    /// </param>
+    public sealed record IncotermDaProposta(string Codigo, string Texto, bool Destino);
+
+    /// <summary>
+    /// Os incoterms do modelo (INCOTERMS 2020). A proposta imprime a linha do
+    /// escolhido e apaga as outras cinco; quem precisar de outro digita.
+    /// </summary>
+    public static readonly IncotermDaProposta[] Incoterms =
+    {
+        new("EXW", "Fábrica Howden en Itatiba (SP, Brasil) o sub-proveedor en la región de São Paulo (SP, Brasil).", false),
+        new("FCA", "Fábrica Howden en Itatiba (SP, Brasil) o sub-proveedor en la región de São Paulo (SP, Brasil).", false),
+        new("FOB", "Puerto de Santos (SP, Brasil).", false),
+        new("CIF", "Puerto de {0}.", true),
+        new("DAP", "UBICACIÓN de {0}.", true),
+        new("DDP", "UBICACIÓN de {0}.", true),
+    };
+
+    /// <summary>
+    /// A linha da entrega como ela sai na proposta: "EXW – Fábrica Howden…".
+    ///
+    /// Fora da lista, o que a equipe digitou sai inteiro — é por isso que dá
+    /// para digitar: nem toda venda cabe nos seis do modelo.
+    /// </summary>
+    public static string LinhaDoIncoterm(string incoterm, string destino)
+    {
+        var escolhido = Incoterms.FirstOrDefault(i => Textos.Igual(i.Codigo, incoterm));
+        if (escolhido is null) return incoterm.Trim();
+
+        var texto = escolhido.Destino
+            ? string.Format(escolhido.Texto,
+                SoOLugar(destino) is { Length: > 0 } lugar ? lugar : "DESTINO (PAÍS DE DESTINO)")
+            : escolhido.Texto;
+
+        return $"{escolhido.Codigo} – {texto}";
+    }
+
+    /// <summary>
+    /// O lugar sem o "Puerto de" / "UBICACIÓN de" que a frase do modelo já
+    /// traz — digitado de novo, a proposta sairia com "Puerto de Puerto de
+    /// Valparaíso". Só o começo exato é cortado, para não mutilar um lugar que
+    /// se chame assim (Puerto Montt continua inteiro).
+    /// </summary>
+    private static string SoOLugar(string destino)
+    {
+        var texto = destino.Trim();
+
+        foreach (var repetido in new[] { "puerto de ", "ubicación de ", "ubicacion de " })
+            if (texto.StartsWith(repetido, StringComparison.OrdinalIgnoreCase))
+                return texto[repetido.Length..].Trim();
+
+        return texto;
+    }
+
+    /// <summary>
+    /// Armado ou desarmado, com a descrição que sai logo abaixo do incoterm.
+    /// </summary>
+    public static readonly (string Codigo, string Texto)[] Armados =
+    {
+        ("Armado",
+         "Equipo armado en base de acero carbono, base común para ventilador y motor eléctrico. " +
+         "El montaje del equipo en sitio no está incluido en este suministro."),
+        ("Desarmado",
+         "Equipo desarmado, en parte estática y girante separadas. " +
+         "El montaje del equipo en sitio no está incluido en este suministro."),
+    };
+
+    /// <summary>A descrição do armado escolhido; vazia quando nada foi escolhido.</summary>
+    public static string TextoDoArmado(string armado) => Armados
+        .FirstOrDefault(a => Textos.Igual(a.Codigo, armado)).Texto ?? "";
 }
 
 /// <summary>
@@ -505,6 +708,13 @@ public sealed class PropostaRepository
         "riscoAdicional", "margemNegociacao", "modoDoPreco", "margemAlvo", "precoMeta",
         "enviadaEm", "criadaEm",
         "moeda", "equipamento", "arranjo", "escolhas", "itens",
+        // colunas novas entram sempre NO FIM: o esquema do Parquet é por
+        // arquivo, e é a leitura por nome que faz o arquivo velho devolver
+        // vazio nelas em vez de errar
+        "cidade", "referenciaCliente",
+        "condicaoPagamento", "incoterm", "incotermDestino", "armado",
+        "contatoArea",
+        "contato2Nome", "contato2Cargo", "contato2Area", "contato2Email", "contato2Telefones",
     };
 
     private readonly ParquetStore _store;
@@ -533,6 +743,12 @@ public sealed class PropostaRepository
             EnviadaEm = S(r, 41), CriadaEm = S(r, 42),
             MoedaCodigo = S(r, 43),
             Itens = Proposta.LerItens(S(r, 47), S(r, 44), S(r, 45), S(r, 46)),
+            Cidade = S(r, 48), ReferenciaCliente = S(r, 49),
+            CondicaoPagamento = S(r, 50), Incoterm = S(r, 51),
+            IncotermDestino = S(r, 52), Armado = S(r, 53),
+            ContatoArea = S(r, 54),
+            Contato2Nome = S(r, 55), Contato2Cargo = S(r, 56), Contato2Area = S(r, 57),
+            Contato2Email = S(r, 58), Contato2Telefones = S(r, 59),
         })
         .OrderByDescending(p => p.Numero)
         .ToList();
@@ -562,6 +778,11 @@ public sealed class PropostaRepository
             // o esquema do Parquet é por arquivo, e tirá-las não apagaria as que
             // já estão lá
             p.MoedaCodigo, "", "", "", p.ItensComoTexto(),
+            p.Cidade, p.ReferenciaCliente,
+            p.CondicaoPagamento, p.Incoterm, p.IncotermDestino, p.Armado,
+            p.ContatoArea,
+            p.Contato2Nome, p.Contato2Cargo, p.Contato2Area,
+            p.Contato2Email, p.Contato2Telefones,
         };
 
         _store.WriteRow(Entidade, Campos

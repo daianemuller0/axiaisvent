@@ -86,6 +86,7 @@ public static class BackendHost
         builder.Services.AddScoped<CaracteristicaRepository>();
         builder.Services.AddScoped<PrecoReferenciaRepository>();
         builder.Services.AddScoped<PropostaRepository>();
+        builder.Services.AddScoped<CondicaoPagamentoRepository>();
 
         var app = builder.Build();
 

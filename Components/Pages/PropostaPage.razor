@@ -11,6 +11,7 @@
 @inject NavigationManager Navegacao
 @inject MotorRepository Motores
 @inject LimiteMotorRepository Limites
+@inject CondicaoPagamentoRepository Pagamentos
 
 <div class="page-head">
     <div>
@@ -139,6 +140,13 @@
             <input class="cell" placeholder="contato@@empresa.com" @bind="_proposta.Email" /></label>
         <label>@Campo("Telefone", "D15")
             <input class="cell" placeholder="+55 …" @bind="_proposta.Telefone" /></label>
+        @* a cidade e a referência do cliente existem por causa da proposta:
+           saem no cabeçalho de todas as páginas, como "Ciudad" e "Su referencia" *@
+        <label>@Campo("Cidade")
+            <input class="cell" placeholder="Cidade do cliente" @bind="_proposta.Cidade" /></label>
+        <label>@Campo("Referência do cliente")
+            <input class="cell" placeholder="O número que o cliente deu" @bind="_proposta.ReferenciaCliente" /></label>
+
         <label>@Campo("Projeto")
             <input class="cell" @bind="_proposta.Projeto" /></label>
 
@@ -322,6 +330,115 @@
         </label>
     </div>
 
+    @* entrega e pagamento saem inteiros na proposta comercial: o pagamento na
+       sua seção, o incoterm com a descrição do lugar e, logo abaixo dele, a
+       frase de armado ou desarmado *@
+    <div style="margin-top:18px; padding-top:16px; border-top:1px solid var(--linha, #e6e8ec)">
+        <h3 style="margin:0 0 12px; font-size:13.5px; letter-spacing:.02em">Entrega e pagamento</h3>
+
+        <div class="form3">
+            <label>@Campo("Condição de pagamento")
+                <select class="cell" value="@(_pagamentoLivre ? OutroPagamento : _proposta.CondicaoPagamento)"
+                        @onchange="e => EscolherPagamento(e.Value?.ToString() ?? string.Empty)">
+                    <option value="">— escolher —</option>
+                    @foreach (var c in _condicoes)
+                    {
+                        <option value="@c.Texto" selected="@(!_pagamentoLivre && c.Texto == _proposta.CondicaoPagamento)">
+                            @c.Texto
+                        </option>
+                    }
+                    <option value="@OutroPagamento" selected="@_pagamentoLivre">— outra (digitar) —</option>
+                </select></label>
+
+            <label>@Campo("Entrega (Incoterm 2020)")
+                <select class="cell" value="@(_incotermLivre ? OutroIncoterm : _proposta.Incoterm)"
+                        @onchange="e => EscolherIncoterm(e.Value?.ToString() ?? string.Empty)">
+                    <option value="">— escolher —</option>
+                    @foreach (var i in ListasDaProposta.Incoterms)
+                    {
+                        <option value="@i.Codigo" selected="@(!_incotermLivre && i.Codigo == _proposta.Incoterm)">
+                            @i.Codigo
+                        </option>
+                    }
+                    <option value="@OutroIncoterm" selected="@_incotermLivre">— outro (digitar) —</option>
+                </select></label>
+
+            <label>@Campo("Entrega do equipamento")
+                <select class="cell" @bind="_proposta.Armado">
+                    <option value="">— escolher —</option>
+                    @foreach (var (codigo, _) in ListasDaProposta.Armados)
+                    {
+                        <option value="@codigo">@codigo</option>
+                    }
+                </select></label>
+        </div>
+
+        @if (_pagamentoLivre)
+        {
+            <label style="display:block; margin-top:12px">@Campo("Condição de pagamento (texto livre)")
+                <textarea class="cell" rows="2" style="width:100%"
+                          @bind="_proposta.CondicaoPagamento"></textarea></label>
+        }
+
+        @if (_incotermLivre)
+        {
+            <label style="display:block; margin-top:12px">@Campo("Entrega (texto livre)")
+                <input class="cell" style="width:100%" @bind="_proposta.Incoterm" /></label>
+        }
+        else if (PedeDestino)
+        {
+            @* CIF, DAP e DDP não dizem onde: o modelo deixa "Puerto de DESTINO
+               (PAÍS DE DESTINO)" para alguém preencher. O rótulo diz o que
+               falta — só o lugar, porque o "Puerto de" já está na frase *@
+            <label style="display:block; margin-top:12px">@Campo(RotuloDoDestino)
+                <input class="cell" style="width:100%"
+                       placeholder="@ExemploDoDestino" @bind="_proposta.IncotermDestino" /></label>
+        }
+
+        @if (_proposta.Incoterm.Length > 0 || _proposta.Armado.Length > 0)
+        {
+            <div class="panel" style="margin:12px 0 0; padding:12px; background:var(--fundo2, #f7f8fa)">
+                <div class="subtitle" style="margin-bottom:6px">Como vai sair na proposta</div>
+                @if (_proposta.Incoterm.Length > 0)
+                {
+                    <div style="font-size:12.5px">@ListasDaProposta.LinhaDoIncoterm(_proposta.Incoterm, _proposta.IncotermDestino)</div>
+                }
+                @if (ListasDaProposta.TextoDoArmado(_proposta.Armado) is { Length: > 0 } armado)
+                {
+                    <div style="font-size:12.5px; margin-top:6px">• @armado</div>
+                }
+            </div>
+        }
+
+        @* o cadastro de condições fica aqui, e não numa tela à parte, porque é
+           aqui que a equipe descobre que falta uma *@
+        <div style="margin-top:12px">
+            <button class="btn-ghost" @onclick="() => _cadastrandoPagamento = !_cadastrandoPagamento">
+                @(_cadastrandoPagamento ? "Fechar cadastro" : "Cadastrar condições de pagamento")
+            </button>
+        </div>
+
+        @if (_cadastrandoPagamento)
+        {
+            <div class="panel" style="margin:12px 0 0; padding:14px">
+                @foreach (var c in _condicoes)
+                {
+                    <div class="toolbar" style="margin-bottom:8px">
+                        <input class="cell" style="flex:1" value="@c.Texto"
+                               @onchange="e => RenomearCondicao(c, e.Value?.ToString() ?? string.Empty)" />
+                        <button class="btn-ghost" title="Apagar"
+                                @onclick="() => ApagarCondicao(c)">✕</button>
+                    </div>
+                }
+                <div class="toolbar">
+                    <input class="cell" style="flex:1" placeholder="Nova condição de pagamento"
+                           @bind="_novaCondicao" @bind:event="oninput" />
+                    <button class="btn" @onclick="AdicionarCondicao">+ linha</button>
+                </div>
+            </div>
+        }
+    </div>
+
     @if (_proposta.Representante.Length > 0 || _proposta.Representante2.Length > 0)
     {
         <p class="subtitle" style="margin:10px 0 0">
@@ -333,31 +450,33 @@
     }
 </div>
 
-<!-- ---------- contato no documento ---------- -->
+<!-- ---------- contatos no documento ---------- -->
 <div class="panel" style="margin-bottom:18px">
-    <h2 style="margin:0 0 14px; font-size:15px">Contato (no documento)</h2>
+    <h2 style="margin:0 0 4px; font-size:15px">Contatos Howden (no documento)</h2>
+    <p class="subtitle" style="margin:0 0 14px">
+        Até dois, do quadro da proposta. @ListasDaProposta.DiretorDeVendas.Nome
+        (@ListasDaProposta.DiretorDeVendas.Cargo) sai sempre, junto com o contato
+        do representante — nenhum dos dois precisa ser escolhido aqui.
+    </p>
 
-    <div class="toolbar" style="margin-bottom:14px">
-        <label style="display:flex; flex-direction:column; gap:5px; font-size:12.5px; color:var(--muted)">
-            Selecionar contato
-            <select class="cell" style="min-width:300px" value="@_proposta.ContatoNome"
-                    @onchange="e => EscolherContato(e.Value?.ToString() ?? string.Empty)">
-                <option value="">— escolher —</option>
-                @foreach (var c in ListasDaProposta.Contatos)
-                {
-                    <option value="@c.Nome" selected="@(c.Nome == _proposta.ContatoNome)">
-                        @c.Nome — @c.Cargo
-                    </option>
-                }
-            </select>
-        </label>
-    </div>
-
+    @Contato("Contato 1", _proposta.ContatoNome, n => EscolherContato(n, 1))
     <div class="form3">
         <label>@Campo("Nome")<input class="cell" @bind="_proposta.ContatoNome" /></label>
         <label>@Campo("Cargo")<input class="cell" @bind="_proposta.ContatoCargo" /></label>
+        <label>@Campo("Área")<input class="cell" @bind="_proposta.ContatoArea" /></label>
         <label>@Campo("E-mail")<input class="cell" @bind="_proposta.ContatoEmail" /></label>
         <label>@Campo("Telefones")<input class="cell" @bind="_proposta.ContatoTelefones" /></label>
+    </div>
+
+    <div style="margin-top:18px; padding-top:16px; border-top:1px solid var(--linha, #e6e8ec)">
+        @Contato("Contato 2 (opcional)", _proposta.Contato2Nome, n => EscolherContato(n, 2))
+        <div class="form3">
+            <label>@Campo("Nome")<input class="cell" @bind="_proposta.Contato2Nome" /></label>
+            <label>@Campo("Cargo")<input class="cell" @bind="_proposta.Contato2Cargo" /></label>
+            <label>@Campo("Área")<input class="cell" @bind="_proposta.Contato2Area" /></label>
+            <label>@Campo("E-mail")<input class="cell" @bind="_proposta.Contato2Email" /></label>
+            <label>@Campo("Telefones")<input class="cell" @bind="_proposta.Contato2Telefones" /></label>
+        </div>
     </div>
 </div>
 
@@ -1043,6 +1162,39 @@
     private List<string> _daPlanilha = new();
     private List<string> _avisos = new();
 
+    // ---------- entrega e pagamento ----------
+    private List<CondicaoPagamento> _condicoes = new();
+    private bool _cadastrandoPagamento;
+    private string _novaCondicao = "";
+
+    /// <summary>
+    /// Marcas de "não é nenhuma das opções, é o que eu digitei": o
+    /// &lt;select&gt; precisa de um value para a opção livre, e ele não pode
+    /// ser igual a nenhuma condição cadastrada nem a nenhum incoterm.
+    /// </summary>
+    private const string OutroPagamento = "(outra condição de pagamento)";
+    private const string OutroIncoterm = "(outro incoterm)";
+
+    private bool _pagamentoLivre;
+    private bool _incotermLivre;
+
+    /// <summary>
+    /// Como chamar o lugar que falta: CIF pede um porto, DAP e DDP pedem o
+    /// lugar de entrega. O que se digita é só o nome — "Puerto de" e
+    /// "UBICACIÓN de" já vêm na frase do modelo.
+    /// </summary>
+    private string RotuloDoDestino =>
+        Textos.Igual(_proposta.Incoterm, "CIF") ? "Porto de destino" : "Local de destino";
+
+    private string ExemploDoDestino =>
+        Textos.Igual(_proposta.Incoterm, "CIF")
+            ? "Ex.: Valparaíso (CHILE) — sem repetir \"Puerto de\""
+            : "Ex.: Antofagasta (CHILE) — sem repetir \"UBICACIÓN de\"";
+
+    /// <summary>O incoterm escolhido pede que alguém diga o lugar (CIF, DAP, DDP)?</summary>
+    private bool PedeDestino => ListasDaProposta.Incoterms
+        .Any(i => Textos.Igual(i.Codigo, _proposta.Incoterm) && i.Destino);
+
     /// <summary>Id na rota: /axiais/proposta/{id} abre aquela proposta direto.</summary>
     [Parameter] public string? Id { get; set; }
 
@@ -1059,6 +1211,7 @@
         if (Repo.Achar(Id) is { } achada)
         {
             _proposta = achada;
+            AjustarEscolhasLivres();
             _aberto = 0;
             Aviso($"Proposta {achada.Numero} aberta.");
         }
@@ -1085,6 +1238,7 @@
     private void Recarregar()
     {
         _gravadas = Repo.Todas();
+        _condicoes = Pagamentos.Todas();
         _equipamentos = Equipamentos.Todos();
         _motores = Motores.Todos();
         _limites = Limites.Todos();
@@ -1466,15 +1620,132 @@
         }
     }
 
-    private void EscolherContato(string nome)
+    /// <summary>
+    /// A escolha de um dos contatos do quadro. Os campos continuam editáveis
+    /// depois: a lista é atalho, não trava.
+    /// </summary>
+    private void EscolherContato(string nome, int qual)
     {
-        var c = ListasDaProposta.Contatos.FirstOrDefault(x => x.Nome == nome);
-        if (c.Nome is null) return;
+        if (ListasDaProposta.Contato(nome) is not { } c)
+        {
+            // "— nenhum —" limpa o contato, que é como se tira o segundo
+            if (nome.Length > 0) return;
+            if (qual == 1) (_proposta.ContatoNome, _proposta.ContatoCargo, _proposta.ContatoArea,
+                            _proposta.ContatoEmail, _proposta.ContatoTelefones) = ("", "", "", "", "");
+            else (_proposta.Contato2Nome, _proposta.Contato2Cargo, _proposta.Contato2Area,
+                  _proposta.Contato2Email, _proposta.Contato2Telefones) = ("", "", "", "", "");
+            return;
+        }
 
-        _proposta.ContatoNome = c.Nome;
-        _proposta.ContatoCargo = c.Cargo;
-        _proposta.ContatoEmail = c.Email;
-        _proposta.ContatoTelefones = c.Telefones;
+        if (qual == 1)
+        {
+            _proposta.ContatoNome = c.Nome;
+            _proposta.ContatoCargo = c.Cargo;
+            _proposta.ContatoArea = c.Area;
+            _proposta.ContatoEmail = c.Email;
+            _proposta.ContatoTelefones = c.Telefones;
+        }
+        else
+        {
+            _proposta.Contato2Nome = c.Nome;
+            _proposta.Contato2Cargo = c.Cargo;
+            _proposta.Contato2Area = c.Area;
+            _proposta.Contato2Email = c.Email;
+            _proposta.Contato2Telefones = c.Telefones;
+        }
+    }
+
+    /// <summary>O seletor de um contato do quadro, igual nos dois.</summary>
+    private RenderFragment Contato(string rotulo, string escolhido, Action<string> escolher) => @<text>
+        <div class="toolbar" style="margin-bottom:12px">
+            <label style="display:flex; flex-direction:column; gap:5px; font-size:12.5px; color:var(--muted)">
+                @rotulo
+                <select class="cell" style="min-width:340px" value="@escolhido"
+                        @onchange="e => escolher(e.Value?.ToString() ?? string.Empty)">
+                    <option value="">— nenhum —</option>
+                    @foreach (var c in ListasDaProposta.Contatos)
+                    {
+                        <option value="@c.Nome" selected="@(Textos.Igual(c.Nome, escolhido))">
+                            @c.Nome — @(c.Area.Length > 0 ? c.Area : c.Cargo)
+                        </option>
+                    }
+                </select>
+            </label>
+        </div>
+    </text>;
+
+    // ---------- entrega e pagamento ----------
+
+    private void EscolherPagamento(string valor)
+    {
+        _pagamentoLivre = valor == OutroPagamento;
+        if (!_pagamentoLivre) _proposta.CondicaoPagamento = valor;
+    }
+
+    private void EscolherIncoterm(string valor)
+    {
+        _incotermLivre = valor == OutroIncoterm;
+        if (_incotermLivre) return;
+
+        _proposta.Incoterm = valor;
+        // trocar para um incoterm que já diz o lugar apaga o destino digitado,
+        // para ele não reaparecer se a equipe voltar para CIF
+        if (!PedeDestino) _proposta.IncotermDestino = "";
+    }
+
+    /// <summary>
+    /// Qual dos dois campos de texto livre abrir ao abrir a proposta: o que
+    /// está gravado não está na lista, então foi digitado.
+    /// </summary>
+    private void AjustarEscolhasLivres()
+    {
+        _pagamentoLivre = _proposta.CondicaoPagamento.Length > 0
+            && !_condicoes.Any(c => Textos.Igual(c.Texto, _proposta.CondicaoPagamento));
+
+        _incotermLivre = _proposta.Incoterm.Length > 0
+            && !ListasDaProposta.Incoterms.Any(i => Textos.Igual(i.Codigo, _proposta.Incoterm));
+    }
+
+    private void AdicionarCondicao()
+    {
+        var texto = _novaCondicao.Trim();
+        if (texto.Length == 0) return;
+
+        // repetida não entra: a lista é para escolher, e duas linhas iguais só
+        // deixam a escolha ambígua
+        if (_condicoes.FirstOrDefault(c => Textos.Igual(c.Texto, texto)) is { } jaTem)
+        {
+            _novaCondicao = "";
+            _proposta.CondicaoPagamento = jaTem.Texto;
+            _pagamentoLivre = false;
+            Aviso("Essa condição já estava cadastrada.");
+            return;
+        }
+
+        Pagamentos.Salvar(new CondicaoPagamento { Texto = texto });
+        _novaCondicao = "";
+        _condicoes = Pagamentos.Todas();
+    }
+
+    private void RenomearCondicao(CondicaoPagamento c, string texto)
+    {
+        if (texto.Trim().Length == 0) return;
+
+        var antigo = c.Texto;
+        c.Texto = texto.Trim();
+        Pagamentos.Salvar(c);
+        _condicoes = Pagamentos.Todas();
+
+        // a proposta aberta guarda o TEXTO, não o id: corrigir a condição no
+        // cadastro tem de corrigir a proposta que estava com ela
+        if (Textos.Igual(_proposta.CondicaoPagamento, antigo)) _proposta.CondicaoPagamento = c.Texto;
+    }
+
+    private void ApagarCondicao(CondicaoPagamento c)
+    {
+        Pagamentos.Apagar(c.Id);
+        _condicoes = Pagamentos.Todas();
+        AjustarEscolhasLivres();
     }
 
     // ---------- folha de dados ----------
@@ -1524,6 +1795,7 @@
     private void Nova()
     {
         _proposta = Nascer();
+        AjustarEscolhasLivres();
         _aberto = 0;
         _apagando = false;
         _apagandoItem = null;
@@ -1551,6 +1823,7 @@
         }
 
         _proposta = achada;
+        AjustarEscolhasLivres();
         _aberto = 0;
         Aviso($"Proposta {achada.Numero} aberta.");
     }
