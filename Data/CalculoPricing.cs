@@ -53,9 +53,16 @@ public static class CalculoPricing
         ["SE"] = (0.07m, 0.12m), ["SP"] = (0.18m, 0.12m), ["TO"] = (0.07m, 0.12m),
     };
 
-    /// <summary>Destinos sem impostos brasileiros (a planilha zera tudo neles).</summary>
-    public static bool SemImpostos(string destino, string estado)
+    /// <summary>
+    /// Venda sem os impostos brasileiros. São três portas, e basta uma:
+    /// o país não é o Brasil (Chile, Peru, qualquer outro), o destino é
+    /// exportação ou back to back, ou o estado já está marcado como fora
+    /// (EXPORT, Chile, Peru) — que é exatamente o que a planilha testa.
+    /// </summary>
+    public static bool SemImpostos(string destino, string estado, string pais = "Brasil")
     {
+        if (pais.Trim().Length > 0 && !ListasDaProposta.TemImpostosBrasileiros(pais)) return true;
+
         var d = Textos.Simples(destino);
         var e = Textos.Simples(estado);
 
@@ -89,7 +96,8 @@ public static class CalculoPricing
         bool ComPortal,
         string Rep1,
         string Rep2,
-        bool ComFianca = false);
+        bool ComFianca = false,
+        string Pais = "Brasil");
 
     /// <summary>O pricing calculado, na ordem em que a tela mostra.</summary>
     public sealed record Resultado(
@@ -151,7 +159,7 @@ public static class CalculoPricing
         // ---------- impostos por cima da venda líquida ----------
         decimal pis = 0m, cofins = 0m, icms = 0m, ipi = 0m, preco = vendaLiquida;
 
-        if (!SemImpostos(e.Destino, e.Estado))
+        if (!SemImpostos(e.Destino, e.Estado, e.Pais))
         {
             var semPisCofins = Textos.Simples(e.Beneficio) is "zona franca de manaus"
                 or "beneficio recap / reidi";

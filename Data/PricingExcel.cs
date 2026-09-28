@@ -56,7 +56,9 @@ public static class PricingExcel
         // e o preço dela saía diferente do da tela sem ninguém entender por quê
         ws.Cell("E8").Value = ListasDaProposta.CodigoDaBu(proposta.Bu);
         ws.Cell("J3").Value = Proposta.SegmentoDoPricing;
-        ws.Cell("J6").Value = proposta.Estado.Length > 0 ? proposta.Estado : "preencher";
+        // fora do Brasil o pricing não quer UF: quer "Chile", "Peru" ou "EXPORT"
+        var estado = ListasDaProposta.EstadoDoPricing(proposta.Pais, proposta.Estado);
+        ws.Cell("J6").Value = estado.Length > 0 ? estado : "preencher";
 
         ws.Cell("J4").Value = proposta.VendaPara;
         ws.Cell("J5").Value = proposta.Destino;

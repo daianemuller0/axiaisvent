@@ -1173,6 +1173,13 @@ todas eram silenciosas:
 3. **Estado digitado à mão.** O ICMS é um `VLOOKUP` na lista de UFs; "São Paulo" não acha
    nada. O campo virou seleção com a mesma `lista_Estados` da planilha, e a BU virou seleção
    dos códigos que ela compara (`HSA-SP`, `HSA-ES`, `HCHL`, `HPU`).
+4. **País que não manda em nada.** ICMS, PIS e COFINS são impostos brasileiros: vendendo no
+   Chile, no Peru ou em qualquer outro país, eles não existem. O sistema olhava só o destino
+   e o estado, então uma venda no Chile com destino "Nacional" e uma UF escolhida antes saía
+   com 18% de ICMS na tela. Agora o **país decide**: `EstadoDoPricing` traduz Brasil → a UF,
+   Chile → "Chile", Peru → "Peru" e qualquer outro → "EXPORT" — que é exatamente o que a
+   planilha testa para zerar tudo. Fora do Brasil o campo de UF nem é escolha: mostra o que
+   vai para J6 e diz por quê.
 
 A conferência é feita refazendo a cadeia **pelas fórmulas e tabelas do arquivo gerado**, sem
 usar nenhuma constante do C#. Dois casos, centavo por centavo:

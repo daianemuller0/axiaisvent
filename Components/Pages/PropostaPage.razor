@@ -152,15 +152,25 @@
         <label>@Campo("Preparada por", "pricing E9")
             <input class="cell" @bind="_proposta.PreparadaPor" /></label>
         @* o estado é a chave do ICMS no pricing (J6), então só vale o que a
-           planilha aceita — digitar "São Paulo" não acharia a alíquota *@
+           planilha aceita — digitar "São Paulo" não acharia a alíquota. Fora do
+           Brasil ele nem é escolha: o país já decide *@
         <label>@Campo("Estado / UF", "pricing J6")
-            <select class="cell" @bind="_proposta.Estado">
-                <option value="">— escolher —</option>
-                @foreach (var uf in ListasDaProposta.Estados)
-                {
-                    <option value="@uf">@uf</option>
-                }
-            </select></label>
+            @if (EhBrasil)
+            {
+                <select class="cell" @bind="_proposta.Estado">
+                    <option value="">— escolher —</option>
+                    @foreach (var uf in ListasDaProposta.Estados.Where(u => u.Length == 2))
+                    {
+                        <option value="@uf">@uf</option>
+                    }
+                </select>
+            }
+            else
+            {
+                <input class="cell" disabled value="@EstadoDoPricing" />
+                <span class="subtitle">vem do país — sem ICMS, PIS nem COFINS</span>
+            }
+        </label>
         <label>@Campo("Validade (dias)")
             <input class="cell num" type="number" min="0" @bind="_proposta.ValidadeDias" /></label>
 
@@ -952,8 +962,23 @@
                         <td class="nowrap"><span class="subtitle">E62</span></td>
                         <td class="nowrap right">@Dinheiro(pricing.ValorIcms)</td>
                         <td class="nowrap right">
-                            @Pct(CalculoPricing.IcmsDoEstado(_proposta.Estado,
+                            @Pct(CalculoPricing.IcmsDoEstado(EstadoDoPricing,
                                 ListasDaProposta.CodigoDaBu(_proposta.Bu)) ?? 0m)
+                        </td>
+                    </tr>
+                }
+                @if (pricing.PrecoComImpostos == pricing.VendaLiquida)
+                {
+                    <tr>
+                        <td class="nowrap">Impostos</td>
+                        <td class="nowrap"><span class="subtitle">E60 · E61 · E62</span></td>
+                        <td class="nowrap right">—</td>
+                        <td class="nowrap right">
+                            <span class="subtitle">
+                                @(EhBrasil
+                                    ? "destino fora do Brasil: a planilha zera ICMS, PIS e COFINS"
+                                    : $"venda fora do Brasil ({_proposta.Pais}): sem ICMS, PIS nem COFINS")
+                            </span>
                         </td>
                     </tr>
                 }
@@ -1431,7 +1456,11 @@
 
     private static readonly System.Globalization.CultureInfo Br = new("pt-BR");
 
-    private bool EhBrasil => Textos.Igual(_proposta.Pais, "Brasil");
+    private bool EhBrasil => ListasDaProposta.TemImpostosBrasileiros(_proposta.Pais);
+
+    /// <summary>O que vai na célula J6: a UF no Brasil, o país fora dele.</summary>
+    private string EstadoDoPricing =>
+        ListasDaProposta.EstadoDoPricing(_proposta.Pais, _proposta.Estado);
 
     private bool PelaMargem => _proposta.ModoDoPreco != "preco";
 
@@ -1448,14 +1477,15 @@
         RiscoAdicional: Risco,
         MargemNegociacao: Negociacao,
         Destino: _proposta.Destino,
-        Estado: _proposta.Estado,
+        Estado: EstadoDoPricing,
         VendaPara: _proposta.VendaPara,
         Beneficio: EhBrasil ? _proposta.Beneficio : "Sem benefício",
         Bu: ListasDaProposta.CodigoDaBu(_proposta.Bu),
         ComPortal: Proposta.TemPortal(_proposta.Portal),
         Rep1: _proposta.Representante,
         Rep2: _proposta.Representante2,
-        ComFianca: Textos.Igual(_proposta.Fianca, "Sim"));
+        ComFianca: Textos.Igual(_proposta.Fianca, "Sim"),
+        Pais: _proposta.Pais);
 
     private CalculoPricing.Resultado Pricing()
     {

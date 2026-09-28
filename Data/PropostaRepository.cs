@@ -295,6 +295,27 @@ public static class ListasDaProposta
     };
 
     /// <summary>
+    /// O que vai na célula J6 do pricing — a chave dos impostos brasileiros.
+    ///
+    /// Só o Brasil tem UF: no Chile e no Peru a planilha espera o nome do país,
+    /// e em qualquer outro lugar espera "EXPORT". É isso que zera ICMS, PIS e
+    /// COFINS lá dentro, então quem decide é o <b>país</b>, e não o estado que
+    /// alguém tenha deixado escolhido antes de trocar de país.
+    /// </summary>
+    public static string EstadoDoPricing(string pais, string estado)
+    {
+        if (Textos.Igual(pais, "Brasil")) return estado;
+
+        if (Textos.Igual(pais, "Chile")) return "Chile";
+        if (Textos.Igual(pais, "Peru") || Textos.Igual(pais, "Perú")) return "Peru";
+
+        return "EXPORT";
+    }
+
+    /// <summary>Venda com impostos brasileiros? Só no Brasil.</summary>
+    public static bool TemImpostosBrasileiros(string pais) => Textos.Igual(pais, "Brasil");
+
+    /// <summary>
     /// Traz uma BU gravada antes desta lista para o código da planilha, para
     /// proposta antiga não gerar pricing com a BU errada.
     /// </summary>
