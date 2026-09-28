@@ -515,6 +515,77 @@
                     <div class="aviso aviso-alerta" style="margin-top:10px">@aviso</div>
                 }
             </div>
+
+            <!-- partidor: o preço vem da potência do motor -->
+            <div class="toolbar" style="flex-wrap:wrap">
+                <strong style="min-width:210px">@ListaDosPartidores</strong>
+                <button class="@(atual.ComPartidor ? "btn-ghost" : "btn-primary")"
+                        @onclick="() => atual.ComPartidor = false">Sem</button>
+                <button class="@(atual.ComPartidor ? "btn-primary" : "btn-ghost")"
+                        @onclick="() => LigarPartidor(atual)">Com</button>
+
+                @if (atual.ComPartidor)
+                {
+                    <select class="cell" style="min-width:260px" value="@atual.Partidor"
+                            @onchange="e => atual.Partidor = e.Value?.ToString() ?? string.Empty">
+                        <option value="">— escolher —</option>
+                        @foreach (var o in OpcoesReais(ListaDosPartidores))
+                        {
+                            <option value="@o.Valor" selected="@(o.Valor == atual.Partidor)">@o.Valor</option>
+                        }
+                    </select>
+
+                    @if (LinhaDoPartidor(atual) is { } linha)
+                    {
+                        <span style="flex:1"></span>
+                        <span class="subtitle" style="margin:0">
+                            @(linha.Codigo.Length > 0 ? $"código {linha.Codigo}" : "sem código")
+                            ·
+                            @(linha.Valor is null ? linha.Origem : $"{Dinheiro(linha.Valor)} — {linha.Origem}")
+                        </span>
+                    }
+                }
+            </div>
+
+            <!-- instrumentação: pode ser mais de uma -->
+            <div class="toolbar" style="flex-wrap:wrap">
+                <strong style="min-width:210px">@ListaDaInstrumentacao</strong>
+                <button class="@(atual.ComInstrumentacao ? "btn-ghost" : "btn-primary")"
+                        @onclick="() => DesligarInstrumentacao(atual)">Sem</button>
+                <button class="@(atual.ComInstrumentacao ? "btn-primary" : "btn-ghost")"
+                        @onclick="() => atual.ComInstrumentacao = true">Com</button>
+                @if (atual.ComInstrumentacao)
+                {
+                    <span class="subtitle" style="margin:0">
+                        pode marcar mais de uma — cada uma entra com o seu código e o seu preço
+                    </span>
+                }
+            </div>
+
+            @if (atual.ComInstrumentacao)
+            {
+                <div class="panel" style="margin:0 0 14px; border-left:3px solid var(--azul, #0b3d6b)">
+                    @foreach (var o in OpcoesReais(ListaDaInstrumentacao))
+                    {
+                        var opcao = o;
+                        var marcada = atual.Instrumentacao.Contains(opcao.Valor);
+                        var linha = Resolver(atual, opcao.Grupo, opcao.Valor);
+
+                        <div class="toolbar" style="flex-wrap:wrap; margin-bottom:6px">
+                            <label style="display:flex; align-items:center; gap:8px; min-width:380px">
+                                <input type="checkbox" checked="@marcada"
+                                       @onchange="e => MarcarInstrumentacao(atual, opcao.Valor, (bool)(e.Value ?? false))" />
+                                <span>@opcao.Valor</span>
+                            </label>
+                            <span class="subtitle" style="margin:0">
+                                @(linha.Codigo.Length > 0 ? $"código {linha.Codigo}" : "sem código")
+                                ·
+                                @(linha.Valor is null ? linha.Origem : Dinheiro(linha.Valor))
+                            </span>
+                        </div>
+                    }
+                </div>
+            }
         }
     }
 </div>
@@ -546,7 +617,7 @@
                         <th class="nowrap">Escolha</th>
                         <th class="nowrap">Código</th>
                         <th class="nowrap">De onde vem o preço</th>
-                        <th class="nowrap right">Unitário @_proposta.Moeda.Rotulo()</th>
+                        <th class="nowrap right" style="width:210px">Unitário @_proposta.Moeda.Rotulo()</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -557,7 +628,7 @@
                             <td class="nowrap">@modelo.Rotulo</td>
                             <td class="nowrap">@(modelo.Codigo.Length > 0 ? modelo.Codigo : "—")</td>
                             <td class="nowrap"><span class="subtitle">lista cruzada de equipamentos</span></td>
-                            <td class="nowrap right">@Dinheiro(PrecoDoModelo(doItem))</td>
+                            <td>@Preco(doItem, "equipamento", PrecoDoModelo(doItem))</td>
                         </tr>
                     }
                     @foreach (var linha in itens)
@@ -567,7 +638,7 @@
                             <td class="nowrap">@linha.Opcao</td>
                             <td class="nowrap">@(linha.Codigo.Length > 0 ? linha.Codigo : "—")</td>
                             <td class="nowrap"><span class="subtitle">@linha.Origem</span></td>
-                            <td class="nowrap right">@Dinheiro(linha.Valor)</td>
+                            <td>@Preco(doItem, $"lista:{linha.Lista}", linha.Valor)</td>
                         </tr>
                     }
                     @if (doItem.ComMotor)
@@ -584,7 +655,28 @@
                                         : motor.Observacoes.Length > 0 ? motor.Observacoes : "catálogo de motores")
                                 </span>
                             </td>
-                            <td class="nowrap right">@Dinheiro(PrecoDoMotor(doItem))</td>
+                            <td>@Preco(doItem, "motor", PrecoDoMotor(doItem))</td>
+                        </tr>
+                    }
+                    @if (doItem.ComPartidor && LinhaDoPartidor(doItem) is { } partidor)
+                    {
+                        <tr>
+                            <td class="nowrap">@ListaDosPartidores</td>
+                            <td class="nowrap">@(doItem.Partidor.Length > 0 ? doItem.Partidor : "não escolhido")</td>
+                            <td class="nowrap">@(partidor.Codigo.Length > 0 ? partidor.Codigo : "—")</td>
+                            <td class="nowrap"><span class="subtitle">@partidor.Origem</span></td>
+                            <td>@Preco(doItem, "partidor", partidor.Valor)</td>
+                        </tr>
+                    }
+                    @foreach (var nome in doItem.ComInstrumentacao ? doItem.Instrumentacao : new List<string>())
+                    {
+                        var linha = Resolver(doItem, ListaDaInstrumentacao, nome);
+                        <tr>
+                            <td class="nowrap">@ListaDaInstrumentacao</td>
+                            <td class="nowrap">@nome</td>
+                            <td class="nowrap">@(linha.Codigo.Length > 0 ? linha.Codigo : "—")</td>
+                            <td class="nowrap"><span class="subtitle">@linha.Origem</span></td>
+                            <td>@Preco(doItem, $"instr:{nome}", linha.Valor)</td>
                         </tr>
                     }
                     <tr>
@@ -672,9 +764,19 @@
         _listas = Caracteristicas.Grupos()
             .OrderBy(g => g.Ordem)
             .Select(g => g.Nome)
-            .Where(nome => _porGrupo.GetValueOrDefault(nome, new())
-                .All(o => FamiliaDePreco.De(o.Grupo, o.Valor)?.Eixo != EixoDePreco.PotenciaMotor))
+            .Where(nome => !EhDaParteEletrica(nome))
             .ToList();
+
+        // o partidor e a instrumentação são da parte elétrica, e não do escopo
+        // do ventilador: o preço do partidor vem da potência do motor, e a
+        // instrumentação aceita mais de uma escolha
+        ListaDosPartidores = Caracteristicas.Grupos()
+            .Select(g => g.Nome)
+            .FirstOrDefault(n => Textos.Simples(n).Contains("partidor")) ?? "PARTIDORES";
+
+        ListaDaInstrumentacao = Caracteristicas.Grupos()
+            .Select(g => g.Nome)
+            .FirstOrDefault(n => Textos.Simples(n).Contains("instrumenta")) ?? "INSTRUMENTAÇÃO";
     }
 
     // ---------- de onde cada campo vem ----------
@@ -704,6 +806,22 @@
 
     // ---------- o escopo ----------
 
+    /// <summary>Os nomes das listas que moram na parte elétrica, neste banco.</summary>
+    private string ListaDosPartidores = "PARTIDORES";
+    private string ListaDaInstrumentacao = "INSTRUMENTAÇÃO";
+
+    private static bool EhDaParteEletrica(string lista)
+    {
+        var nome = Textos.Simples(lista);
+        return nome.Contains("partidor") || nome.Contains("instrumenta");
+    }
+
+    /// <summary>As opções de uma lista que não são "sem" — as que se escolhe.</summary>
+    private List<Caracteristica> OpcoesReais(string lista) => _porGrupo
+        .GetValueOrDefault(lista, new())
+        .Where(o => !FamiliaDePreco.EhAusencia(o.Valor))
+        .ToList();
+
     private int PosicaoValida =>
         _proposta.Itens.Count == 0 ? 0 : Math.Clamp(_aberto, 0, _proposta.Itens.Count - 1);
 
@@ -720,7 +838,8 @@
             .FirstOrDefault(o => o.Valor == valor)
             ?? new Caracteristica { Grupo = grupo, Valor = valor };
 
-        return EscopoProposta.Resolver(opcao, ModeloDe(item), _proposta.Moeda, _precos);
+        return EscopoProposta.Resolver(opcao, ModeloDe(item), _proposta.Moeda, _precos,
+            MotorDe(item)?.PotenciaCv ?? "");
     }
 
     /// <summary>As linhas do escopo de um equipamento, na ordem das listas.</summary>
@@ -729,10 +848,94 @@
         .Select(l => Resolver(item, l, item.Escolhas[l]))
         .ToList();
 
+    // ---------- preço puxado, com a mão por cima ----------
+
+    /// <summary>
+    /// Todas as linhas de preço de um equipamento: a chave, o que o cadastro
+    /// puxou e nada mais. Quem soma, quem desenha e quem valida olham esta
+    /// mesma lista, para nunca divergirem.
+    /// </summary>
+    private List<(string Chave, decimal? Puxado)> LinhasDePreco(ItemProposta item)
+    {
+        var linhas = new List<(string, decimal?)> { ("equipamento", PrecoDoModelo(item)) };
+
+        linhas.AddRange(Itens(item).Select(i => ($"lista:{i.Lista}", i.Valor)));
+
+        if (item.ComMotor) linhas.Add(("motor", PrecoDoMotor(item)));
+        if (LinhaDoPartidor(item) is { } partidor) linhas.Add(("partidor", partidor.Valor));
+
+        if (item.ComInstrumentacao)
+        {
+            linhas.AddRange(item.Instrumentacao.Select(nome =>
+                ($"instr:{nome}", Resolver(item, ListaDaInstrumentacao, nome).Valor)));
+        }
+
+        return linhas;
+    }
+
+    /// <summary>
+    /// O preço que vale: o digitado à mão, quando houver; o do cadastro, quando
+    /// não. É a regra geral da proposta — puxa, mas sempre dá para corrigir.
+    /// </summary>
+    private decimal? Efetivo(ItemProposta item, string chave, decimal? puxado) =>
+        item.PrecosManuais.TryGetValue(chave, out var texto) && texto.Trim().Length > 0
+            ? DadosExcel.Numero(texto)
+            : puxado;
+
+    private bool EhManual(ItemProposta item, string chave) =>
+        item.PrecosManuais.TryGetValue(chave, out var t) && t.Trim().Length > 0;
+
+    /// <summary>O campo de preço de uma linha: puxado, editável, e com volta.</summary>
+    private RenderFragment Preco(ItemProposta item, string chave, decimal? puxado) => @<text>
+        <div style="display:flex; align-items:center; gap:6px; justify-content:flex-end">
+            <input class="cell num" style="max-width:120px" placeholder="—"
+                   value="@TextoDoPreco(item, chave, puxado)"
+                   @onchange="e => DefinirPrecoManual(item, chave, e.Value?.ToString() ?? string.Empty, puxado)" />
+            @if (EhManual(item, chave))
+            {
+                <button class="btn-link" title="Voltar ao preço do cadastro"
+                        @onclick="() => item.PrecosManuais.Remove(chave)">↺</button>
+            }
+        </div>
+    </text>;
+
+    private string TextoDoPreco(ItemProposta item, string chave, decimal? puxado)
+    {
+        if (item.PrecosManuais.TryGetValue(chave, out var texto) && texto.Trim().Length > 0)
+            return texto;
+
+        return puxado?.ToString("N2", new System.Globalization.CultureInfo("pt-BR")) ?? "";
+    }
+
+    private void DefinirPrecoManual(ItemProposta item, string chave, string texto, decimal? puxado)
+    {
+        var valor = texto.Trim();
+
+        // apagar o campo é voltar ao cadastro, não zerar o preço
+        if (valor.Length == 0)
+        {
+            item.PrecosManuais.Remove(chave);
+            return;
+        }
+
+        if (DadosExcel.Numero(valor) is not { } numero)
+        {
+            Aviso($"\"{valor}\" não parece um preço. Use 1234,56 ou 1234.56.", erro: true);
+            return;
+        }
+
+        // digitar o mesmo número que o cadastro já dava não é uma exceção
+        if (puxado is not null && numero == puxado)
+        {
+            item.PrecosManuais.Remove(chave);
+            return;
+        }
+
+        item.PrecosManuais[chave] = valor;
+    }
+
     private decimal Unitario(ItemProposta item) =>
-        (PrecoDoModelo(item) ?? 0)
-        + Itens(item).Sum(i => i.Valor ?? 0)
-        + (PrecoDoMotor(item) ?? 0);
+        LinhasDePreco(item).Sum(l => Efetivo(item, l.Chave, l.Puxado) ?? 0);
 
     // ---------- parte elétrica ----------
 
@@ -772,6 +975,40 @@
             ? candidatos.FirstOrDefault(m => m.Id == item.MotorId)
             : null;
     }
+
+    private void LigarPartidor(ItemProposta item)
+    {
+        item.ComPartidor = true;
+        if (item.Partidor.Length == 0)
+            item.Partidor = OpcoesReais(ListaDosPartidores).FirstOrDefault()?.Valor ?? "";
+    }
+
+    private void DesligarInstrumentacao(ItemProposta item)
+    {
+        item.ComInstrumentacao = false;
+        item.Instrumentacao.Clear();
+    }
+
+    private void MarcarInstrumentacao(ItemProposta item, string valor, bool marcada)
+    {
+        if (marcada)
+        {
+            if (!item.Instrumentacao.Contains(valor)) item.Instrumentacao.Add(valor);
+        }
+        else
+        {
+            item.Instrumentacao.Remove(valor);
+        }
+    }
+
+    /// <summary>
+    /// A linha do partidor. O preço dele vem da POTÊNCIA do motor, que já está
+    /// escolhida na parte elétrica — por isso ela mora aqui e não no escopo.
+    /// </summary>
+    private ItemDoEscopo? LinhaDoPartidor(ItemProposta item) =>
+        item.ComPartidor && item.Partidor.Length > 0
+            ? Resolver(item, ListaDosPartidores, item.Partidor)
+            : null;
 
     private decimal? PrecoDoMotor(ItemProposta item) => MotorDe(item) is { } motor
         ? DadosExcel.Numero(EscopoProposta.PrecoDoMotor(motor, _proposta.Moeda))
@@ -816,9 +1053,12 @@
     private decimal Total => _proposta.Itens.Sum(SubtotalDe);
 
     /// <summary>Escolhas que deveriam ter preço e não têm — para avisar sem travar.</summary>
-    private int FaltaPreco => _proposta.Itens
-        .SelectMany(Itens)
-        .Count(i => !i.Ausencia && i.Valor is null);
+    /// <summary>
+    /// Linhas que continuam sem preço nenhum — nem do cadastro, nem digitado.
+    /// É o aviso de que a proposta ainda não fecha, sem travar o trabalho.
+    /// </summary>
+    private int FaltaPreco => _proposta.Itens.Sum(item => LinhasDePreco(item)
+        .Count(l => Efetivo(item, l.Chave, l.Puxado) is null));
 
     /// <summary>
     /// O código do equipamento: modelo + cada opção + o motor, nesta ordem —
@@ -827,9 +1067,17 @@
     private string CodigoDe(ItemProposta item)
     {
         var codigo = EscopoProposta.Codigo(ModeloDe(item), Itens(item));
-        var motor = MotorDe(item);
 
-        return motor is null ? codigo : codigo + motor.Codigo;
+        if (MotorDe(item) is { } motor) codigo += motor.Codigo;
+        if (LinhaDoPartidor(item) is { } partidor) codigo += partidor.Codigo;
+
+        if (item.ComInstrumentacao)
+        {
+            foreach (var nome in item.Instrumentacao)
+                codigo += Resolver(item, ListaDaInstrumentacao, nome).Codigo;
+        }
+
+        return codigo;
     }
 
     private string Dinheiro(decimal? valor) => valor is null

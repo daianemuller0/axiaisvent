@@ -38,6 +38,29 @@ public sealed class ItemProposta
     /// <summary>O id do motor, quando o filtro já chegou a um só.</summary>
     public string MotorId { get; set; } = "";
 
+    /// <summary>Verdadeiro quando a proposta leva partidor.</summary>
+    public bool ComPartidor { get; set; }
+
+    /// <summary>A opção escolhida na lista de partidores.</summary>
+    public string Partidor { get; set; } = "";
+
+    /// <summary>Verdadeiro quando a proposta leva instrumentação.</summary>
+    public bool ComInstrumentacao { get; set; }
+
+    /// <summary>
+    /// As instrumentações escolhidas — aqui pode ser mais de uma, ao contrário
+    /// das outras listas, onde a escolha é uma só.
+    /// </summary>
+    public List<string> Instrumentacao { get; set; } = new();
+
+    /// <summary>
+    /// Preços digitados à mão, por linha da proposta ("motor", "partidor",
+    /// "lista:Difusor"…). Todo preço puxado do cadastro pode ser trocado aqui:
+    /// o cadastro é a regra, e esta é a exceção do caso concreto — inclusive
+    /// quando o cadastro ainda não tem preço nenhum.
+    /// </summary>
+    public Dictionary<string, string> PrecosManuais { get; set; } = new();
+
     /// <summary>
     /// A coluna da planilha de onde este item veio ("D", "E"…), quando veio de
     /// uma. Serve para a tela dizer de onde cada coisa saiu.

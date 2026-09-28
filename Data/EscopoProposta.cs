@@ -104,19 +104,25 @@ public static class EscopoProposta
     /// Resolve UMA escolha: quanto custa e com que código, para este modelo e
     /// nesta moeda.
     /// </summary>
+    /// <param name="potenciaMotor">
+    /// A potência do motor já escolhido, em CV. É a referência das listas que se
+    /// precificam pelo motor — o partidor —, e vem vazia enquanto a parte
+    /// elétrica não tiver motor definido.
+    /// </param>
     public static ItemDoEscopo Resolver(
         Caracteristica opcao,
         Equipamento? modelo,
         Moeda moeda,
-        List<PrecoReferencia> precos)
+        List<PrecoReferencia> precos,
+        string potenciaMotor = "")
     {
         var familia = FamiliaDePreco.De(opcao.Grupo, opcao.Valor);
 
-        if (familia is not null && modelo is not null)
+        if (familia is not null)
         {
-            // hoje o escopo do ventilador só tem o eixo do Fan Diameter; a
-            // potência do motor entra quando o partidor entrar na proposta
-            var referencia = familia.Eixo == EixoDePreco.FanDiameter ? modelo.Diametro : "";
+            var referencia = familia.Eixo == EixoDePreco.FanDiameter
+                ? modelo?.Diametro ?? ""
+                : potenciaMotor;
 
             var linha = referencia.Length == 0
                 ? null
@@ -137,7 +143,9 @@ public static class EscopoProposta
             ? "sem custo"
             : familia is null
                 ? "preço único da opção"
-                : $"a tabela de {familia.Rotulo} ainda não tem preço para este {familia.RotuloDoEixo}";
+                : familia.Eixo == EixoDePreco.PotenciaMotor && potenciaMotor.Length == 0
+                    ? "escolha o motor: o preço vem da potência dele"
+                    : $"a tabela de {familia.Rotulo} ainda não tem preço para este {familia.RotuloDoEixo}";
 
         return new ItemDoEscopo(opcao.Grupo, opcao.Valor, opcao.Codigo, doCadastro,
             DadosExcel.Numero(doCadastro), origem);

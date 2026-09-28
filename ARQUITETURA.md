@@ -990,6 +990,35 @@ O frame escolhido passa pela regra que já existia na guia Dados (`RegraMotor`),
 com o frame máximo da combinação e, na falta dele, com o do cubo. Aqui ela **avisa e não
 impede**: quem monta a proposta pode saber de uma exceção que o cadastro ainda não tem.
 
+Junto com o motor moram mais duas listas, e elas saíram do escopo do ventilador de
+propósito:
+
+- **PARTIDORES** — flag Sem/Com e uma escolha. O preço vem da **potência do motor**, que já
+  está definida logo acima: é a mesma tabela por referência do resto do sistema, só que no
+  eixo `PotenciaMotor`. Sem motor escolhido, a linha diz *"escolha o motor: o preço vem da
+  potência dele"* em vez de um valor errado.
+- **INSTRUMENTAÇÃO** — flag Sem/Com e **várias** escolhas, que é o que a equipe precisa: um
+  equipamento pode levar vibração e vazão ao mesmo tempo. Cada marcada entra com o seu
+  código e o seu preço.
+
+Quais listas são "da parte elétrica" é decidido pelo nome (`partidor`, `instrumenta`), como
+o resto das regras de lista — renomear não quebra.
+
+### Puxa, mas dá para corrigir
+
+Regra geral da proposta, e não exceção de um campo: **toda linha de preço é editável**. O
+campo já vem com o valor do cadastro; digitar outro passa a valer para aquela proposta, e um
+**↺** ao lado volta ao cadastro. Apagar o campo também volta — apagar é "usa o que está
+cadastrado", nunca "vale zero".
+
+`ItemProposta.PrecosManuais` guarda essas exceções por chave de linha (`motor`, `partidor`,
+`lista:Difusor`, `instr:SENSOR DE VAZÃO`). Quem soma e quem desenha leem a mesma lista
+(`LinhasDePreco`), então total, aviso de "falta preço" e tela nunca divergem. Digitar
+exatamente o número que o cadastro já dava não cria exceção nenhuma.
+
+É isto que destrava o caso mais comum do dia a dia: o cadastro ainda não tem aquele preço, e
+a proposta precisa sair hoje.
+
 ### A proposta guarda a escolha, nunca o preço
 
 `Proposta` (entidade `propostas`) guarda a moeda e, por equipamento, a quantidade, o id do
