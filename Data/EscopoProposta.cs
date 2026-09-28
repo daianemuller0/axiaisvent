@@ -53,6 +53,53 @@ public static class EscopoProposta
         _ => e.Preco,
     };
 
+    /// <summary>O preço de um motor do catálogo, na moeda pedida.</summary>
+    public static string PrecoDoMotor(Motor m, Moeda moeda) => moeda switch
+    {
+        Moeda.Usd => m.PrecoUsd,
+        Moeda.Clp => m.PrecoClp,
+        _ => m.Preco,
+    };
+
+    /// <summary>
+    /// Os campos que identificam um motor, na ordem em que a equipe escolhe.
+    /// Cada um é um filtro: escolhendo de cima para baixo, o catálogo vai
+    /// afunilando até sobrar um motor.
+    /// </summary>
+    public static readonly (string Rotulo, Func<Motor, string> Valor)[] CamposDoMotor =
+    {
+        ("Fabricante", m => m.Fabricante),
+        ("Potência (CV)", m => m.PotenciaCv),
+        ("Frequência (Hz)", m => m.Frequencia),
+        ("Tensão", m => m.Tensao),
+        ("Rotação (rpm)", m => m.Rotacao),
+        ("Nº de polos", m => m.Polos),
+        ("Tipo de flange", m => m.Flange),
+        ("IEC/NEMA", m => m.Padrao),
+        ("Frame", m => m.Frame),
+    };
+
+    /// <summary>
+    /// Os motores que atendem a um equipamento e ao que já foi escolhido no
+    /// filtro. <paramref name="ignorar"/> deixa um campo de fora — é o que
+    /// permite a cada seletor mostrar as suas próprias opções sem se apagar.
+    /// </summary>
+    public static List<Motor> MotoresPara(List<Motor> catalogo, string serie,
+        Dictionary<string, string> filtro, string ignorar = "")
+    {
+        var lista = catalogo.Where(m => m.ServeA(serie));
+
+        foreach (var (rotulo, valor) in CamposDoMotor)
+        {
+            if (rotulo == ignorar) continue;
+            if (!filtro.TryGetValue(rotulo, out var escolhido) || escolhido.Length == 0) continue;
+
+            lista = lista.Where(m => valor(m) == escolhido);
+        }
+
+        return lista.ToList();
+    }
+
     /// <summary>
     /// Resolve UMA escolha: quanto custa e com que código, para este modelo e
     /// nesta moeda.

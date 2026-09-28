@@ -969,6 +969,27 @@ Depois de importar, um quadro lista o que veio e o que ficou faltando — inclus
 **modelo de cada equipamento**, que a folha não diz: ela dá a quantidade, não qual
 ventilador. É o que evita mandar proposta pela metade achando que a planilha cuidou de tudo.
 
+### A parte elétrica
+
+O motor entra junto com o escopo, por equipamento: um flag **Sem / Com** e, no Com, uma
+caixa com os nove campos do catálogo — fabricante, potência, frequência, tensão, rotação,
+nº de polos, tipo de flange, IEC/NEMA e frame. Quando o filtro chega a **um** motor, vêm o
+**código**, o **preço** na moeda da proposta e a **observação**.
+
+Dois detalhes que valem registrar:
+
+- **A série do motor filtra o catálogo.** A equipe escreve "as duas" (ou deixa vazio) quando
+  o motor serve ao VAX e ao Joy, e "VAX" ou "Joy" quando é de uma linha só — `Motor.ServeA`.
+  Escolher um modelo Joy esconde os motores só-VAX antes de qualquer outro filtro, então a
+  lista que aparece já é a que pode ser vendida.
+- **Cada seletor mostra o que ainda é possível.** As opções de um campo saem dos motores que
+  passam pelos OUTROS filtros (`MotoresPara(..., ignorar: campo)`), que é o que evita o
+  seletor apagar as próprias opções ao ser usado.
+
+O frame escolhido passa pela regra que já existia na guia Dados (`RegraMotor`), comparando
+com o frame máximo da combinação e, na falta dele, com o do cubo. Aqui ela **avisa e não
+impede**: quem monta a proposta pode saber de uma exceção que o cadastro ainda não tem.
+
 ### A proposta guarda a escolha, nunca o preço
 
 `Proposta` (entidade `propostas`) guarda a moeda e, por equipamento, a quantidade, o id do

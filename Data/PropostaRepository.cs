@@ -23,6 +23,21 @@ public sealed class ItemProposta
     /// <summary>A opção marcada em cada lista de característica.</summary>
     public Dictionary<string, string> Escolhas { get; set; } = new();
 
+    // ---------- parte elétrica ----------
+
+    /// <summary>Verdadeiro quando a proposta leva motor para este equipamento.</summary>
+    public bool ComMotor { get; set; }
+
+    /// <summary>
+    /// O que já foi escolhido no motor, campo por campo ("Fabricante" → "WEG").
+    /// A escolha é guardada campo a campo, e não só o id do motor, porque ela
+    /// pode estar pela metade: a equipe vai apertando o filtro até sobrar um.
+    /// </summary>
+    public Dictionary<string, string> FiltroMotor { get; set; } = new();
+
+    /// <summary>O id do motor, quando o filtro já chegou a um só.</summary>
+    public string MotorId { get; set; } = "";
+
     /// <summary>
     /// A coluna da planilha de onde este item veio ("D", "E"…), quando veio de
     /// uma. Serve para a tela dizer de onde cada coisa saiu.

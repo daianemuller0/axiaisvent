@@ -179,15 +179,15 @@ public static class FolhaDeDados
     /// </summary>
     public static string? Casar(string texto, List<Caracteristica> opcoes)
     {
-        var alvo = Simples(texto);
+        var alvo = Textos.Simples(texto);
         if (alvo.Length == 0) return null;
 
         // 1) o próprio nome da opção
-        var exata = opcoes.FirstOrDefault(o => Simples(o.Valor) == alvo);
+        var exata = opcoes.FirstOrDefault(o => Textos.Simples(o.Valor) == alvo);
         if (exata is not null) return exata.Valor;
 
         var contida = opcoes.FirstOrDefault(o =>
-            Simples(o.Valor).Contains(alvo) || alvo.Contains(Simples(o.Valor)));
+            Textos.Simples(o.Valor).Contains(alvo) || alvo.Contains(Textos.Simples(o.Valor)));
 
         // "sem" casaria com "sem contrarrecuo" por conter, o que é certo; mas
         // também casaria com qualquer coisa curta demais, então só vale de 3
@@ -211,20 +211,7 @@ public static class FolhaDeDados
         t is "com" or "sim" or "s" or "yes" or "com item";
 
     /// <summary>Compara sem acento, sem caixa e sem espaço sobrando.</summary>
-    private static bool Parecido(string a, string b) => Simples(a) == Simples(b);
-
-    private static string Simples(string texto)
-    {
-        var normal = (texto ?? "").Trim().ToLowerInvariant()
-            .Normalize(System.Text.NormalizationForm.FormD);
-
-        var limpo = new string(normal
-            .Where(c => System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c)
-                != System.Globalization.UnicodeCategory.NonSpacingMark)
-            .ToArray());
-
-        return limpo.Normalize(System.Text.NormalizationForm.FormC);
-    }
+    private static bool Parecido(string a, string b) => Textos.Igual(a, b);
 
     private static string Texto(IXLWorksheet ws, string celula) =>
         ws.Cell(celula).GetFormattedString().Trim();

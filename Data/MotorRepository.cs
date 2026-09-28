@@ -60,6 +60,31 @@ public sealed class Motor
     /// <summary>Observações em texto livre — o que não coube nas outras colunas.</summary>
     public string Observacoes { get; set; } = "";
 
+    /// <summary>
+    /// Como a equipe escreve, na coluna Série, que o motor serve às duas linhas
+    /// de produto. Deixar vazio também vale — é o que já estava no cadastro.
+    /// </summary>
+    private static readonly string[] AsDuas =
+        { "as duas", "ambas", "duas", "todas", "vax e joy", "joy e vax", "vax/joy", "joy/vax" };
+
+    /// <summary>
+    /// O motor serve a esta linha de produto?
+    ///
+    /// A regra é da equipe: "se o motor estiver como as duas, ele serve para o
+    /// VAX e o Joy; se estiver como VAX, serve só no VAX". Por isso a proposta
+    /// só oferece motores que servem à série do modelo escolhido.
+    /// </summary>
+    public bool ServeA(string serie)
+    {
+        var minha = Textos.Simples(Serie);
+        if (minha.Length == 0 || AsDuas.Contains(minha)) return true;
+
+        var pedida = Textos.Simples(serie);
+        if (pedida.Length == 0) return true;
+
+        return minha.Contains(pedida) || pedida.Contains(minha);
+    }
+
     /// <summary>Como o motor aparece numa mensagem: o frame, ou o que houver.</summary>
     public string Descricao
     {

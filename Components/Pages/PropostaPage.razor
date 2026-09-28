@@ -5,6 +5,8 @@
 @inject EquipamentoRepository Equipamentos
 @inject CaracteristicaRepository Caracteristicas
 @inject PrecoReferenciaRepository Precos
+@inject MotorRepository Motores
+@inject LimiteMotorRepository Limites
 
 <div class="page-head">
     <div>
@@ -441,6 +443,79 @@
                 }
             </div>
         }
+
+        <!-- ---------- parte elétrica ---------- -->
+        <div class="toolbar" style="flex-wrap:wrap; border-top:2px solid var(--border); padding-top:14px; margin-top:14px">
+            <strong style="min-width:210px">@Campo("Parte Elétrica")</strong>
+            <button class="@(atual.ComMotor ? "btn-ghost" : "btn-primary")"
+                    @onclick="() => atual.ComMotor = false">Sem</button>
+            <button class="@(atual.ComMotor ? "btn-primary" : "btn-ghost")"
+                    @onclick="() => atual.ComMotor = true">Com</button>
+
+            <span class="subtitle" style="margin:0">
+                o catálogo de motores, já filtrado pela série
+                @(modelo is null ? "do modelo" : $"\"{modelo.Serie}\"") — motor marcado como
+                "as duas" serve às duas linhas
+            </span>
+        </div>
+
+        @if (atual.ComMotor)
+        {
+            var candidatos = Candidatos(atual);
+
+            <div class="panel" style="margin:0 0 14px; border-left:3px solid var(--azul, #0b3d6b)">
+                <div class="form3">
+                    @foreach (var campo in EscopoProposta.CamposDoMotor)
+                    {
+                        var rotulo = campo.Rotulo;
+                        var opcoes = OpcoesDoCampo(atual, campo);
+
+                        <label>
+                            @rotulo
+                            <select class="cell" value="@atual.FiltroMotor.GetValueOrDefault(rotulo, "")"
+                                    @onchange="e => FiltrarMotor(atual, rotulo, e.Value?.ToString() ?? string.Empty)">
+                                <option value="">— todos (@opcoes.Count) —</option>
+                                @foreach (var o in opcoes)
+                                {
+                                    <option value="@o" selected="@(o == atual.FiltroMotor.GetValueOrDefault(rotulo, ""))">@o</option>
+                                }
+                            </select>
+                        </label>
+                    }
+                </div>
+
+                <div class="toolbar" style="margin:14px 0 0; flex-wrap:wrap">
+                    <span class="val-count">@candidatos.Count motor(es) atendem</span>
+                    <button class="btn-link" @onclick="() => LimparFiltro(atual)">limpar filtro</button>
+                    <span style="flex:1"></span>
+
+                    @if (MotorDe(atual) is { } motor)
+                    {
+                        <strong>@(motor.Codigo.Length > 0 ? $"código {motor.Codigo}" : "sem código")</strong>
+                        <span class="val-count">@Dinheiro(DadosExcel.Numero(EscopoProposta.PrecoDoMotor(motor, _proposta.Moeda)))</span>
+                    }
+                    else
+                    {
+                        <span class="subtitle" style="margin:0">
+                            aperte o filtro até sobrar um motor — aí vêm o código, o preço e a
+                            observação
+                        </span>
+                    }
+                </div>
+
+                @if (MotorDe(atual) is { } escolhido && escolhido.Observacoes.Length > 0)
+                {
+                    <p class="subtitle" style="margin:10px 0 0">
+                        <strong>Observação:</strong> @escolhido.Observacoes
+                    </p>
+                }
+
+                @if (AvisoDoMotor(atual) is { } aviso)
+                {
+                    <div class="aviso aviso-alerta" style="margin-top:10px">@aviso</div>
+                }
+            </div>
+        }
     }
 </div>
 
@@ -495,6 +570,23 @@
                             <td class="nowrap right">@Dinheiro(linha.Valor)</td>
                         </tr>
                     }
+                    @if (doItem.ComMotor)
+                    {
+                        var motor = MotorDe(doItem);
+                        <tr>
+                            <td class="nowrap"><strong>Parte Elétrica</strong></td>
+                            <td class="nowrap">@(motor is null ? "motor ainda não definido" : motor.Descricao)</td>
+                            <td class="nowrap">@(motor is null || motor.Codigo.Length == 0 ? "—" : motor.Codigo)</td>
+                            <td class="nowrap">
+                                <span class="subtitle">
+                                    @(motor is null
+                                        ? "aperte o filtro até sobrar um motor"
+                                        : motor.Observacoes.Length > 0 ? motor.Observacoes : "catálogo de motores")
+                                </span>
+                            </td>
+                            <td class="nowrap right">@Dinheiro(PrecoDoMotor(doItem))</td>
+                        </tr>
+                    }
                     <tr>
                         <td colspan="4" class="right">
                             <strong>Unitário</strong> × @doItem.Quantos
@@ -526,6 +618,8 @@
     private List<Proposta> _gravadas = new();
 
     private List<Equipamento> _equipamentos = new();
+    private List<Motor> _motores = new();
+    private List<LimiteMotor> _limites = new();
     private List<string> _listas = new();
     private Dictionary<string, List<Caracteristica>> _porGrupo = new();
     private List<Caracteristica> _caracteristicas = new();
@@ -565,6 +659,8 @@
     {
         _gravadas = Repo.Todas();
         _equipamentos = Equipamentos.Todos();
+        _motores = Motores.Todos();
+        _limites = Limites.Todos();
         _precos = Precos.Todos();
 
         _caracteristicas = Caracteristicas.Todas();
@@ -634,7 +730,86 @@
         .ToList();
 
     private decimal Unitario(ItemProposta item) =>
-        (PrecoDoModelo(item) ?? 0) + Itens(item).Sum(i => i.Valor ?? 0);
+        (PrecoDoModelo(item) ?? 0)
+        + Itens(item).Sum(i => i.Valor ?? 0)
+        + (PrecoDoMotor(item) ?? 0);
+
+    // ---------- parte elétrica ----------
+
+    /// <summary>A série do modelo escolhido — é ela que filtra o catálogo.</summary>
+    private string SerieDe(ItemProposta item) => ModeloDe(item)?.Serie ?? "";
+
+    /// <summary>Os motores que ainda atendem ao filtro deste equipamento.</summary>
+    private List<Motor> Candidatos(ItemProposta item) =>
+        EscopoProposta.MotoresPara(_motores, SerieDe(item), item.FiltroMotor);
+
+    /// <summary>
+    /// As opções de um campo: os valores distintos entre os motores que passam
+    /// pelos OUTROS filtros. Assim cada seletor mostra o que ainda é possível,
+    /// e escolher um campo não apaga as opções dele mesmo.
+    /// </summary>
+    private List<string> OpcoesDoCampo(ItemProposta item,
+        (string Rotulo, Func<Motor, string> Valor) campo) =>
+        EscopoProposta.MotoresPara(_motores, SerieDe(item), item.FiltroMotor, campo.Rotulo)
+            .Select(campo.Valor)
+            .Where(v => v.Length > 0)
+            .Distinct()
+            .OrderBy(v => Medida.Numero(v))
+            .ThenBy(v => v, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+    /// <summary>O motor escolhido: existe quando o filtro chegou a um só.</summary>
+    private Motor? MotorDe(ItemProposta item)
+    {
+        if (!item.ComMotor) return null;
+
+        var candidatos = Candidatos(item);
+        if (candidatos.Count == 1) return candidatos[0];
+
+        // filtro ainda aberto, mas com um motor já fixado antes: vale enquanto
+        // ele continuar entre os candidatos
+        return item.MotorId.Length > 0
+            ? candidatos.FirstOrDefault(m => m.Id == item.MotorId)
+            : null;
+    }
+
+    private decimal? PrecoDoMotor(ItemProposta item) => MotorDe(item) is { } motor
+        ? DadosExcel.Numero(EscopoProposta.PrecoDoMotor(motor, _proposta.Moeda))
+        : null;
+
+    private void FiltrarMotor(ItemProposta item, string campo, string valor)
+    {
+        if (valor.Length == 0) item.FiltroMotor.Remove(campo);
+        else item.FiltroMotor[campo] = valor;
+
+        var candidatos = Candidatos(item);
+        item.MotorId = candidatos.Count == 1 ? candidatos[0].Id : "";
+    }
+
+    private void LimparFiltro(ItemProposta item)
+    {
+        item.FiltroMotor.Clear();
+        item.MotorId = "";
+    }
+
+    /// <summary>
+    /// O frame escolhido cabe no equipamento? A regra já existe para a guia
+    /// Dados — aqui ela só avisa, nunca impede: quem monta a proposta pode
+    /// saber de uma exceção que o cadastro não tem.
+    /// </summary>
+    private string? AvisoDoMotor(ItemProposta item)
+    {
+        var motor = MotorDe(item);
+        if (motor is null || ModeloDe(item) is not { } modelo) return null;
+        if (motor.Frame.Length == 0 || motor.Padrao.Length == 0) return null;
+
+        var resultado = RegraMotor.Verificar(_limites, _motores, modelo.Serie, modelo.Cubo,
+            motor.Padrao, motor.Frame, modelo.FrameMaximo(motor.Padrao));
+
+        return resultado.Situacao == RegraMotor.Situacao.AcimaDoLimite
+            ? resultado.Mensagem
+            : null;
+    }
 
     private decimal SubtotalDe(ItemProposta item) => Unitario(item) * item.Quantos;
 
@@ -645,8 +820,17 @@
         .SelectMany(Itens)
         .Count(i => !i.Ausencia && i.Valor is null);
 
-    private string CodigoDe(ItemProposta item) =>
-        EscopoProposta.Codigo(ModeloDe(item), Itens(item));
+    /// <summary>
+    /// O código do equipamento: modelo + cada opção + o motor, nesta ordem —
+    /// a parte elétrica é a última porque é a última a ser escolhida.
+    /// </summary>
+    private string CodigoDe(ItemProposta item)
+    {
+        var codigo = EscopoProposta.Codigo(ModeloDe(item), Itens(item));
+        var motor = MotorDe(item);
+
+        return motor is null ? codigo : codigo + motor.Codigo;
+    }
 
     private string Dinheiro(decimal? valor) => valor is null
         ? "—"
