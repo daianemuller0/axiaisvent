@@ -1144,10 +1144,14 @@ inverter a fórmula:
 markup = (1 − percentuais) ÷ (1 − percentuais − margem pedida)
 ```
 
-São os dois modos da tela: **pela margem** (padrão 25%, o markup sai) e **pelo preço**
+São os dois modos da tela: **pela margem** (padrão **28%**, o markup sai) e **pelo preço**
 (a equipe digita o preço-meta, o markup e a margem saem). Sair do padrão — 2% de risco, 3%
-de negociação, 25% de margem — acende **"Solicitar aprovação de Pricing"** ao lado do campo,
+de negociação, 28% de margem — acende **"Solicitar aprovação de Pricing"** ao lado do campo,
 sem impedir nada: quem aprova é gente, o sistema só não deixa passar despercebido.
+
+> A planilha nasceu com 25% em P25; a equipe subiu a régua para 28%. Proposta gravada antes
+> disso guarda os 25% que tinha, e por isso passa a acender o aviso — que é o comportamento
+> certo: ela está abaixo do padrão de hoje.
 
 ### A planilha gerada é a deles
 

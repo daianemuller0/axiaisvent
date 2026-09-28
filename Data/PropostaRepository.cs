@@ -150,8 +150,8 @@ public sealed class Proposta
     /// <summary>"margem" (a partir da margem pedida) ou "preco" (a partir do preço-meta).</summary>
     public string ModoDoPreco { get; set; } = "margem";
 
-    /// <summary>Margem pedida, em % (P25). Padrão 25%.</summary>
-    public string MargemAlvo { get; set; } = "25";
+    /// <summary>Margem pedida, em % (P25). Padrão 28%.</summary>
+    public string MargemAlvo { get; set; } = "28";
 
     /// <summary>Preço-meta, quando o cálculo parte dele.</summary>
     public string PrecoMeta { get; set; } = "";
@@ -528,7 +528,7 @@ public sealed class PropostaRepository
             Representante2 = S(r, 32), Representante2Contato = S(r, 33),
             Beneficio = S(r, 34), Fianca = Ou(S(r, 35), "Não"),
             RiscoAdicional = Ou(S(r, 36), "2"), MargemNegociacao = Ou(S(r, 37), "3"),
-            ModoDoPreco = Ou(S(r, 38), "margem"), MargemAlvo = Ou(S(r, 39), "25"),
+            ModoDoPreco = Ou(S(r, 38), "margem"), MargemAlvo = Ou(S(r, 39), "28"),
             PrecoMeta = S(r, 40),
             EnviadaEm = S(r, 41), CriadaEm = S(r, 42),
             MoedaCodigo = S(r, 43),
