@@ -1,4 +1,5 @@
 @page "/axiais/proposta"
+@page "/axiais/proposta/{Id?}"
 @attribute [Authorize]
 @rendermode InteractiveServer
 @inject PropostaRepository Repo
@@ -7,6 +8,7 @@
 @inject PrecoReferenciaRepository Precos
 @inject IJSRuntime JS
 @inject IWebHostEnvironment Ambiente
+@inject NavigationManager Navegacao
 @inject MotorRepository Motores
 @inject LimiteMotorRepository Limites
 
@@ -20,7 +22,23 @@
         </p>
     </div>
     <div class="page-actions">
+        <button class="btn-ghost" @onclick="@(() => Navegacao.NavigateTo("/axiais/propostas"))">
+            ☰ Propostas
+        </button>
         <button class="btn-ghost" @onclick="Nova">+ Nova</button>
+
+        @if (_proposta.Id.Length > 0 && !_proposta.Enviada)
+        {
+            <button class="btn-ghost" @onclick="MarcarEnviada" title="Registrar no histórico que foi enviada ao cliente">
+                ✈ Marcar como enviada
+            </button>
+        }
+        else if (_proposta.Enviada)
+        {
+            <span class="val-count" title="Clique para desfazer" style="cursor:pointer"
+                  @onclick="DesmarcarEnviada">enviada em @DataCurta(_proposta.EnviadaEm)</span>
+        }
+
         <button class="btn-primary" @onclick="Salvar">💾 Salvar</button>
     </div>
 </div>
@@ -1013,6 +1031,9 @@
     private List<Equipamento> _equipamentos = new();
     private List<Motor> _motores = new();
     private List<LimiteMotor> _limites = new();
+
+    /// <summary>A conta da proposta — a mesma que a lista de propostas usa.</summary>
+    private CustoDaProposta _custo = default!;
     private List<string> _listas = new();
     private Dictionary<string, List<Caracteristica>> _porGrupo = new();
     private List<Caracteristica> _caracteristicas = new();
@@ -1032,7 +1053,30 @@
     private List<string> _avisos = new();
     private List<string> _manuais = new();
 
+    /// <summary>Id na rota: /axiais/proposta/{id} abre aquela proposta direto.</summary>
+    [Parameter] public string? Id { get; set; }
+
     protected override void OnInitialized() => Recarregar();
+
+    /// <summary>
+    /// A rota manda. Como a mesma página atende /axiais/proposta e
+    /// /axiais/proposta/{id}, isto roda também quando a lista navega para cá.
+    /// </summary>
+    protected override void OnParametersSet()
+    {
+        if (string.IsNullOrWhiteSpace(Id) || Id == _proposta.Id) return;
+
+        if (Repo.Achar(Id) is { } achada)
+        {
+            _proposta = achada;
+            _aberto = 0;
+            Aviso($"Proposta {achada.Numero} aberta.");
+        }
+        else
+        {
+            Aviso("Essa proposta não está mais no banco.", erro: true);
+        }
+    }
 
     /// <summary>
     /// Uma proposta em branco, já com o que dá para adivinhar: hoje, o ano
@@ -1058,6 +1102,9 @@
 
         _caracteristicas = Caracteristicas.Todas();
         _porGrupo = _caracteristicas.GroupBy(c => c.Grupo).ToDictionary(g => g.Key, g => g.ToList());
+
+        _custo = new CustoDaProposta(_equipamentos, _motores, _caracteristicas,
+            Caracteristicas.Grupos(), _precos);
 
         // o escopo do ventilador mostra as listas na ordem do cadastro, menos as
         // que se precificam pelo motor — o partidor entra quando a proposta
@@ -1111,77 +1158,33 @@
     private string ListaDosPartidores = "PARTIDORES";
     private string ListaDaInstrumentacao = "INSTRUMENTAÇÃO";
 
-    private static bool EhDaParteEletrica(string lista)
-    {
-        var nome = Textos.Simples(lista);
-        return nome.Contains("partidor") || nome.Contains("instrumenta");
-    }
+    private static bool EhDaParteEletrica(string lista) => CustoDaProposta.EhDaParteEletrica(lista);
 
-    /// <summary>As opções de uma lista que não são "sem" — as que se escolhe.</summary>
-    private List<Caracteristica> OpcoesReais(string lista) => _porGrupo
-        .GetValueOrDefault(lista, new())
-        .Where(o => !FamiliaDePreco.EhAusencia(o.Valor))
-        .ToList();
+    private List<Caracteristica> OpcoesReais(string lista) => _custo.OpcoesReais(lista);
 
     private int PosicaoValida =>
         _proposta.Itens.Count == 0 ? 0 : Math.Clamp(_aberto, 0, _proposta.Itens.Count - 1);
 
-    private Equipamento? ModeloDe(ItemProposta item) =>
-        _equipamentos.FirstOrDefault(e => e.Id == item.EquipamentoId);
+    private Equipamento? ModeloDe(ItemProposta item) => _custo.Modelo(item);
 
-    private decimal? PrecoDoModelo(ItemProposta item) => ModeloDe(item) is { } modelo
-        ? DadosExcel.Numero(EscopoProposta.PrecoDoEquipamento(modelo, _proposta.Moeda))
-        : null;
+    private decimal? PrecoDoModelo(ItemProposta item) => _custo.PrecoDoModelo(item, _proposta.Moeda);
 
-    private ItemDoEscopo Resolver(ItemProposta item, string grupo, string valor)
-    {
-        var opcao = _porGrupo.GetValueOrDefault(grupo, new())
-            .FirstOrDefault(o => o.Valor == valor)
-            ?? new Caracteristica { Grupo = grupo, Valor = valor };
+    private ItemDoEscopo Resolver(ItemProposta item, string grupo, string valor) =>
+        _custo.Resolver(item, grupo, valor, _proposta.Moeda);
 
-        return EscopoProposta.Resolver(opcao, ModeloDe(item), _proposta.Moeda, _precos,
-            MotorDe(item)?.PotenciaCv ?? "");
-    }
-
-    /// <summary>As linhas do escopo de um equipamento, na ordem das listas.</summary>
-    private List<ItemDoEscopo> Itens(ItemProposta item) => _listas
-        .Where(l => item.Escolhas.ContainsKey(l) && item.Escolhas[l].Length > 0)
-        .Select(l => Resolver(item, l, item.Escolhas[l]))
-        .ToList();
+    private List<ItemDoEscopo> Itens(ItemProposta item) => _custo.Itens(item, _proposta.Moeda);
 
     // ---------- preço puxado, com a mão por cima ----------
 
-    /// <summary>
-    /// Todas as linhas de preço de um equipamento: a chave, o que o cadastro
-    /// puxou e nada mais. Quem soma, quem desenha e quem valida olham esta
-    /// mesma lista, para nunca divergirem.
-    /// </summary>
-    private List<(string Chave, decimal? Puxado)> LinhasDePreco(ItemProposta item)
-    {
-        var linhas = new List<(string, decimal?)> { ("equipamento", PrecoDoModelo(item)) };
-
-        linhas.AddRange(Itens(item).Select(i => ($"lista:{i.Lista}", i.Valor)));
-
-        if (item.ComMotor) linhas.Add(("motor", PrecoDoMotor(item)));
-        if (LinhaDoPartidor(item) is { } partidor) linhas.Add(("partidor", partidor.Valor));
-
-        if (item.ComInstrumentacao)
-        {
-            linhas.AddRange(item.Instrumentacao.Select(nome =>
-                ($"instr:{nome}", Resolver(item, ListaDaInstrumentacao, nome).Valor)));
-        }
-
-        return linhas;
-    }
+    private List<(string Chave, decimal? Puxado)> LinhasDePreco(ItemProposta item) =>
+        _custo.LinhasDePreco(item, _proposta.Moeda);
 
     /// <summary>
     /// O preço que vale: o digitado à mão, quando houver; o do cadastro, quando
     /// não. É a regra geral da proposta — puxa, mas sempre dá para corrigir.
     /// </summary>
-    private decimal? Efetivo(ItemProposta item, string chave, decimal? puxado) =>
-        item.PrecosManuais.TryGetValue(chave, out var texto) && texto.Trim().Length > 0
-            ? DadosExcel.Numero(texto)
-            : puxado;
+    private static decimal? Efetivo(ItemProposta item, string chave, decimal? puxado) =>
+        CustoDaProposta.Efetivo(item, chave, puxado);
 
     private bool EhManual(ItemProposta item, string chave) =>
         item.PrecosManuais.TryGetValue(chave, out var t) && t.Trim().Length > 0;
@@ -1235,47 +1238,17 @@
         item.PrecosManuais[chave] = valor;
     }
 
-    private decimal Unitario(ItemProposta item) =>
-        LinhasDePreco(item).Sum(l => Efetivo(item, l.Chave, l.Puxado) ?? 0);
+    private decimal Unitario(ItemProposta item) => _custo.Unitario(item, _proposta.Moeda);
 
     // ---------- parte elétrica ----------
 
     /// <summary>A série do modelo escolhido — é ela que filtra o catálogo.</summary>
     private string SerieDe(ItemProposta item) => ModeloDe(item)?.Serie ?? "";
 
-    /// <summary>Os motores que ainda atendem ao filtro deste equipamento.</summary>
-    private List<Motor> Candidatos(ItemProposta item) =>
-        EscopoProposta.MotoresPara(_motores, SerieDe(item), item.FiltroMotor);
+    private List<Motor> Candidatos(ItemProposta item) => _custo.Candidatos(item);
 
-    /// <summary>
-    /// As opções de um campo: os valores distintos entre os motores que passam
-    /// pelos OUTROS filtros. Assim cada seletor mostra o que ainda é possível,
-    /// e escolher um campo não apaga as opções dele mesmo.
-    /// </summary>
     private List<string> OpcoesDoCampo(ItemProposta item,
-        (string Rotulo, Func<Motor, string> Valor) campo) =>
-        EscopoProposta.MotoresPara(_motores, SerieDe(item), item.FiltroMotor, campo.Rotulo)
-            .Select(campo.Valor)
-            .Where(v => v.Length > 0)
-            .Distinct()
-            .OrderBy(v => Medida.Numero(v))
-            .ThenBy(v => v, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
-    /// <summary>O motor escolhido: existe quando o filtro chegou a um só.</summary>
-    private Motor? MotorDe(ItemProposta item)
-    {
-        if (!item.ComMotor) return null;
-
-        var candidatos = Candidatos(item);
-        if (candidatos.Count == 1) return candidatos[0];
-
-        // filtro ainda aberto, mas com um motor já fixado antes: vale enquanto
-        // ele continuar entre os candidatos
-        return item.MotorId.Length > 0
-            ? candidatos.FirstOrDefault(m => m.Id == item.MotorId)
-            : null;
-    }
+        (string Rotulo, Func<Motor, string> Valor) campo) => _custo.OpcoesDoCampo(item, campo);
 
     private void LigarPartidor(ItemProposta item)
     {
@@ -1302,18 +1275,12 @@
         }
     }
 
-    /// <summary>
-    /// A linha do partidor. O preço dele vem da POTÊNCIA do motor, que já está
-    /// escolhida na parte elétrica — por isso ela mora aqui e não no escopo.
-    /// </summary>
-    private ItemDoEscopo? LinhaDoPartidor(ItemProposta item) =>
-        item.ComPartidor && item.Partidor.Length > 0
-            ? Resolver(item, ListaDosPartidores, item.Partidor)
-            : null;
+    private Motor? MotorDe(ItemProposta item) => _custo.MotorDe(item);
 
-    private decimal? PrecoDoMotor(ItemProposta item) => MotorDe(item) is { } motor
-        ? DadosExcel.Numero(EscopoProposta.PrecoDoMotor(motor, _proposta.Moeda))
-        : null;
+    private decimal? PrecoDoMotor(ItemProposta item) => _custo.PrecoDoMotor(item, _proposta.Moeda);
+
+    private ItemDoEscopo? LinhaDoPartidor(ItemProposta item) =>
+        _custo.LinhaDoPartidor(item, _proposta.Moeda);
 
     private void FiltrarMotor(ItemProposta item, string campo, string valor)
     {
@@ -1349,37 +1316,18 @@
             : null;
     }
 
-    private decimal SubtotalDe(ItemProposta item) => Unitario(item) * item.Quantos;
+    private decimal SubtotalDe(ItemProposta item) => _custo.Subtotal(item, _proposta.Moeda);
 
-    private decimal Total => _proposta.Itens.Sum(SubtotalDe);
+    private decimal Total => _custo.Total(_proposta);
 
     /// <summary>Escolhas que deveriam ter preço e não têm — para avisar sem travar.</summary>
     /// <summary>
     /// Linhas que continuam sem preço nenhum — nem do cadastro, nem digitado.
     /// É o aviso de que a proposta ainda não fecha, sem travar o trabalho.
     /// </summary>
-    private int FaltaPreco => _proposta.Itens.Sum(item => LinhasDePreco(item)
-        .Count(l => Efetivo(item, l.Chave, l.Puxado) is null));
+    private int FaltaPreco => _custo.FaltaPreco(_proposta);
 
-    /// <summary>
-    /// O código do equipamento: modelo + cada opção + o motor, nesta ordem —
-    /// a parte elétrica é a última porque é a última a ser escolhida.
-    /// </summary>
-    private string CodigoDe(ItemProposta item)
-    {
-        var codigo = EscopoProposta.Codigo(ModeloDe(item), Itens(item));
-
-        if (MotorDe(item) is { } motor) codigo += motor.Codigo;
-        if (LinhaDoPartidor(item) is { } partidor) codigo += partidor.Codigo;
-
-        if (item.ComInstrumentacao)
-        {
-            foreach (var nome in item.Instrumentacao)
-                codigo += Resolver(item, ListaDaInstrumentacao, nome).Codigo;
-        }
-
-        return codigo;
-    }
+    private string CodigoDe(ItemProposta item) => _custo.Codigo(item, _proposta.Moeda);
 
     private string Dinheiro(decimal? valor) => valor is null
         ? "—"
@@ -1622,6 +1570,31 @@
         _aberto = 0;
         Aviso($"Proposta {achada.Numero} aberta.");
     }
+
+    /// <summary>
+    /// Registra que a proposta saiu para o cliente. A data de envio é o que
+    /// separa rascunho de histórico — e é por ela que a lista ordena.
+    /// </summary>
+    private void MarcarEnviada()
+    {
+        _proposta.EnviadaEm = DateTime.Now.ToString("yyyy-MM-dd");
+        Repo.Salvar(_proposta);
+
+        Recarregar();
+        Aviso($"Proposta {_proposta.Numero} marcada como enviada em {DataCurta(_proposta.EnviadaEm)}.");
+    }
+
+    private void DesmarcarEnviada()
+    {
+        _proposta.EnviadaEm = "";
+        Repo.Salvar(_proposta);
+
+        Recarregar();
+        Aviso($"Proposta {_proposta.Numero} voltou para \"em elaboração\".");
+    }
+
+    private static string DataCurta(string texto) =>
+        DateTime.TryParse(texto, out var data) ? data.ToString("dd/MM/yyyy") : texto;
 
     private void Apagar()
     {

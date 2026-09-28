@@ -156,6 +156,19 @@ public sealed class Proposta
     /// <summary>Preço-meta, quando o cálculo parte dele.</summary>
     public string PrecoMeta { get; set; } = "";
 
+    // ---------- histórico ----------
+
+    /// <summary>
+    /// Quando a proposta foi enviada ao cliente (aaaa-mm-dd). Vazio = ainda em
+    /// elaboração. É o que separa rascunho de proposta que saiu da casa.
+    /// </summary>
+    public string EnviadaEm { get; set; } = "";
+
+    /// <summary>Quando a proposta foi criada no sistema, com hora.</summary>
+    public string CriadaEm { get; set; } = "";
+
+    public bool Enviada => EnviadaEm.Trim().Length > 0;
+
     /// <summary>O contato que vale: o da lista, quando o representante ainda está nela.</summary>
     public string ContatoDoRepresentante()
     {
@@ -490,6 +503,7 @@ public sealed class PropostaRepository
         "representante", "representanteContato", "representante2", "representante2Contato",
         "beneficio", "fianca",
         "riscoAdicional", "margemNegociacao", "modoDoPreco", "margemAlvo", "precoMeta",
+        "enviadaEm", "criadaEm",
         "moeda", "equipamento", "arranjo", "escolhas", "itens",
     };
 
@@ -516,8 +530,9 @@ public sealed class PropostaRepository
             RiscoAdicional = Ou(S(r, 36), "2"), MargemNegociacao = Ou(S(r, 37), "3"),
             ModoDoPreco = Ou(S(r, 38), "margem"), MargemAlvo = Ou(S(r, 39), "25"),
             PrecoMeta = S(r, 40),
-            MoedaCodigo = S(r, 41),
-            Itens = Proposta.LerItens(S(r, 45), S(r, 42), S(r, 43), S(r, 44)),
+            EnviadaEm = S(r, 41), CriadaEm = S(r, 42),
+            MoedaCodigo = S(r, 43),
+            Itens = Proposta.LerItens(S(r, 47), S(r, 44), S(r, 45), S(r, 46)),
         })
         .OrderByDescending(p => p.Numero)
         .ToList();
@@ -527,6 +542,7 @@ public sealed class PropostaRepository
     public void Salvar(Proposta p)
     {
         if (string.IsNullOrWhiteSpace(p.Id)) p.Id = Guid.NewGuid().ToString("n");
+        if (string.IsNullOrWhiteSpace(p.CriadaEm)) p.CriadaEm = DateTime.Now.ToString("yyyy-MM-dd HH:mm");
         if (string.IsNullOrWhiteSpace(p.Numero)) p.Numero = ProximoNumero(p.Ano);
 
         var valores = new object?[]
@@ -541,6 +557,7 @@ public sealed class PropostaRepository
             p.Representante2, p.Representante2Contato,
             p.Beneficio, p.Fianca,
             p.RiscoAdicional, p.MargemNegociacao, p.ModoDoPreco, p.MargemAlvo, p.PrecoMeta,
+            p.EnviadaEm, p.CriadaEm,
             // as três colunas do formato antigo continuam sendo gravadas vazias:
             // o esquema do Parquet é por arquivo, e tirá-las não apagaria as que
             // já estão lá

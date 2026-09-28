@@ -1,0 +1,199 @@
+@page "/axiais/propostas"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject PropostaRepository Repo
+@inject EquipamentoRepository Equipamentos
+@inject MotorRepository Motores
+@inject CaracteristicaRepository Caracteristicas
+@inject PrecoReferenciaRepository Precos
+@inject NavigationManager Navegacao
+
+<div class="page-head">
+    <div>
+        <h1>Propostas</h1>
+        <p class="subtitle">
+            O histórico do que foi cotado. Clique numa linha para abrir a proposta inteira —
+            cabeçalho, escopo, parte elétrica e pricing, como ficou gravada.
+        </p>
+    </div>
+    <div class="page-actions">
+        <button class="btn-ghost" @onclick="Recarregar" title="Buscar no banco o que outra pessoa gravou">
+            🔄 Atualizar
+        </button>
+        <button class="btn-primary" @onclick="@(() => Navegacao.NavigateTo("/axiais/proposta"))">
+            + Nova proposta
+        </button>
+    </div>
+</div>
+
+<div class="toolbar" style="flex-wrap:wrap">
+    <div class="tabs" style="margin:0">
+        @foreach (var (chave, rotulo) in Filtros)
+        {
+            var f = chave;
+            <button class="tab @(_filtro == f ? "active" : "")" @onclick="() => _filtro = f">
+                @rotulo <span class="tab-badge">@Contar(f)</span>
+            </button>
+        }
+    </div>
+
+    <input class="cell" style="width:240px" placeholder="filtrar cliente, número, quem fez…"
+           value="@_busca" @oninput="e => _busca = e.Value?.ToString() ?? string.Empty" />
+
+    <span style="flex:1"></span>
+    <span class="subtitle" style="margin:0">
+        @Filtradas().Count proposta(s) · @Filtradas().Sum(p => CustoDaProposta.Quantidade(p)) equipamento(s)
+    </span>
+</div>
+
+@if (Filtradas().Count == 0)
+{
+    <div class="panel empty" style="padding:22px">
+        @(_busca.Trim().Length > 0
+            ? "Nenhuma proposta casa com esse filtro."
+            : "Nenhuma proposta gravada ainda — comece pela guia Proposta.")
+    </div>
+}
+else
+{
+    <div class="panel" style="padding:0; overflow-x:auto">
+        <table class="grid">
+            <thead>
+                <tr>
+                    <th class="nowrap">Número</th>
+                    <th class="nowrap">Cliente</th>
+                    <th class="nowrap">Projeto</th>
+                    <th class="nowrap right" style="width:90px">Qtde.</th>
+                    <th class="nowrap right" style="width:170px">Valor</th>
+                    <th class="nowrap">Quem fez</th>
+                    <th class="nowrap" style="width:130px">Data</th>
+                    <th class="nowrap" style="width:120px">Situação</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var p in Filtradas())
+                {
+                    var proposta = p;
+                    <tr @key="proposta.Id" style="cursor:pointer" @onclick="() => Abrir(proposta)">
+                        <td class="nowrap"><strong>@(proposta.Numero.Length > 0 ? proposta.Numero : "—")</strong></td>
+                        <td class="nowrap">@(proposta.Cliente.Length > 0 ? proposta.Cliente : "(sem cliente)")</td>
+                        <td class="nowrap"><span class="subtitle">@proposta.Projeto</span></td>
+                        <td class="nowrap right">@CustoDaProposta.Quantidade(proposta)</td>
+                        <td class="nowrap right"><strong>@Valor(proposta)</strong></td>
+                        <td class="nowrap">@proposta.PreparadaPor</td>
+                        <td class="nowrap">@Data(proposta)</td>
+                        <td class="nowrap">
+                            @if (proposta.Enviada)
+                            {
+                                <span class="val-count">enviada</span>
+                            }
+                            else
+                            {
+                                <span class="subtitle">em elaboração</span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <p class="subtitle" style="margin:12px 0 0">
+        O <strong>valor</strong> é a venda líquida do pricing — custo, risco, markup e os
+        percentuais de venda —, na moeda de cada proposta. Ele é recalculado agora, a partir
+        do cadastro: corrigir um preço na guia Dados muda o que aparece aqui.
+    </p>
+}
+
+@code {
+    private List<Proposta> _todas = new();
+    private CustoDaProposta _custo = default!;
+
+    private string _filtro = "enviadas";
+    private string _busca = "";
+
+    private static readonly (string Chave, string Rotulo)[] Filtros =
+    {
+        ("enviadas", "Enviadas"),
+        ("elaboracao", "Em elaboração"),
+        ("todas", "Todas"),
+    };
+
+    protected override void OnInitialized() => Recarregar();
+
+    private void Recarregar()
+    {
+        _todas = Repo.Todas();
+        _custo = new CustoDaProposta(Equipamentos.Todos(), Motores.Todos(),
+            Caracteristicas.Todas(), Caracteristicas.Grupos(), Precos.Todos());
+    }
+
+    private int Contar(string filtro) => Do(filtro).Count;
+
+    private List<Proposta> Do(string filtro) => filtro switch
+    {
+        "enviadas" => _todas.Where(p => p.Enviada).ToList(),
+        "elaboracao" => _todas.Where(p => !p.Enviada).ToList(),
+        _ => _todas,
+    };
+
+    private List<Proposta> Filtradas()
+    {
+        var busca = _busca.Trim();
+
+        var lista = Do(_filtro).Where(p => busca.Length == 0 || new[]
+        {
+            p.Numero, p.Cliente, p.Projeto, p.PreparadaPor, p.Representante,
+        }.Any(t => t.Contains(busca, StringComparison.OrdinalIgnoreCase)));
+
+        // a mais recente em cima: é a que alguém quer abrir
+        return lista
+            .OrderByDescending(p => p.EnviadaEm.Length > 0 ? p.EnviadaEm : p.CriadaEm)
+            .ThenByDescending(p => p.Numero, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    /// <summary>
+    /// O valor da proposta: a venda líquida do pricing, refeita agora com o
+    /// cadastro de hoje — a proposta guarda escolhas, não preços.
+    /// </summary>
+    private string Valor(Proposta p)
+    {
+        var custo = _custo.Total(p);
+        if (custo <= 0m) return "—";
+
+        var entrada = new CalculoPricing.Entrada(
+            CustoTotal: custo,
+            RiscoAdicional: Proposta.Percentual(p.RiscoAdicional, CalculoPricing.RiscoAdicionalPadrao),
+            MargemNegociacao: Proposta.Percentual(p.MargemNegociacao, CalculoPricing.MargemNegociacaoPadrao),
+            Destino: p.Destino,
+            Estado: ListasDaProposta.EstadoDoPricing(p.Pais, p.Estado),
+            VendaPara: p.VendaPara,
+            Beneficio: p.Beneficio,
+            Bu: ListasDaProposta.CodigoDaBu(p.Bu),
+            ComPortal: Proposta.TemPortal(p.Portal),
+            Rep1: p.Representante,
+            Rep2: p.Representante2,
+            ComFianca: Textos.Igual(p.Fianca, "Sim"),
+            Pais: p.Pais);
+
+        var pricing = p.ModoDoPreco == "preco"
+            ? CalculoPricing.PeloPreco(entrada, DadosExcel.Numero(p.PrecoMeta) ?? 0m)
+            : CalculoPricing.PelaMargem(entrada,
+                Proposta.Percentual(p.MargemAlvo, CalculoPricing.MargemAlvoPadrao));
+
+        return $"{p.Moeda.Rotulo()} {pricing.VendaLiquida.ToString("N2", Br)}";
+    }
+
+    private static string Data(Proposta p)
+    {
+        var texto = p.Enviada ? p.EnviadaEm : p.CriadaEm;
+        if (texto.Length == 0) return "—";
+
+        return DateTime.TryParse(texto, out var data) ? data.ToString("dd/MM/yyyy") : texto;
+    }
+
+    private void Abrir(Proposta p) => Navegacao.NavigateTo($"/axiais/proposta/{p.Id}");
+
+    private static readonly System.Globalization.CultureInfo Br = new("pt-BR");
+}

@@ -172,7 +172,9 @@ A pasta vem de `Data:Folder` no `appsettings.json`
 | `/axiais/dados` | Dados | Três vistas na mesma aba: Modelos, Motores e Características |
 | `/axiais/motores` | Dados › Motores | Abre a aba Dados já na vista dos motores (rota antiga, mantida) |
 | `/axiais/caracteristicas` | Dados › Características | Abre a aba Dados já na vista das listas de características |
-| `/axiais/proposta` | Proposta | O documento comercial: cabeçalho, cliente e escopo do ventilador |
+| `/axiais/propostas` | Propostas | O histórico: cliente, valor, quantidade, quem fez e data |
+| `/axiais/proposta` | Montar proposta | O documento comercial: cabeçalho, cliente, escopo e pricing |
+| `/axiais/proposta/{id}` | Montar proposta | Abre aquela proposta gravada, como ela ficou |
 
 ---
 
@@ -1200,3 +1202,32 @@ Duas diferenças **conhecidas** continuam, e a tela avisa nas duas:
   a conta do ICMS multiplica esse `"-"`: o Excel responde **#VALOR!** em S75/S76. A venda
   líquida continua válida — é ela que vira preço na proposta —, mas o preço bruto não sai de
   lá. É um defeito da planilha, não do sistema.
+
+
+---
+
+## 15. O histórico de propostas
+
+`/axiais/propostas` é a lista do que foi cotado: **número, cliente, projeto, quantidade,
+valor, quem fez, data e situação**. Clicar numa linha abre `/axiais/proposta/{id}` com tudo
+como ficou gravado — cabeçalho, escopo, parte elétrica e pricing.
+
+### Enviada é um estado, não uma pasta
+
+`EnviadaEm` guarda o dia em que a proposta saiu para o cliente, e é ele que separa rascunho
+de histórico. As abas da lista são **Enviadas**, **Em elaboração** e **Todas**, e o botão
+*Marcar como enviada* vive na própria proposta — com um clique para desfazer, porque errar o
+botão não pode custar caro. `CriadaEm` é gravado sozinho na primeira gravação, para a lista
+ter data mesmo antes do envio.
+
+### Uma conta só para as duas telas
+
+O valor da lista é a **venda líquida do pricing** — a mesma conta da proposta aberta. Para
+não existirem duas contas que um dia divergissem, ela saiu da tela e virou
+`Data/CustoDaProposta.cs`: modelo, opções, motor, partidor, instrumentação, preços digitados
+à mão, código montado e total. A página da proposta é hoje uma casca em volta dessa classe,
+e a lista usa a mesma.
+
+O valor é **recalculado na hora**, a partir do cadastro de hoje — coerente com a decisão de a
+proposta guardar escolhas e não preços: corrigir um preço na guia Dados muda o que a lista
+mostra, em vez de deixar um número velho congelado.
