@@ -129,12 +129,57 @@ public sealed class Proposta
     /// </summary>
     public string RepresentanteContato { get; set; } = "";
 
+    /// <summary>O segundo representante, quando a venda é dividida (P6 do pricing).</summary>
+    public string Representante2 { get; set; } = "";
+    public string Representante2Contato { get; set; } = "";
+
+    /// <summary>Regime do cliente (J9). Vazio fora do Brasil = "Sem benefício".</summary>
+    public string Beneficio { get; set; } = "";
+
+    /// <summary>Fiança ou seguro garantia (P3): "Sim" ou "Não".</summary>
+    public string Fianca { get; set; } = "Não";
+
+    // ---------- pricing ----------
+
+    /// <summary>Risco adicional (D36). Padrão 2% para axiais NB.</summary>
+    public string RiscoAdicional { get; set; } = "2";
+
+    /// <summary>Margem de negociação (D46). Padrão 3%.</summary>
+    public string MargemNegociacao { get; set; } = "3";
+
+    /// <summary>"margem" (a partir da margem pedida) ou "preco" (a partir do preço-meta).</summary>
+    public string ModoDoPreco { get; set; } = "margem";
+
+    /// <summary>Margem pedida, em % (P25). Padrão 25%.</summary>
+    public string MargemAlvo { get; set; } = "25";
+
+    /// <summary>Preço-meta, quando o cálculo parte dele.</summary>
+    public string PrecoMeta { get; set; } = "";
+
     /// <summary>O contato que vale: o da lista, quando o representante ainda está nela.</summary>
     public string ContatoDoRepresentante()
     {
         var daLista = ListasDaProposta.ContatoDoRepresentante(Representante);
         return daLista.Length > 0 ? daLista : RepresentanteContato;
     }
+
+    public string ContatoDoRepresentante2()
+    {
+        var daLista = ListasDaProposta.ContatoDoRepresentante(Representante2);
+        return daLista.Length > 0 ? daLista : Representante2Contato;
+    }
+
+    /// <summary>
+    /// A proposta passa por um portal de compras? No pricing isso é Sim/Não
+    /// (célula P4) e vale 0,7% sobre a venda; aqui a equipe escolhe qual, e
+    /// "Nenhum" é o único que quer dizer não.
+    /// </summary>
+    public static bool TemPortal(string portal) =>
+        portal.Trim().Length > 0 && !Textos.Igual(portal, "Nenhum");
+
+    /// <summary>Um percentual digitado pela equipe ("2,5" → 0,025).</summary>
+    public static decimal Percentual(string texto, decimal padrao) =>
+        DadosExcel.Numero(texto) is { } n ? n / 100m : padrao;
 
     // ---------- contato que sai no documento ----------
     public string ContatoNome { get; set; } = "";
@@ -224,9 +269,24 @@ public static class ListasDaProposta
 
     public static readonly string[] Idiomas = { "Português", "Espanhol", "Inglês" };
 
-    public static readonly string[] VendaPara = { "Cliente Final", "EPC", "Distribuidor", "Interno" };
+    /// <summary>Venda para (J4 do pricing).</summary>
+    public static readonly string[] VendaPara = { "Industrialização", "Cliente Final", "Revenda" };
 
-    public static readonly string[] Destinos = { "Nacional", "Exportação" };
+    /// <summary>Destino (J5 do pricing).</summary>
+    public static readonly string[] Destinos =
+    {
+        "Nacional", "Exportação", "Exportação com Back to Back", "Back to Back 100% importado",
+    };
+
+    /// <summary>
+    /// Regime do cliente (J9 do pricing). Só aparece quando o país é o Brasil —
+    /// fora dele a proposta fica em "Sem benefício", e a equipe ainda pode
+    /// trocar.
+    /// </summary>
+    public static readonly string[] Beneficios =
+    {
+        "Sem benefício", "não-contribuinte ICMS", "Benefício RECAP / REIDI", "Zona Franca de Manaus",
+    };
 
     public static readonly string[] Categorias = { "Other", "Projeto", "Reposição", "Serviço" };
 
@@ -246,57 +306,61 @@ public static class ListasDaProposta
     ///
     /// A divisão em dois grupos é a da própria planilha da equipe.
     /// </summary>
-    public sealed record Representante(string Grupo, string Nome, string Contato);
+    /// <param name="Comissao">
+    /// A comissão dele, da tabela BD_pricing do pricing (colunas NB e AFM são
+    /// iguais hoje, então uma só basta).
+    /// </param>
+    public sealed record Representante(string Grupo, string Nome, string Contato, decimal Comissao);
 
     public static readonly Representante[] Representantes =
     {
         new("Brasil", "Douglas (Mezza & Baga)",
-            "Douglas M. Matavelli por (11) 97144-3085 ou e-mail: douglas.matavelli@howden.com"),
+            "Douglas M. Matavelli por (11) 97144-3085 ou e-mail: douglas.matavelli@howden.com", 0.03m),
         new("Brasil", "Alexandre (Artman)",
-            "Alexandre B. Pereira por (91) 98883-8142 / (16) 99429-1786 ou e-mail: alexandre.pereira@artman.net.br"),
-        new("Brasil", "Gerson (Lizan)", ""),
+            "Alexandre B. Pereira por (91) 98883-8142 / (16) 99429-1786 ou e-mail: alexandre.pereira@artman.net.br", 0.03m),
+        new("Brasil", "Gerson (Lizan)", "", 0.03m),
         new("Brasil", "Ivars (Dzelme & Leite Ltda)",
-            "Ivars Janis Dzelme por (81) 3221-0250 / (81) 99946-0506 ou e-mail: ivars@hotlink.com.br"),
+            "Ivars Janis Dzelme por (81) 3221-0250 / (81) 99946-0506 ou e-mail: ivars@hotlink.com.br", 0.03m),
         new("Brasil", "Júlio (Doulus)",
-            "Júlio Augusto Afro por (27) 3314-1000 / (27) 98122-1177 ou e-mail: howden@doulus.com.br"),
+            "Júlio Augusto Afro por (27) 3314-1000 / (27) 98122-1177 ou e-mail: howden@doulus.com.br", 0.03m),
         new("Brasil", "Mauricio (Livimat)",
-            "Mauricio A. de Araujo por (21) 99908-1687 ou e-mail: Livimat.comercial@outlook.com"),
+            "Mauricio A. de Araujo por (21) 99908-1687 ou e-mail: Livimat.comercial@outlook.com", 0.03m),
         new("Brasil", "Ricardo (Sesbras)",
-            "Ricardo V. F. Martins por (21) 2532-7404 / (21) 99764-5297 ou e-mail: aviabras@aviabras.com.br"),
-        new("Brasil", "Sander (Provent)", ""),
+            "Ricardo V. F. Martins por (21) 2532-7404 / (21) 99764-5297 ou e-mail: aviabras@aviabras.com.br", 0.05m),
+        new("Brasil", "Sander (Provent)", "", 0.05m),
         new("Brasil", "Thais (InTec)",
-            "InTec – Engª Thais Werner de Lima por (71) 3289-3611 / (71) 9 9961-9278 ou e-mail: intec@inovacaotecnologia.com.br"),
+            "InTec – Engª Thais Werner de Lima por (71) 3289-3611 / (71) 9 9961-9278 ou e-mail: intec@inovacaotecnologia.com.br", 0.03m),
         new("Brasil", "Wander (Wanseve)",
-            "Wander S. da Silva por (16) 3627-6499 / (16) 9 9228 2928 ou e-mail: wanseve@uol.com.br"),
+            "Wander S. da Silva por (16) 3627-6499 / (16) 9 9228 2928 ou e-mail: wanseve@uol.com.br", 0.03m),
         new("Brasil", "Adolpho (Atric)",
-            "Adolpho Procópio Rossi Neto por (11) 99976-1952 ou e-mail: rossi@atric.com.br"),
+            "Adolpho Procópio Rossi Neto por (11) 99976-1952 ou e-mail: rossi@atric.com.br", 0.05m),
 
-        new("América Latina", "ASESORIA Y EQUIPO < =USD 500K", ContatoAseqsa),
-        new("América Latina", "ASESORIA Y EQUIPO < USD 1MM", ContatoAseqsa),
-        new("América Latina", "ASESORIA Y EQUIPO > USD 1MM", ContatoAseqsa),
+        new("América Latina", "ASESORIA Y EQUIPO < =USD 500K", ContatoAseqsa, 0.10m),
+        new("América Latina", "ASESORIA Y EQUIPO < USD 1MM", ContatoAseqsa, 0.075m),
+        new("América Latina", "ASESORIA Y EQUIPO > USD 1MM", ContatoAseqsa, 0.05m),
         new("América Latina", "FERRUNION",
-            "Gilmer Vasquez por: +51 1 4754560 ou e-mail: gsvasquez@ferrunion.net"),
+            "Gilmer Vasquez por: +51 1 4754560 ou e-mail: gsvasquez@ferrunion.net", 0.05m),
         new("América Latina", "H&T",
-            "Jorge Gonzalo Hernández Cabeza por +56 2 29970179 / +56 9 98871135 ou e-mail: jhernandez@ghis.cl"),
+            "Jorge Gonzalo Hernández Cabeza por +56 2 29970179 / +56 9 98871135 ou e-mail: jhernandez@ghis.cl", 0.05m),
         new("América Latina", "HCA",
-            "Angelo Ramirez por +56 9 4478 3695 / +56 2 5725-7371 o e-mail: angelo@hcamineria.cl"),
+            "Angelo Ramirez por +56 9 4478 3695 / +56 2 5725-7371 o e-mail: angelo@hcamineria.cl", 0.06m),
         new("América Latina", "HRI S.A.",
-            "Rury Harms Orrego por +56 2 2592 3500 ou e-mail: rharms@hri.cl"),
-        new("América Latina", "IPT Colômbia < =EUR 500K", ContatoIpt),
-        new("América Latina", "IPT Colômbia < =EUR 750K", ContatoIpt),
-        new("América Latina", "IPT Colômbia < =EUR 1MM", ContatoIpt),
-        new("América Latina", "IPT Colômbia < =EUR 1,25MM", ContatoIpt),
-        new("América Latina", "IPT Colômbia >EUR 1,25MM", ContatoIpt),
+            "Rury Harms Orrego por +56 2 2592 3500 ou e-mail: rharms@hri.cl", 0.05m),
+        new("América Latina", "IPT Colômbia < =EUR 500K", ContatoIpt, 0.08m),
+        new("América Latina", "IPT Colômbia < =EUR 750K", ContatoIpt, 0.065m),
+        new("América Latina", "IPT Colômbia < =EUR 1MM", ContatoIpt, 0.05m),
+        new("América Latina", "IPT Colômbia < =EUR 1,25MM", ContatoIpt, 0.035m),
+        new("América Latina", "IPT Colômbia >EUR 1,25MM", ContatoIpt, 0.03m),
         new("América Latina", "SIMINCO",
             "Alejandro Cadavid L. por +57 323 460 0551 o e-mail comercial@siminco.com.co " +
-            "o Carlos Contreras U. por +57 311 588 488"),
+            "o Carlos Contreras U. por +57 311 588 488", 0.05m),
         new("América Latina", "TEJADA",
-            "Luis Felipe Tejada por: +57 315-505-5397 ou e-mail: Tejadaingenieros@tejadaingenieros.com"),
-        new("América Latina", "Turbomaquinarias <= EUR 100 k", ContatoTurbo),
-        new("América Latina", "Turbomaquinarias <= EUR 500 k", ContatoTurbo),
-        new("América Latina", "Turbomaquinarias <= EUR 2,5 M", ContatoTurbo),
-        new("América Latina", "Turbomaquinarias <= EUR 7,0 M", ContatoTurbo),
-        new("América Latina", "Turbomaquinarias > EUR 7,0 M", ContatoTurbo),
+            "Luis Felipe Tejada por: +57 315-505-5397 ou e-mail: Tejadaingenieros@tejadaingenieros.com", 0.05m),
+        new("América Latina", "Turbomaquinarias <= EUR 100 k", ContatoTurbo, 0.04m),
+        new("América Latina", "Turbomaquinarias <= EUR 500 k", ContatoTurbo, 0.03m),
+        new("América Latina", "Turbomaquinarias <= EUR 2,5 M", ContatoTurbo, 0.025m),
+        new("América Latina", "Turbomaquinarias <= EUR 7,0 M", ContatoTurbo, 0.02m),
+        new("América Latina", "Turbomaquinarias > EUR 7,0 M", ContatoTurbo, 0.01m),
     };
 
     // o mesmo contato atende a várias faixas de valor — fica em um lugar só
@@ -310,6 +374,10 @@ public static class ListasDaProposta
     /// <summary>O contato de um representante, pelo nome. Vazio se não achar.</summary>
     public static string ContatoDoRepresentante(string nome) => Representantes
         .FirstOrDefault(r => r.Nome == nome)?.Contato ?? "";
+
+    /// <summary>A comissão de um representante. Sem representante, zero.</summary>
+    public static decimal ComissaoDoRepresentante(string nome) => Representantes
+        .FirstOrDefault(r => r.Nome == nome)?.Comissao ?? 0m;
 
     /// <summary>Os contatos que assinam a proposta.</summary>
     public static readonly (string Nome, string Cargo, string Email, string Telefones)[] Contatos =
@@ -335,7 +403,9 @@ public sealed class PropostaRepository
         "ano", "numero", "revisao", "bu", "idioma", "vendaPara", "destino",
         "paisDestino", "categoria", "produto", "marketSegment", "portal",
         "contatoNome", "contatoCargo", "contatoEmail", "contatoTelefones",
-        "representante", "representanteContato",
+        "representante", "representanteContato", "representante2", "representante2Contato",
+        "beneficio", "fianca",
+        "riscoAdicional", "margemNegociacao", "modoDoPreco", "margemAlvo", "precoMeta",
         "moeda", "equipamento", "arranjo", "escolhas", "itens",
     };
 
@@ -357,8 +427,13 @@ public sealed class PropostaRepository
             ContatoNome = S(r, 26), ContatoCargo = S(r, 27),
             ContatoEmail = S(r, 28), ContatoTelefones = S(r, 29),
             Representante = S(r, 30), RepresentanteContato = S(r, 31),
-            MoedaCodigo = S(r, 32),
-            Itens = Proposta.LerItens(S(r, 36), S(r, 33), S(r, 34), S(r, 35)),
+            Representante2 = S(r, 32), Representante2Contato = S(r, 33),
+            Beneficio = S(r, 34), Fianca = Ou(S(r, 35), "Não"),
+            RiscoAdicional = Ou(S(r, 36), "2"), MargemNegociacao = Ou(S(r, 37), "3"),
+            ModoDoPreco = Ou(S(r, 38), "margem"), MargemAlvo = Ou(S(r, 39), "25"),
+            PrecoMeta = S(r, 40),
+            MoedaCodigo = S(r, 41),
+            Itens = Proposta.LerItens(S(r, 45), S(r, 42), S(r, 43), S(r, 44)),
         })
         .OrderByDescending(p => p.Numero)
         .ToList();
@@ -379,6 +454,9 @@ public sealed class PropostaRepository
             p.PaisDestino, p.Categoria, p.Produto, p.MarketSegment, p.Portal,
             p.ContatoNome, p.ContatoCargo, p.ContatoEmail, p.ContatoTelefones,
             p.Representante, p.RepresentanteContato,
+            p.Representante2, p.Representante2Contato,
+            p.Beneficio, p.Fianca,
+            p.RiscoAdicional, p.MargemNegociacao, p.ModoDoPreco, p.MargemAlvo, p.PrecoMeta,
             // as três colunas do formato antigo continuam sendo gravadas vazias:
             // o esquema do Parquet é por arquivo, e tirá-las não apagaria as que
             // já estão lá
@@ -415,4 +493,7 @@ public sealed class PropostaRepository
     }
 
     private static string S(System.Data.IDataReader r, int i) => r.IsDBNull(i) ? "" : r.GetString(i);
+
+    /// <summary>O que veio do banco, ou o padrão quando a coluna é nova e está vazia.</summary>
+    private static string Ou(string valor, string padrao) => valor.Length > 0 ? valor : padrao;
 }

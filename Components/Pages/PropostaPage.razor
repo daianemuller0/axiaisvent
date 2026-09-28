@@ -5,6 +5,8 @@
 @inject EquipamentoRepository Equipamentos
 @inject CaracteristicaRepository Caracteristicas
 @inject PrecoReferenciaRepository Precos
+@inject IJSRuntime JS
+@inject IWebHostEnvironment Ambiente
 @inject MotorRepository Motores
 @inject LimiteMotorRepository Limites
 
@@ -112,7 +114,7 @@
 <div class="panel" style="margin-bottom:18px">
     <h2 style="margin:0 0 14px; font-size:15px">Cliente</h2>
     <div class="form3">
-        <label>@Campo("Cliente", "D6")
+        <label>@Campo("Cliente", "D6 · pricing E3")
             <input class="cell" placeholder="Empresa cliente" @bind="_proposta.Cliente" /></label>
         <label>@Campo("Aos cuidados de", "D13")
             <input class="cell" placeholder="Nome do contato" @bind="_proposta.AosCuidados" /></label>
@@ -147,7 +149,7 @@
                 }
             </select></label>
 
-        <label>@Campo("Preparada por")
+        <label>@Campo("Preparada por", "pricing E9")
             <input class="cell" @bind="_proposta.PreparadaPor" /></label>
         <label>@Campo("Estado / Província")
             <input class="cell" @bind="_proposta.Estado" /></label>
@@ -165,10 +167,10 @@
     <div class="form3">
         <label>@Campo("Ano")
             <input class="cell num" @bind="_proposta.Ano" /></label>
-        <label>@Campo("Número da proposta", "D4")
+        <label>@Campo("Número da proposta", "D4 · pricing E6")
             <input class="cell" placeholder="@($"Ex.: {Repo.ProximoNumero(_proposta.Ano)} (gera sozinho se vazio)")"
                    @bind="_proposta.Numero" /></label>
-        <label>@Campo("Revisão")
+        <label>@Campo("Revisão", "pricing E7")
             <input class="cell" @bind="_proposta.Revisao" /></label>
 
         <label>@Campo("BU (empresa emissora)")
@@ -185,7 +187,7 @@
                     <option value="@x">@x</option>
                 }
             </select></label>
-        <label>@Campo("Venda para")
+        <label>@Campo("Venda para", "pricing J4")
             <select class="cell" @bind="_proposta.VendaPara">
                 @foreach (var x in ListasDaProposta.VendaPara)
                 {
@@ -193,7 +195,7 @@
                 }
             </select></label>
 
-        <label>@Campo("Destino")
+        <label>@Campo("Destino", "pricing J5")
             <select class="cell" @bind="_proposta.Destino">
                 @foreach (var x in ListasDaProposta.Destinos)
                 {
@@ -229,7 +231,7 @@
                     <option value="@x">@x</option>
                 }
             </select></label>
-        <label>@Campo("Portal")
+        <label>@Campo("Portal", "pricing P4")
             <select class="cell" @bind="_proposta.Portal">
                 @foreach (var x in ListasDaProposta.Portais)
                 {
@@ -239,7 +241,7 @@
 
         @* o contato do representante não aparece aqui de propósito: ele é
            guardado com a proposta e sai no documento *@
-        <label>@Campo("Representante")
+        <label>@Campo("Representante", "pricing P5")
             <select class="cell" value="@_proposta.Representante"
                     @onchange="e => EscolherRepresentante(e.Value?.ToString() ?? string.Empty)">
                 <option value="">— escolher —</option>
@@ -254,15 +256,52 @@
                 }
             </select></label>
 
-        @if (_proposta.Representante.Length > 0)
-        {
-            <span class="subtitle" style="align-self:end; padding-bottom:9px">
-                @(_proposta.ContatoDoRepresentante().Length > 0
-                    ? "contato guardado com a proposta — sai no documento"
-                    : "esse representante ainda não tem contato cadastrado")
-            </span>
-        }
+        <label>@Campo("Representante 2", "pricing P6")
+            <select class="cell" value="@_proposta.Representante2"
+                    @onchange="e => EscolherRepresentante2(e.Value?.ToString() ?? string.Empty)">
+                <option value="">— nenhum —</option>
+                @foreach (var grupo in ListasDaProposta.Representantes.GroupBy(r => r.Grupo))
+                {
+                    <optgroup label="@grupo.Key">
+                        @foreach (var r in grupo)
+                        {
+                            <option value="@r.Nome" selected="@(r.Nome == _proposta.Representante2)">@r.Nome</option>
+                        }
+                    </optgroup>
+                }
+            </select></label>
+
+        <label>@Campo("Fiança / Seguro Garantia", "pricing P3")
+            <select class="cell" @bind="_proposta.Fianca">
+                <option value="Não">Não</option>
+                <option value="Sim">Sim</option>
+            </select></label>
+
+        @* o regime do cliente só existe no Brasil; fora dele fica "Sem
+           benefício", e a equipe ainda pode trocar se precisar *@
+        <label>@Campo("Benefícios", "pricing J9")
+            <select class="cell" @bind="_proposta.Beneficio">
+                @foreach (var x in ListasDaProposta.Beneficios)
+                {
+                    <option value="@x">@x</option>
+                }
+            </select>
+            @if (!EhBrasil)
+            {
+                <span class="subtitle">país fora do Brasil — o padrão é "Sem benefício"</span>
+            }
+        </label>
     </div>
+
+    @if (_proposta.Representante.Length > 0 || _proposta.Representante2.Length > 0)
+    {
+        <p class="subtitle" style="margin:10px 0 0">
+            Contato dos representantes guardado com a proposta (não aparece aqui, sai no
+            documento). Comissão no pricing:
+            <strong>@Pct(CalculoPricing.Comissoes(_proposta.Representante, _proposta.Representante2))</strong>
+            — já com PPR, ELG e provisões.
+        </p>
+    }
 </div>
 
 <!-- ---------- contato no documento ---------- -->
@@ -725,17 +764,210 @@
 
     <div class="toolbar" style="margin:16px 0 0">
         <span style="flex:1"></span>
-        <strong style="font-size:15px">Total da proposta</strong>
+        <strong style="font-size:15px">Custo total</strong>
         <span class="val-count" style="font-size:15px">@Dinheiro(Total)</span>
+        <span class="subtitle" style="margin:0">vai para a célula E33 do pricing</span>
     </div>
 
     @if (FaltaPreco > 0)
     {
         <p class="subtitle" style="margin:10px 0 0">
-            @FaltaPreco item(ns) escolhido(s) ainda sem preço cadastrado — o total conta só o
+            @FaltaPreco item(ns) escolhido(s) ainda sem preço cadastrado — o custo conta só o
             que já tem valor.
         </p>
     }
+</div>
+
+<!-- ---------- pricing ---------- -->
+<div class="panel" style="margin-bottom:18px">
+    @{
+        var pricing = Pricing();
+        var mudouRisco = Math.Abs(Risco - CalculoPricing.RiscoAdicionalPadrao) > 0.00001m;
+        var mudouNegoc = Math.Abs(Negociacao - CalculoPricing.MargemNegociacaoPadrao) > 0.00001m;
+        var mudouMargem = Math.Abs(pricing.Margem - CalculoPricing.MargemAlvoPadrao) > 0.0005m;
+    }
+
+    <div class="toolbar" style="flex-wrap:wrap">
+        <h2 style="margin:0; font-size:15px">Pricing</h2>
+        <span class="subtitle" style="margin:0">
+            margem, comissões e impostos — a mesma conta da aba PRICING da planilha
+        </span>
+        <span style="flex:1"></span>
+        <button class="btn-primary" @onclick="GerarPricing">⬇ Gerar pricing</button>
+    </div>
+
+    <div class="form3">
+        <label>@Campo("Risco adicional (%)", "pricing D36")
+            <input class="cell num" value="@_proposta.RiscoAdicional"
+                   @onchange="e => _proposta.RiscoAdicional = e.Value?.ToString() ?? string.Empty" />
+            @if (mudouRisco)
+            {
+                <span class="aviso-vermelho">Solicitar aprovação de Pricing</span>
+            }
+        </label>
+
+        <label>@Campo("Margem de negociação (%)", "pricing D46")
+            <input class="cell num" value="@_proposta.MargemNegociacao"
+                   @onchange="e => _proposta.MargemNegociacao = e.Value?.ToString() ?? string.Empty" />
+            @if (mudouNegoc)
+            {
+                <span class="aviso-vermelho">Solicitar aprovação de Pricing</span>
+            }
+        </label>
+
+        <label>Calcular preço
+            <div style="display:flex; gap:6px">
+                <button class="@(PelaMargem ? "btn-primary" : "btn-ghost")"
+                        @onclick="@(() => _proposta.ModoDoPreco = "margem")">pela margem</button>
+                <button class="@(PelaMargem ? "btn-ghost" : "btn-primary")"
+                        @onclick="@(() => _proposta.ModoDoPreco = "preco")">pelo preço</button>
+            </div>
+        </label>
+
+        @if (PelaMargem)
+        {
+            <label>Margem pedida (%)
+                <input class="cell num" value="@_proposta.MargemAlvo"
+                       @onchange="e => _proposta.MargemAlvo = e.Value?.ToString() ?? string.Empty" />
+            </label>
+        }
+        else
+        {
+            <label>Preço-meta (@_proposta.Moeda.Rotulo())
+                <input class="cell num" placeholder="quanto o cliente aceita"
+                       value="@_proposta.PrecoMeta"
+                       @onchange="e => _proposta.PrecoMeta = e.Value?.ToString() ?? string.Empty" />
+            </label>
+        }
+    </div>
+
+    @if (mudouMargem)
+    {
+        <div class="aviso aviso-erro" style="margin-top:12px">
+            <strong>Solicitar aprovação de Pricing</strong> — a margem ficou em
+            @Pct(pricing.Margem), e o padrão é @Pct(CalculoPricing.MargemAlvoPadrao).
+        </div>
+    }
+
+    @foreach (var aviso in pricing.Avisos)
+    {
+        <div class="aviso aviso-alerta" style="margin-top:8px">@aviso</div>
+    }
+
+    <div class="panel" style="padding:0; overflow-x:auto; margin-top:14px">
+        <table class="grid">
+            <thead>
+                <tr>
+                    <th class="nowrap">Linha do pricing</th>
+                    <th class="nowrap">Célula</th>
+                    <th class="nowrap right">Valor</th>
+                    <th class="nowrap right">%</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="nowrap"><strong>Custo total</strong></td>
+                    <td class="nowrap"><span class="subtitle">E33</span></td>
+                    <td class="nowrap right">@Dinheiro(pricing.CustoTotal)</td>
+                    <td class="nowrap right">—</td>
+                </tr>
+                <tr>
+                    <td class="nowrap">Risco adicional</td>
+                    <td class="nowrap"><span class="subtitle">D36 · E36</span></td>
+                    <td class="nowrap right">@Dinheiro(pricing.Risco)</td>
+                    <td class="nowrap right">@Pct(Risco)</td>
+                </tr>
+                <tr>
+                    <td class="nowrap"><strong>Custo com riscos</strong></td>
+                    <td class="nowrap"><span class="subtitle">E38</span></td>
+                    <td class="nowrap right">@Dinheiro(pricing.CustoComRiscos)</td>
+                    <td class="nowrap right">—</td>
+                </tr>
+                <tr>
+                    <td class="nowrap">Markup</td>
+                    <td class="nowrap"><span class="subtitle">E40</span></td>
+                    <td class="nowrap right">@pricing.Markup.ToString("N4", Br)</td>
+                    <td class="nowrap right">—</td>
+                </tr>
+                <tr>
+                    <td class="nowrap">Venda pura</td>
+                    <td class="nowrap"><span class="subtitle">E41</span></td>
+                    <td class="nowrap right">@Dinheiro(pricing.VendaPura)</td>
+                    <td class="nowrap right">—</td>
+                </tr>
+                <tr>
+                    <td class="nowrap">Comissões</td>
+                    <td class="nowrap"><span class="subtitle">D45</span></td>
+                    <td class="nowrap right">@Dinheiro(pricing.VendaLiquida * pricing.Comissoes)</td>
+                    <td class="nowrap right">@Pct(pricing.Comissoes)</td>
+                </tr>
+                <tr>
+                    <td class="nowrap">Negociação, PM/SACH, garantia e portal</td>
+                    <td class="nowrap"><span class="subtitle">D46 · D47 · D48 · D49</span></td>
+                    <td class="nowrap right">
+                        @Dinheiro(pricing.VendaLiquida * (pricing.PercentuaisDeVenda - pricing.Comissoes))
+                    </td>
+                    <td class="nowrap right">@Pct(pricing.PercentuaisDeVenda - pricing.Comissoes)</td>
+                </tr>
+                <tr>
+                    <td class="nowrap"><strong>Venda líquida (sem impostos)</strong></td>
+                    <td class="nowrap"><span class="subtitle">E51</span></td>
+                    <td class="nowrap right"><strong>@Dinheiro(pricing.VendaLiquida)</strong></td>
+                    <td class="nowrap right">—</td>
+                </tr>
+                <tr>
+                    <td class="nowrap">Margem do projeto</td>
+                    <td class="nowrap"><span class="subtitle">D54</span></td>
+                    <td class="nowrap right">@Dinheiro(pricing.VendaLiquida * pricing.Margem)</td>
+                    <td class="nowrap right">
+                        <strong class="@(mudouMargem ? "texto-vermelho" : "")">@Pct(pricing.Margem)</strong>
+                    </td>
+                </tr>
+                @if (pricing.PrecoComImpostos != pricing.VendaLiquida)
+                {
+                    <tr>
+                        <td class="nowrap">PIS</td>
+                        <td class="nowrap"><span class="subtitle">E60</span></td>
+                        <td class="nowrap right">@Dinheiro(pricing.ValorPis)</td>
+                        <td class="nowrap right">@Pct(CalculoPricing.Pis)</td>
+                    </tr>
+                    <tr>
+                        <td class="nowrap">COFINS</td>
+                        <td class="nowrap"><span class="subtitle">E61</span></td>
+                        <td class="nowrap right">@Dinheiro(pricing.ValorCofins)</td>
+                        <td class="nowrap right">@Pct(CalculoPricing.Cofins)</td>
+                    </tr>
+                    <tr>
+                        <td class="nowrap">ICMS</td>
+                        <td class="nowrap"><span class="subtitle">E62</span></td>
+                        <td class="nowrap right">@Dinheiro(pricing.ValorIcms)</td>
+                        <td class="nowrap right">
+                            @Pct(CalculoPricing.IcmsDoEstado(_proposta.Estado, _proposta.Bu) ?? 0m)
+                        </td>
+                    </tr>
+                }
+                <tr>
+                    <td class="nowrap"><strong>Preço ao cliente</strong></td>
+                    <td class="nowrap"><span class="subtitle">S76</span></td>
+                    <td class="nowrap right"><strong>@Dinheiro(pricing.PrecoComImpostos)</strong></td>
+                    <td class="nowrap right">—</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <p class="subtitle" style="margin:12px 0 0">
+        <strong>Na planilha continuam manuais:</strong> a BU emissora (E8) e o estado do
+        ICMS (J6) — o sistema não escreve essas duas, então confira-as ao abrir o arquivo.
+        A prévia acima usa o Estado e a BU do cabeçalho daqui.
+    </p>
+
+    <p class="subtitle" style="margin:8px 0 0">
+        O botão <strong>Gerar pricing</strong> baixa a planilha da equipe com as sete abas,
+        as fórmulas e as macros intactas — só as células de entrada são preenchidas
+        (@string.Join(", ", PricingExcel.Mapa.Take(6).Select(m => m.Celula))…). O Excel
+        refaz a conta sozinho; os números acima são a prévia.
+    </p>
 </div>
 
 @code {
@@ -1176,6 +1408,82 @@
     {
         _proposta.Representante = nome;
         _proposta.RepresentanteContato = ListasDaProposta.ContatoDoRepresentante(nome);
+    }
+
+    private void EscolherRepresentante2(string nome)
+    {
+        _proposta.Representante2 = nome;
+        _proposta.Representante2Contato = ListasDaProposta.ContatoDoRepresentante(nome);
+    }
+
+    // ---------- pricing ----------
+
+    private static readonly System.Globalization.CultureInfo Br = new("pt-BR");
+
+    private bool EhBrasil => Textos.Igual(_proposta.Pais, "Brasil");
+
+    private bool PelaMargem => _proposta.ModoDoPreco != "preco";
+
+    private decimal Risco =>
+        Proposta.Percentual(_proposta.RiscoAdicional, CalculoPricing.RiscoAdicionalPadrao);
+
+    private decimal Negociacao =>
+        Proposta.Percentual(_proposta.MargemNegociacao, CalculoPricing.MargemNegociacaoPadrao);
+
+    private string Pct(decimal v) => (v * 100m).ToString("N2", Br) + "%";
+
+    private CalculoPricing.Entrada EntradaDoPricing() => new(
+        CustoTotal: Total,
+        RiscoAdicional: Risco,
+        MargemNegociacao: Negociacao,
+        Destino: _proposta.Destino,
+        Estado: _proposta.Estado,
+        VendaPara: _proposta.VendaPara,
+        Beneficio: EhBrasil ? _proposta.Beneficio : "Sem benefício",
+        Bu: _proposta.Bu,
+        ComPortal: Proposta.TemPortal(_proposta.Portal),
+        Rep1: _proposta.Representante,
+        Rep2: _proposta.Representante2);
+
+    private CalculoPricing.Resultado Pricing()
+    {
+        var entrada = EntradaDoPricing();
+
+        if (PelaMargem)
+        {
+            var alvo = Proposta.Percentual(_proposta.MargemAlvo, CalculoPricing.MargemAlvoPadrao);
+            return CalculoPricing.PelaMargem(entrada, alvo);
+        }
+
+        var meta = DadosExcel.Numero(_proposta.PrecoMeta) ?? 0m;
+        return CalculoPricing.PeloPreco(entrada, meta);
+    }
+
+    private async Task GerarPricing()
+    {
+        var modelo = Path.Combine(Ambiente.ContentRootPath, PricingExcel.CaminhoDoModelo);
+
+        if (!File.Exists(modelo))
+        {
+            Aviso($"A planilha modelo não está em {PricingExcel.CaminhoDoModelo}.", erro: true);
+            return;
+        }
+
+        try
+        {
+            var bytes = PricingExcel.Gerar(_proposta, Total, Pricing(), modelo);
+
+            await JS.InvokeVoidAsync("appDownload",
+                PricingExcel.NomeDoArquivo(_proposta),
+                "application/vnd.ms-excel.sheet.macroEnabled.12",
+                Convert.ToBase64String(bytes));
+
+            Aviso($"Pricing gerado: {PricingExcel.NomeDoArquivo(_proposta)}.");
+        }
+        catch (Exception ex)
+        {
+            Aviso($"Não consegui gerar o pricing: {ex.Message}", erro: true);
+        }
     }
 
     private void EscolherContato(string nome)

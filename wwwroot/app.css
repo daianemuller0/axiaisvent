@@ -623,3 +623,11 @@ h1 { font-size: 24px; margin: 0 0 4px; color: var(--primary); letter-spacing: -.
     .doc-grid { grid-template-columns: 1fr; }
     .ferr-side { position: static; max-height: none; overflow: visible; }
 }
+
+/* aviso de aprovação do pricing, ao lado do campo que saiu do padrão */
+.aviso-vermelho {
+    color: #b91c1c;
+    font-weight: 600;
+    font-size: 12px;
+}
+.texto-vermelho { color: #b91c1c; }

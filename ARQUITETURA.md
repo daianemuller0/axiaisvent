@@ -1085,3 +1085,74 @@ compartilhada.
 > **Falta ainda**: gerar o documento (PDF/Word) a partir da proposta, o partidor pela
 > potência do motor dentro do escopo e as listas de cabeçalho completas — as de hoje são as
 > que apareceram no documento da equipe.
+
+
+---
+
+## 14. Pricing
+
+A proposta monta o **custo**; o pricing transforma custo em **preço**. A conta é a da aba
+PRICING da planilha da equipe, refeita em `Data/CalculoPricing.cs` — as letras entre
+parênteses no código são as células de lá, para quem for conferir um número não precisar
+adivinhar.
+
+### A cadeia
+
+```
+custo total (E33)
+  + risco adicional (D36 × custo)          →  custo com riscos (E38)
+  × markup (E40)                           →  venda pura (E41)
+  ÷ (1 − comissões − negociação − PM/SACH − garantia − portal)
+                                           →  VENDA LÍQUIDA (E51)
+  + PIS/COFINS, ICMS e IPI por cima        →  preço ao cliente (S76)
+```
+
+As comissões (D45) são as fixas da casa — PPR 1%, ELG 0,4%, Sales Industrial 0% e a
+provisão de DSR, 64,11% do que foi para SALES — mais a do **representante 1** e a do
+**representante 2**, que saem da tabela `BD_pricing` e agora vivem junto com os contatos em
+`ListasDaProposta.Representantes`.
+
+### O markup deixou de ser chute
+
+Na planilha, `E40` é um número **digitado**: para chegar à margem pedida, alguém ajusta na
+mão ou roda o Solver. Aqui não precisa, porque a margem é linear no markup e dá para
+inverter a fórmula:
+
+```
+markup = (1 − percentuais) ÷ (1 − percentuais − margem pedida)
+```
+
+São os dois modos da tela: **pela margem** (padrão 25%, o markup sai) e **pelo preço**
+(a equipe digita o preço-meta, o markup e a margem saem). Sair do padrão — 2% de risco, 3%
+de negociação, 25% de margem — acende **"Solicitar aprovação de Pricing"** ao lado do campo,
+sem impedir nada: quem aprova é gente, o sistema só não deixa passar despercebido.
+
+### A planilha gerada é a deles
+
+`PricingExcel.Gerar` abre `wwwroot/modelos/pricing.xlsm` — a planilha da equipe, inteira — e
+escreve **só as células de entrada**. As sete abas, as fórmulas e as **macros** saem
+intactas (testado: `vbaProject.bin` sobrevive ao round-trip do ClosedXML). O Excel refaz a
+conta sozinho; os números da tela são a prévia da mesma cadeia.
+
+O mapa de células está em `PricingExcel.Mapa`, em um lugar só, porque é o contrato entre o
+sistema e a planilha: se ela mudar de linha, é essa tabela que muda.
+
+| Célula | De onde vem |
+|---|---|
+| E3 · E6 · E7 · E9 | cliente, número, revisão, preparada por |
+| J4 · J5 | venda para, destino |
+| J7 | sempre "Não" (reforma) |
+| J9 | benefícios — só o Brasil escolhe; fora dele, "Sem benefício" |
+| P3 · P4 | fiança/seguro garantia, portal (**Sim/Não**: "Nenhum" no sistema vira "Não") |
+| P5 · P6 | representante 1 e 2 |
+| P7 · P8 · P9 | fixos dos axiais: Axials · PAXIAL4 · Mining |
+| E33 **e G33** | o custo total |
+| D36 · D46 · E40 | risco adicional, margem de negociação e o markup calculado |
+
+**Por que G33 também:** na planilha, `E33` é a soma das rubricas e `G33` a soma delas com
+variação; o "risco de variação" é a diferença entre as duas. Escrevendo só `E33`, `G33`
+ficaria zerado e esse risco viraria o custo inteiro. Como o sistema manda o custo já
+fechado, sem variação por rubrica, as duas recebem o mesmo valor e a diferença é zero.
+
+> **Continuam manuais na planilha**: a BU emissora (E8) e o estado do ICMS (J6). A tela
+> avisa isso na hora de gerar, e a prévia usa o Estado e a BU do cabeçalho da proposta.
