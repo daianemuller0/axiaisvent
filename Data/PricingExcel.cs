@@ -26,8 +26,10 @@ public static class PricingExcel
     public static readonly (string Celula, string Campo)[] Mapa =
     {
         ("E3", "Cliente"), ("E6", "Número da proposta"), ("E7", "Revisão"),
-        ("E9", "Preparada por"), ("J4", "Venda para"), ("J5", "Destino"),
-        ("J7", "Reforma (sempre Não)"), ("J9", "Benefícios"),
+        ("E8", "BU emissora"), ("E9", "Preparada por"),
+        ("J3", "Segmento (NB nos axiais)"), ("J4", "Venda para"), ("J5", "Destino"),
+        ("J6", "Estado"), ("J7", "Reforma (sempre Não)"), ("J8", "Prazo de entrega"),
+        ("J9", "Benefícios"),
         ("P3", "Fiança/Seguro Garantia"), ("P4", "Portal"),
         ("P5", "Representante"), ("P6", "Representante 2"),
         ("P7", "Categories"), ("P8", "Product"), ("P9", "Market Segments"),
@@ -50,11 +52,21 @@ public static class PricingExcel
             : proposta.Revisao;
         ws.Cell("E9").Value = proposta.PreparadaPor;
 
+        // sem estas três, a planilha calculava com o que estivesse no modelo —
+        // e o preço dela saía diferente do da tela sem ninguém entender por quê
+        ws.Cell("E8").Value = ListasDaProposta.CodigoDaBu(proposta.Bu);
+        ws.Cell("J3").Value = Proposta.SegmentoDoPricing;
+        ws.Cell("J6").Value = proposta.Estado.Length > 0 ? proposta.Estado : "preencher";
+
         ws.Cell("J4").Value = proposta.VendaPara;
         ws.Cell("J5").Value = proposta.Destino;
 
         // a equipe pediu: reforma sempre "Não"
         ws.Cell("J7").Value = "Não";
+
+        // o prazo entra no custo da fiança (R48 conta os dias de cobertura)
+        if (DadosExcel.Numero(proposta.PrazoEntregaDias) is { } prazo)
+            ws.Cell("J8").Value = (double)prazo;
 
         ws.Cell("J9").Value = proposta.Beneficio.Length > 0 ? proposta.Beneficio : "Sem benefício";
 

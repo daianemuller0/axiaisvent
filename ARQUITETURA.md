@@ -1154,5 +1154,42 @@ variação; o "risco de variação" é a diferença entre as duas. Escrevendo s�
 ficaria zerado e esse risco viraria o custo inteiro. Como o sistema manda o custo já
 fechado, sem variação por rubrica, as duas recebem o mesmo valor e a diferença é zero.
 
-> **Continuam manuais na planilha**: a BU emissora (E8) e o estado do ICMS (J6). A tela
-> avisa isso na hora de gerar, e a prévia usa o Estado e a BU do cabeçalho da proposta.
+### Bater 100% com a planilha
+
+O preço da tela e o da planilha **têm de dar o mesmo número**. Três coisas quebravam isso, e
+todas eram silenciosas:
+
+1. **Nome de representante fora do lugar.** O pricing acha a comissão com
+   `MATCH(P5, lista_representantes, 0)` e, quando não acha, o `IFERROR` devolve a primeira
+   linha da tabela — a do "-", com comissão **zero**. A lista do sistema tinha
+   "Mauricio (Livimat)" sem acento e "Wander (Wanseve)" sem o espaço antes do parêntese:
+   dois representantes de 3% viravam 0% dentro do Excel, e ninguém via. Agora
+   `ListasDaProposta.Representantes` é cópia fiel de `BD_pricing!A68:E101` — nomes, contatos
+   **e comissões** saem de lá.
+2. **Entradas que o sistema não escrevia.** A BU (E8), o segmento (J3) e o estado (J6) ficavam
+   com o que estivesse no modelo — e o modelo vem com `HCHL` e `Chile`, que **zeram todos os
+   impostos**. A tela calculava com São Paulo e 18% de ICMS enquanto o arquivo calculava com
+   o Chile e zero. As três passaram a ser escritas, junto com o prazo de entrega (J8).
+3. **Estado digitado à mão.** O ICMS é um `VLOOKUP` na lista de UFs; "São Paulo" não acha
+   nada. O campo virou seleção com a mesma `lista_Estados` da planilha, e a BU virou seleção
+   dos códigos que ela compara (`HSA-SP`, `HSA-ES`, `HCHL`, `HPU`).
+
+A conferência é feita refazendo a cadeia **pelas fórmulas e tabelas do arquivo gerado**, sem
+usar nenhuma constante do C#. Dois casos, centavo por centavo:
+
+| | Nacional · MG · Industrialização | Exportação · EXPORT · Cliente Final |
+|---|---|---|
+| Comissões (D45) | 7,66% | 8,16% |
+| Custo com riscos (E38) | 255.000,00 | 183.600,00 |
+| **Venda líquida (E51)** | **423.281,76** | **305.269,59** |
+| Margem (D54) | 25,00% | 25,00% |
+| Preço com impostos (S76) | 530.029,75 | — (exportação) |
+
+Duas diferenças **conhecidas** continuam, e a tela avisa nas duas:
+
+- **Fiança = Sim.** O valor dela (E42) sai da tabela de eventos de pagamento da planilha, que
+  o sistema ainda não preenche. A prévia não a inclui; o Excel soma.
+- **NB vendendo fora de "Industrialização".** `D64` devolve `"-"` para o IPI no segmento NB, e
+  a conta do ICMS multiplica esse `"-"`: o Excel responde **#VALOR!** em S75/S76. A venda
+  líquida continua válida — é ela que vira preço na proposta —, mas o preço bruto não sai de
+  lá. É um defeito da planilha, não do sistema.

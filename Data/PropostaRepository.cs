@@ -177,6 +177,12 @@ public sealed class Proposta
     public static bool TemPortal(string portal) =>
         portal.Trim().Length > 0 && !Textos.Igual(portal, "Nenhum");
 
+    /// <summary>
+    /// O segmento de margem (J3). Ventilador axial é sempre NB — é o que faz o
+    /// risco adicional nascer em 2% na própria planilha.
+    /// </summary>
+    public const string SegmentoDoPricing = "NB";
+
     /// <summary>Um percentual digitado pela equipe ("2,5" → 0,025).</summary>
     public static decimal Percentual(string texto, decimal padrao) =>
         DadosExcel.Numero(texto) is { } n ? n / 100m : padrao;
@@ -264,8 +270,49 @@ public static class ListasDaProposta
     public static readonly string[] Fases =
         { "— Nenhuma —", "Orçamento preliminar", "Proposta firme", "Negociação", "Fechada", "Perdida" };
 
-    public static readonly string[] Bus =
-        { "HSA — Itatiba (Brasil)", "HSA — Santiago (Chile)", "HSA — Lima (Peru)" };
+    /// <summary>
+    /// A BU emissora (E8 do pricing). O <b>valor</b> é o código que a planilha
+    /// espera — as fórmulas de ICMS e de moeda comparam com "HSA-SP", "HSA-ES"
+    /// e "HCHL" —, e o rótulo é para a equipe saber qual é qual.
+    /// </summary>
+    public static readonly (string Codigo, string Rotulo)[] Bus =
+    {
+        ("HSA-SP", "HSA-SP — Itatiba (Brasil)"),
+        ("HSA-ES", "HSA-ES — Serra (Brasil)"),
+        ("HCHL", "HCHL — Chile"),
+        ("HPU", "HPU — Peru"),
+    };
+
+    /// <summary>
+    /// Os estados que o pricing aceita (J6, lista_Estados): as UFs mais EXPORT,
+    /// Chile e Peru, que é como a planilha marca venda fora do Brasil.
+    /// </summary>
+    public static readonly string[] Estados =
+    {
+        "EXPORT", "Chile", "Peru",
+        "AC", "AL", "AM", "AP", "BA", "CE", "DF", "ES", "GO", "MA", "MG", "MS", "MT",
+        "PA", "PB", "PE", "PI", "PR", "RJ", "RN", "RO", "RR", "RS", "SC", "SE", "SP", "TO",
+    };
+
+    /// <summary>
+    /// Traz uma BU gravada antes desta lista para o código da planilha, para
+    /// proposta antiga não gerar pricing com a BU errada.
+    /// </summary>
+    public static string CodigoDaBu(string valor)
+    {
+        var t = Textos.Simples(valor);
+        if (t.Length == 0) return "HSA-SP";
+
+        foreach (var (codigo, _) in Bus)
+            if (Textos.Igual(codigo, valor)) return codigo;
+
+        if (t.Contains("itatiba") || t.Contains("sao paulo") || t.Contains("sp")) return "HSA-SP";
+        if (t.Contains("serra") || t.Contains("es")) return "HSA-ES";
+        if (t.Contains("chile") || t.Contains("santiago")) return "HCHL";
+        if (t.Contains("peru") || t.Contains("lima")) return "HPU";
+
+        return "HSA-SP";
+    }
 
     public static readonly string[] Idiomas = { "Português", "Espanhol", "Inglês" };
 
@@ -312,64 +359,80 @@ public static class ListasDaProposta
     /// </param>
     public sealed record Representante(string Grupo, string Nome, string Contato, decimal Comissao);
 
+    /// <summary>
+    /// A lista é uma CÓPIA FIEL de <c>BD_pricing!A68:E101</c> da planilha de
+    /// pricing — nomes, contatos e comissões.
+    ///
+    /// Os nomes têm de bater letra por letra: o pricing acha a comissão com
+    /// <c>MATCH(P5, lista_representantes, 0)</c>, e um acento ou um espaço a
+    /// mais cai no <c>IFERROR</c>, que devolve a primeira linha da tabela — a do
+    /// "-", com comissão zero. O preço sairia diferente do da tela, em silêncio.
+    /// É por isso que "Maurício" tem acento e "Wander (Wanseve )" tem o espaço
+    /// antes do parêntese: é assim que está lá.
+    /// </summary>
     public static readonly Representante[] Representantes =
     {
-        new("Brasil", "Douglas (Mezza & Baga)",
-            "Douglas M. Matavelli por (11) 97144-3085 ou e-mail: douglas.matavelli@howden.com", 0.03m),
-        new("Brasil", "Alexandre (Artman)",
-            "Alexandre B. Pereira por (91) 98883-8142 / (16) 99429-1786 ou e-mail: alexandre.pereira@artman.net.br", 0.03m),
-        new("Brasil", "Gerson (Lizan)", "", 0.03m),
-        new("Brasil", "Ivars (Dzelme & Leite Ltda)",
-            "Ivars Janis Dzelme por (81) 3221-0250 / (81) 99946-0506 ou e-mail: ivars@hotlink.com.br", 0.03m),
-        new("Brasil", "Júlio (Doulus)",
-            "Júlio Augusto Afro por (27) 3314-1000 / (27) 98122-1177 ou e-mail: howden@doulus.com.br", 0.03m),
-        new("Brasil", "Mauricio (Livimat)",
-            "Mauricio A. de Araujo por (21) 99908-1687 ou e-mail: Livimat.comercial@outlook.com", 0.03m),
-        new("Brasil", "Ricardo (Sesbras)",
-            "Ricardo V. F. Martins por (21) 2532-7404 / (21) 99764-5297 ou e-mail: aviabras@aviabras.com.br", 0.05m),
-        new("Brasil", "Sander (Provent)", "", 0.05m),
-        new("Brasil", "Thais (InTec)",
-            "InTec – Engª Thais Werner de Lima por (71) 3289-3611 / (71) 9 9961-9278 ou e-mail: intec@inovacaotecnologia.com.br", 0.03m),
-        new("Brasil", "Wander (Wanseve)",
-            "Wander S. da Silva por (16) 3627-6499 / (16) 9 9228 2928 ou e-mail: wanseve@uol.com.br", 0.03m),
-        new("Brasil", "Adolpho (Atric)",
-            "Adolpho Procópio Rossi Neto por (11) 99976-1952 ou e-mail: rossi@atric.com.br", 0.05m),
-
-        new("América Latina", "ASESORIA Y EQUIPO < =USD 500K", ContatoAseqsa, 0.10m),
-        new("América Latina", "ASESORIA Y EQUIPO < USD 1MM", ContatoAseqsa, 0.075m),
-        new("América Latina", "ASESORIA Y EQUIPO > USD 1MM", ContatoAseqsa, 0.05m),
-        new("América Latina", "FERRUNION",
-            "Gilmer Vasquez por: +51 1 4754560 ou e-mail: gsvasquez@ferrunion.net", 0.05m),
-        new("América Latina", "H&T",
-            "Jorge Gonzalo Hernández Cabeza por +56 2 29970179 / +56 9 98871135 ou e-mail: jhernandez@ghis.cl", 0.05m),
-        new("América Latina", "HCA",
-            "Angelo Ramirez por +56 9 4478 3695 / +56 2 5725-7371 o e-mail: angelo@hcamineria.cl", 0.06m),
-        new("América Latina", "HRI S.A.",
-            "Rury Harms Orrego por +56 2 2592 3500 ou e-mail: rharms@hri.cl", 0.05m),
-        new("América Latina", "IPT Colômbia < =EUR 500K", ContatoIpt, 0.08m),
-        new("América Latina", "IPT Colômbia < =EUR 750K", ContatoIpt, 0.065m),
-        new("América Latina", "IPT Colômbia < =EUR 1MM", ContatoIpt, 0.05m),
-        new("América Latina", "IPT Colômbia < =EUR 1,25MM", ContatoIpt, 0.035m),
-        new("América Latina", "IPT Colômbia >EUR 1,25MM", ContatoIpt, 0.03m),
-        new("América Latina", "SIMINCO",
-            "Alejandro Cadavid L. por +57 323 460 0551 o e-mail comercial@siminco.com.co " +
-            "o Carlos Contreras U. por +57 311 588 488", 0.05m),
-        new("América Latina", "TEJADA",
-            "Luis Felipe Tejada por: +57 315-505-5397 ou e-mail: Tejadaingenieros@tejadaingenieros.com", 0.05m),
-        new("América Latina", "Turbomaquinarias <= EUR 100 k", ContatoTurbo, 0.04m),
-        new("América Latina", "Turbomaquinarias <= EUR 500 k", ContatoTurbo, 0.03m),
-        new("América Latina", "Turbomaquinarias <= EUR 2,5 M", ContatoTurbo, 0.025m),
-        new("América Latina", "Turbomaquinarias <= EUR 7,0 M", ContatoTurbo, 0.02m),
-        new("América Latina", "Turbomaquinarias > EUR 7,0 M", ContatoTurbo, 0.01m),
+        new("Brasil", "Douglas (Mezza & Baga)", "Douglas M. Matavelli por (11) 97144-3085 ou e-mail: douglas.matavelli@howden.com",
+            0.03m),
+        new("Brasil", "Alexandre (Artman)", "Alexandre B. Pereira por (91) 98883-8142 / (16) 99429-1786 ou e-mail: alexandre.pereira@artman.net.br",
+            0.03m),
+        new("Brasil", "Gerson (Lizan)", "",
+            0.03m),
+        new("Brasil", "Ivars (Dzelme & Leite Ltda)", "Ivars Janis Dzelme por (81) 3221-0250 / (81) 99946-0506 ou e-mail: ivars@hotlink.com.br",
+            0.03m),
+        new("Brasil", "Júlio (Doulus)", "Júlio Augusto Afro por (27) 3314-1000 / (27) 98122-1177 ou e-mail: howden@doulus.com.br",
+            0.03m),
+        new("Brasil", "Maurício (Livimat)", "Mauricio A. de Araujo por (21) 99908-1687 ou e-mail: Livimat.comercial@outlook.com",
+            0.03m),
+        new("Brasil", "Ricardo (Sesbras)", "Ricardo V. F. Martins por (21) 2532-7404 / (21) 99764-5297 ou e-mail: aviabras@aviabras.com.br",
+            0.05m),
+        new("Brasil", "Sander (Provent)", "",
+            0.05m),
+        new("Brasil", "Thais (InTec)", "InTec – Engª Thais Werner de Lima por (71) 3289-3611 / (71) 9 9961-9278 ou e-mail: intec@inovacaotecnologia.com.br",
+            0.03m),
+        new("Brasil", "Wander (Wanseve )", "Wander S. da Silva por (16) 3627-6499 / (16) 9 9228 2928 ou e-mail: wanseve@uol.com.br",
+            0.03m),
+        new("Brasil", "Adolpho (Atric)", "Adolpho Procópio Rossi Neto por (11) 99976-1952 ou e-mail: rossi@atric.com.br",
+            0.05m),
+        new("Exterior", "ASESORIA Y EQUIPO < =USD 500K", "Pablo Santamarina por +502 24285468, 24285478, 23658515, 23658669 ou e-mail: aseqsa@gmail.com",
+            0.1m),
+        new("Exterior", "ASESORIA Y EQUIPO < USD 1MM", "Pablo Santamarina por +502 24285468, 24285478, 23658515, 23658669 ou e-mail: aseqsa@gmail.com",
+            0.075m),
+        new("Exterior", "ASESORIA Y EQUIPO > USD 1MM", "Pablo Santamarina por +502 24285468, 24285478, 23658515, 23658669 ou e-mail: aseqsa@gmail.com",
+            0.05m),
+        new("Exterior", "FERRUNION", "Gilmer Vasquez por: +51 1 4754560 ou e-mail: gsvasquez@ferrunion.net",
+            0.05m),
+        new("Exterior", "H&T", "Jorge Gonzalo Hernández Cabeza por +56 2 29970179 / +56 9 98871135 ou e-mail: jhernandez@ghis.cl",
+            0.05m),
+        new("Exterior", "HCA", "Angelo Ramirez por +56 9 4478 3695 / +56 2 5725-7371 o e-mail: angelo@hcamineria.cl",
+            0.06m),
+        new("Exterior", "HRI S.A.", "Rury Harms Orrego por +56 2 2592 3500 ou e-mail: rharms@hri.cl",
+            0.05m),
+        new("Exterior", "IPT Colômbia < =EUR 1,25MM", "Ricardo Morales Castro por: +57 3125866426 / 3206737171 ou email: rmorales@iptcolombia.com",
+            0.035m),
+        new("Exterior", "IPT Colômbia < =EUR 1MM", "Ricardo Morales Castro por: +57 3125866426 / 3206737171 ou email: rmorales@iptcolombia.com",
+            0.05m),
+        new("Exterior", "IPT Colômbia < =EUR 500K", "Ricardo Morales Castro por: +57 3125866426 / 3206737171 ou email: rmorales@iptcolombia.com",
+            0.08m),
+        new("Exterior", "IPT Colômbia < =EUR 750K", "Ricardo Morales Castro por: +57 3125866426 / 3206737171 ou email: rmorales@iptcolombia.com",
+            0.065m),
+        new("Exterior", "IPT Colômbia >EUR 1,25MM", "Ricardo Morales Castro por: +57 3125866426 / 3206737171 ou email: rmorales@iptcolombia.com",
+            0.03m),
+        new("Exterior", "SIMINCO", "Alejandro Cadavid L. por +57 323 460 0551 o e-mail comercial@siminco.com.co o Carlos Contreras U. por +57 311 588 4883 o e-mail coordinadortecnico@siminco.com.co",
+            0.05m),
+        new("Exterior", "TEJADA", "Luis Felipe Tejada por :+57 315-505-5397 ou e-mail:Tejadaingenieros@tejadaingenieros.com",
+            0.05m),
+        new("Exterior", "Turbomaquinarias <= EUR 100 k", "Carlos Daniel Weihmuller por email: cweihmuller@turbomaquinarias.com",
+            0.04m),
+        new("Exterior", "Turbomaquinarias <= EUR 2,5 M", "Carlos Daniel Weihmuller por email: cweihmuller@turbomaquinarias.com",
+            0.025m),
+        new("Exterior", "Turbomaquinarias <= EUR 500 k", "Carlos Daniel Weihmuller por email: cweihmuller@turbomaquinarias.com",
+            0.03m),
+        new("Exterior", "Turbomaquinarias <= EUR 7,0 M", "Carlos Daniel Weihmuller por email: cweihmuller@turbomaquinarias.com",
+            0.02m),
+        new("Exterior", "Turbomaquinarias > EUR 7,0 M", "Carlos Daniel Weihmuller por email: cweihmuller@turbomaquinarias.com",
+            0.01m),
     };
-
-    // o mesmo contato atende a várias faixas de valor — fica em um lugar só
-    private const string ContatoAseqsa =
-        "Pablo Santamarina por +502 24285468, 24285478, 23658515, 23658669 ou e-mail: aseqsa@gmail.com";
-    private const string ContatoIpt =
-        "Ricardo Morales Castro por: +57 3125866426 / 3206737171 ou e-mail: rmorales@iptcolombia.com";
-    private const string ContatoTurbo =
-        "Carlos Daniel Weihmuller por e-mail: cweihmuller@turbomaquinarias.com";
 
     /// <summary>O contato de um representante, pelo nome. Vazio se não achar.</summary>
     public static string ContatoDoRepresentante(string nome) => Representantes

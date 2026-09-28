@@ -88,7 +88,8 @@ public static class CalculoPricing
         string Bu,
         bool ComPortal,
         string Rep1,
-        string Rep2);
+        string Rep2,
+        bool ComFianca = false);
 
     /// <summary>O pricing calculado, na ordem em que a tela mostra.</summary>
     public sealed record Resultado(
@@ -158,8 +159,18 @@ public static class CalculoPricing
             var aliqPis = semPisCofins ? 0m : Pis;
             var aliqCofins = semPisCofins ? 0m : Cofins;
 
-            // o IPI só existe fora do segmento NB, e axiais são NB
+            // o IPI só existe fora do segmento NB, e axiais são NB: a planilha
+            // devolve "-" em D64. E aí, fora de "Industrialização", a conta do
+            // ICMS multiplica esse "-" e o Excel devolve #VALOR! — a venda
+            // líquida continua boa, mas o preço COM impostos não sai de lá
             var aliqIpi = 0m;
+
+            if (!Textos.Igual(e.VendaPara, "Industrialização"))
+            {
+                avisos.Add("Segmento NB com venda para \"" + e.VendaPara + "\": na planilha o " +
+                           "IPI fica \"-\" e a célula do preço com impostos (S75/S76) devolve " +
+                           "#VALOR!. A venda líquida (E51) bate; o preço bruto, confira no Excel.");
+            }
 
             var aliqIcms = IcmsDoEstado(e.Estado, e.Bu);
             if (aliqIcms is null)
@@ -186,6 +197,13 @@ public static class CalculoPricing
             cofins = base1 * aliqCofins;
             ipi = base2 * aliqIpi;
             icms = preco * aliqIcms.Value;
+        }
+
+        if (e.ComFianca)
+        {
+            avisos.Add("Fiança/seguro garantia marcado como \"Sim\": o valor dela (E42) sai da " +
+                       "tabela de eventos de pagamento da planilha, que o sistema ainda não " +
+                       "preenche — a prévia não a inclui, e o Excel vai somá-la.");
         }
 
         return new Resultado(e.CustoTotal, risco, custoComRiscos, markup, vendaPura,
@@ -218,8 +236,7 @@ public static class CalculoPricing
         if (achado.Key is null) return null;
 
         // a planilha escolhe a coluna pela empresa emissora (E8)
-        return Textos.Simples(bu).Contains("itatiba") || Textos.Simples(bu).Contains("sp")
-            ? achado.Value.Sp
-            : achado.Value.Es;
+        // a planilha escolhe a coluna comparando E8 com "HSA-SP"
+        return Textos.Igual(bu, "HSA-SP") ? achado.Value.Sp : achado.Value.Es;
     }
 }

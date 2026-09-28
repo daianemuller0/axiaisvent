@@ -151,8 +151,16 @@
 
         <label>@Campo("Preparada por", "pricing E9")
             <input class="cell" @bind="_proposta.PreparadaPor" /></label>
-        <label>@Campo("Estado / Província")
-            <input class="cell" @bind="_proposta.Estado" /></label>
+        @* o estado é a chave do ICMS no pricing (J6), então só vale o que a
+           planilha aceita — digitar "São Paulo" não acharia a alíquota *@
+        <label>@Campo("Estado / UF", "pricing J6")
+            <select class="cell" @bind="_proposta.Estado">
+                <option value="">— escolher —</option>
+                @foreach (var uf in ListasDaProposta.Estados)
+                {
+                    <option value="@uf">@uf</option>
+                }
+            </select></label>
         <label>@Campo("Validade (dias)")
             <input class="cell num" type="number" min="0" @bind="_proposta.ValidadeDias" /></label>
 
@@ -173,11 +181,13 @@
         <label>@Campo("Revisão", "pricing E7")
             <input class="cell" @bind="_proposta.Revisao" /></label>
 
-        <label>@Campo("BU (empresa emissora)")
-            <select class="cell" @bind="_proposta.Bu">
-                @foreach (var x in ListasDaProposta.Bus)
+        <label>@Campo("BU (empresa emissora)", "pricing E8")
+            <select class="cell" value="@ListasDaProposta.CodigoDaBu(_proposta.Bu)"
+                    @onchange="e => _proposta.Bu = e.Value?.ToString() ?? string.Empty">
+                @foreach (var (codigo, rotulo) in ListasDaProposta.Bus)
                 {
-                    <option value="@x">@x</option>
+                    <option value="@codigo"
+                            selected="@(codigo == ListasDaProposta.CodigoDaBu(_proposta.Bu))">@rotulo</option>
                 }
             </select></label>
         <label>@Campo("Idioma da proposta")
@@ -942,7 +952,8 @@
                         <td class="nowrap"><span class="subtitle">E62</span></td>
                         <td class="nowrap right">@Dinheiro(pricing.ValorIcms)</td>
                         <td class="nowrap right">
-                            @Pct(CalculoPricing.IcmsDoEstado(_proposta.Estado, _proposta.Bu) ?? 0m)
+                            @Pct(CalculoPricing.IcmsDoEstado(_proposta.Estado,
+                                ListasDaProposta.CodigoDaBu(_proposta.Bu)) ?? 0m)
                         </td>
                     </tr>
                 }
@@ -957,9 +968,9 @@
     </div>
 
     <p class="subtitle" style="margin:12px 0 0">
-        <strong>Na planilha continuam manuais:</strong> a BU emissora (E8) e o estado do
-        ICMS (J6) — o sistema não escreve essas duas, então confira-as ao abrir o arquivo.
-        A prévia acima usa o Estado e a BU do cabeçalho daqui.
+        <strong>O sistema escreve todas as entradas do preço</strong> — inclusive BU (E8),
+        segmento (J3) e estado (J6) —, então a planilha gerada calcula exatamente a mesma
+        venda líquida que a prévia acima.
     </p>
 
     <p class="subtitle" style="margin:8px 0 0">
@@ -1007,7 +1018,7 @@
         Data = DateTime.Now.ToString("yyyy-MM-dd"),
         Ano = DateTime.Now.Year.ToString(),
         Fase = ListasDaProposta.Fases[0],
-        Bu = ListasDaProposta.Bus[0],
+        Bu = ListasDaProposta.Bus[0].Codigo,
         Produto = ListasDaProposta.Produtos[0],
         MarketSegment = ListasDaProposta.Segmentos[0],
     };
@@ -1440,10 +1451,11 @@
         Estado: _proposta.Estado,
         VendaPara: _proposta.VendaPara,
         Beneficio: EhBrasil ? _proposta.Beneficio : "Sem benefício",
-        Bu: _proposta.Bu,
+        Bu: ListasDaProposta.CodigoDaBu(_proposta.Bu),
         ComPortal: Proposta.TemPortal(_proposta.Portal),
         Rep1: _proposta.Representante,
-        Rep2: _proposta.Representante2);
+        Rep2: _proposta.Representante2,
+        ComFianca: Textos.Igual(_proposta.Fianca, "Sim"));
 
     private CalculoPricing.Resultado Pricing()
     {
