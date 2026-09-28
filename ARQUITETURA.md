@@ -967,9 +967,29 @@ marca três estados (sem / contrarrecuo / freio), e antes a lista só tinha dois
 ### O que a planilha não traz
 
 Cada campo da tela diz de onde vem: a célula (`D6`, `linha 42`) ou **"preencher manual"**.
-Depois de importar, um quadro lista o que veio e o que ficou faltando — inclusive o
-**modelo de cada equipamento**, que a folha não diz: ela dá a quantidade, não qual
-ventilador. É o que evita mandar proposta pela metade achando que a planilha cuidou de tudo.
+Isso basta — depois de importar, a tela mostra **uma linha verde** com o que a folha trouxe,
+e aviso só quando há algo a resolver. A lista do que é manual, repetida a cada importação,
+era barulho: já está escrita no rótulo de cada campo.
+
+### Ler uma folha de verdade
+
+A primeira folha real da equipe não trouxe nada, e as três causas valem registrar:
+
+1. **A aba.** O arquivo tem `revisões` e `V.axiais_PT`, e o leitor pegava a primeira. Agora
+   ele procura a primeira aba com alguma célula do cabeçalho preenchida ou algum número na
+   linha das quantidades.
+2. **Célula mesclada.** Em formulário o campo costuma ser um bloco (`D4:G4`) e o valor mora
+   na primeira célula dele; ler "D4" dava vazio. Célula vazia dentro de uma mesclagem passou
+   a devolver o valor da mesclagem.
+3. **Nome de lista.** A folha diz "Contrarrecuo"; no banco da equipe a lista tinha virado
+   **"Contrarrecuo ou Freio"**. Procurar o nome exato fazia a escolha cair no chão. As listas
+   da folha passaram a ser achadas por **palavra** (`difusor`, `damper`, `contrarrecuo`/`freio`),
+   como as outras regras de lista do sistema — e a migração que cria o subitem "Contrarrecuo"
+   também, senão ela se marcava como feita sem ter feito nada.
+
+Célula não preenchida numa folha assim não vem vazia: vem com "Preencher", "Escolher", "N/A"
+ou com a lista de opções ainda intacta ("sim / não", "não / admissão / descarga").
+`EmBranco` trata todas como vazio, senão viravam escolha errada ou aviso à toa.
 
 ### A parte elétrica
 

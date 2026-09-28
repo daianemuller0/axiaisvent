@@ -41,15 +41,33 @@ public static class FolhaDeDados
         ["Telefone"] = CelulaTelefone,
     };
 
-    /// <summary>As listas de característica que a planilha preenche, e em que linha.</summary>
-    public static readonly (string Lista, int Linha)[] ListasDaPlanilha =
+    /// <summary>
+    /// As listas de característica que a planilha preenche, e em que linha.
+    ///
+    /// A lista é achada por <b>palavra</b>, e não pelo nome inteiro: a equipe
+    /// renomeia ("Contrarrecuo ou Freio", "Damper mariposa saída") e o nome
+    /// exato deixaria a escolha cair no chão sem ninguém ver.
+    /// </summary>
+    public static readonly (string Palavra, string Rotulo, int Linha)[] ListasDaPlanilha =
     {
-        ("Difusor", LinhaDifusor),
-        ("Damper mariposa", LinhaDamper),
-        ("Contrarrecuo", LinhaContrarrecuo),
+        ("difusor", "Difusor", LinhaDifusor),
+        ("damper", "Damper", LinhaDamper),
+        ("contrarrecuo", "Contrarrecuo ou freio", LinhaContrarrecuo),
     };
 
-    public sealed record Resultado(int Equipamentos, List<string> Avisos, List<string> Manuais);
+    /// <summary>A lista do cadastro que atende a uma palavra da folha.</summary>
+    private static string? ListaDoCadastro(string palavra, IEnumerable<string> listas) =>
+        listas.FirstOrDefault(l => Textos.Simples(l).Contains(palavra))
+        ?? (palavra == "contrarrecuo"
+            ? listas.FirstOrDefault(l => Textos.Simples(l).Contains("freio"))
+            : null);
+
+    /// <param name="Preenchidos">
+    /// Os campos que a folha realmente trouxe, para a tela mostrar uma linha só.
+    /// O que ela não traz já está dito no rótulo de cada campo — repetir a lista
+    /// inteira a cada importação era só barulho.
+    /// </param>
+    public sealed record Resultado(int Equipamentos, List<string> Avisos, List<string> Preenchidos);
 
     /// <summary>
     /// Lê a planilha para dentro da proposta. O que a folha não traz fica como
@@ -71,17 +89,21 @@ public static class FolhaDeDados
         var email = Texto(ws, CelulaEmail);
         var telefone = Texto(ws, CelulaTelefone);
 
-        if (numero.Length > 0) proposta.Numero = numero;
-        if (cliente.Length > 0) proposta.Cliente = cliente;
-        if (aosCuidados.Length > 0) proposta.AosCuidados = aosCuidados;
-        if (email.Length > 0) proposta.Email = email;
-        if (telefone.Length > 0) proposta.Telefone = telefone;
+        var preenchidos = new List<string>();
 
-        foreach (var (campo, celula) in CamposDaPlanilha)
+        void Trazer(string campo, string celula, string valor, Action<string> guardar)
         {
-            if (Texto(ws, celula).Length == 0)
-                avisos.Add($"{celula} ({campo}) veio vazia — o campo ficou como estava.");
+            if (EmBranco(valor)) return;
+
+            guardar(valor);
+            preenchidos.Add($"{campo} ({celula})");
         }
+
+        Trazer("Número da proposta", CelulaNumero, numero, v => proposta.Numero = v);
+        Trazer("Cliente", CelulaCliente, cliente, v => proposta.Cliente = v);
+        Trazer("Aos cuidados de", CelulaAosCuidados, aosCuidados, v => proposta.AosCuidados = v);
+        Trazer("E-mail", CelulaEmail, email, v => proposta.Email = v);
+        Trazer("Telefone", CelulaTelefone, telefone, v => proposta.Telefone = v);
 
         // ---------- os equipamentos, uma coluna cada ----------
         var porGrupo = caracteristicas.GroupBy(c => c.Grupo)
@@ -103,32 +125,33 @@ public static class FolhaDeDados
 
             // arranjo: teto ou piso
             var arranjo = Texto(ws, col, LinhaArranjo);
-            if (arranjo.Length > 0)
+            if (!EmBranco(arranjo))
             {
                 var achado = ListasDaProposta.Arranjos
                     .FirstOrDefault(a => Parecido(arranjo, a));
 
                 if (achado is not null) item.Arranjo = achado;
-                else avisos.Add($"Coluna {letra}, linha {LinhaArranjo}: \"{arranjo}\" não é Teto nem Piso.");
+                else avisos.Add($"Arranjo (coluna {letra}): \"{arranjo}\" não é Teto nem Piso.");
             }
 
             // as listas de característica
-            foreach (var (lista, linha) in ListasDaPlanilha)
+            foreach (var (palavra, rotulo, linha) in ListasDaPlanilha)
             {
                 var texto = Texto(ws, col, linha);
-                if (texto.Length == 0) continue;
+                if (EmBranco(texto)) continue;
 
-                var opcoes = porGrupo.GetValueOrDefault(lista, new());
-                if (opcoes.Count == 0)
+                var lista = ListaDoCadastro(palavra, porGrupo.Keys);
+                if (lista is null)
                 {
-                    avisos.Add($"A lista \"{lista}\" não existe no cadastro — coluna {letra} ignorada.");
+                    avisos.Add($"{rotulo}: não há lista parecida no cadastro, então a coluna " +
+                               $"{letra} ficou sem essa escolha.");
                     continue;
                 }
 
-                var escolha = Casar(texto, opcoes);
+                var escolha = Casar(texto, porGrupo[lista]);
                 if (escolha is null)
                 {
-                    avisos.Add($"Coluna {letra}, linha {linha} ({lista}): não entendi \"{texto}\" — escolha na tela.");
+                    avisos.Add($"{lista} (coluna {letra}): não entendi \"{texto}\" — escolha na tela.");
                     continue;
                 }
 
@@ -138,38 +161,34 @@ public static class FolhaDeDados
             itens.Add(item);
         }
 
-        if (itens.Count > 0) proposta.Itens = itens;
-        else avisos.Add($"Nenhuma coluna da linha {LinhaQuantidade} tinha um número — nenhum equipamento foi criado.");
+        if (itens.Count > 0)
+        {
+            proposta.Itens = itens;
+            preenchidos.Add($"{itens.Count} equipamento(s), um por coluna");
+        }
+        else
+        {
+            avisos.Add($"Nenhuma coluna da linha {LinhaQuantidade} tinha um número — " +
+                       "nenhum equipamento foi criado.");
+        }
 
-        return new Resultado(itens.Count, avisos, Manuais(itens, caracteristicas));
+        return new Resultado(itens.Count, avisos, preenchidos);
     }
 
     /// <summary>
-    /// O que a planilha NÃO traz e continua sendo de mão — o que a tela mostra
-    /// depois de importar, para ninguém mandar uma proposta pela metade.
+    /// Célula que não diz nada: vazia, ou com o texto que a folha usa como
+    /// espaço para preencher — "Preencher", "Escolher", "N/A" — ou com a lista
+    /// de opções ainda intacta ("sim / não", "não / admissão / descarga").
     /// </summary>
-    private static List<string> Manuais(List<ItemProposta> itens, List<Caracteristica> caracteristicas)
+    private static bool EmBranco(string texto)
     {
-        var manuais = new List<string>
-        {
-            "Cabeçalho: País, Projeto, datas, Fase, BU, idioma, venda para, destino, " +
-            "categoria, produto, segmento e portal",
-            "Contato do documento (nome, cargo, e-mail e telefones)",
-            "Moeda da proposta",
-            "O modelo de cada equipamento — a folha diz a quantidade, não qual ventilador",
-        };
+        var t = Textos.Simples(texto);
+        if (t.Length == 0) return true;
 
-        var daPlanilha = ListasDaPlanilha.Select(l => l.Lista).ToHashSet();
-        var outras = caracteristicas
-            .Select(c => c.Grupo)
-            .Distinct()
-            .Where(g => !daPlanilha.Contains(g))
-            .ToList();
+        if (t is "preencher" or "escolher" or "n/a" or "na" or "-" or "--") return true;
 
-        if (outras.Count > 0)
-            manuais.Add("Listas que a folha não traz: " + string.Join(", ", outras));
-
-        return manuais;
+        // a folha deixa as opções escritas na célula até alguém escolher uma
+        return t.Contains(" / ");
     }
 
     /// <summary>
@@ -231,9 +250,6 @@ public static class FolhaDeDados
                 .Any(col => DadosExcel.Numero(Texto(aba, col, LinhaQuantidade)) is > 0);
 
             if (!temCabecalho && !temQuantidade) continue;
-
-            if (aba != abas[0])
-                avisos.Add($"Li a aba \"{aba.Name}\" — é a que tem os campos do formulário.");
 
             return aba;
         }

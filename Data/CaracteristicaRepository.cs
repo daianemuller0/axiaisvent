@@ -92,9 +92,12 @@ public sealed class CaracteristicaRepository
     /// Subitens que passaram a ser de fábrica depois de o banco existir. Entram
     /// uma vez cada, na posição pedida; apagados depois, ficam apagados.
     /// </summary>
-    private static readonly (string Marca, string Lista, string Valor, string DepoisDe)[] SubitensNovos =
+    private static readonly (string Marca, string Palavra, string Valor, string DepoisDe)[] SubitensNovos =
     {
-        ("(subitem novo: Contrarrecuo)", "Contrarrecuo", "Contrarrecuo", "Sem Contrarrecuo"),
+        // a lista é achada por PALAVRA porque a equipe renomeia: no banco da
+        // rede ela virou "Contrarrecuo ou Freio", e procurar o nome exato
+        // fazia a migração passar batido (e marcar como feita)
+        ("(subitem novo: Contrarrecuo v2)", "contrarrecuo", "Contrarrecuo", "Sem Contrarrecuo"),
     };
 
     private readonly ParquetStore _store;
@@ -294,16 +297,23 @@ public sealed class CaracteristicaRepository
             .ReadLatest(EntidadeSemeados, "id", r => r.IsDBNull(0) ? "" : r.GetString(0))
             .ToHashSet();
 
-        foreach (var (marca, lista, valor, depoisDe) in SubitensNovos)
+        foreach (var (marca, palavra, valor, depoisDe) in SubitensNovos)
         {
             if (marcas.Contains(marca)) continue;
 
-            var daLista = Todas().Where(c => c.Grupo == lista).OrderBy(c => c.Ordem).ToList();
+            var lista = Grupos()
+                .Select(g => g.Nome)
+                .FirstOrDefault(n => Textos.Simples(n).Contains(palavra));
+
+            var daLista = lista is null
+                ? new List<Caracteristica>()
+                : Todas().Where(c => c.Grupo == lista).OrderBy(c => c.Ordem).ToList();
 
             if (daLista.Count > 0 &&
                 daLista.All(c => !c.Valor.Equals(valor, StringComparison.OrdinalIgnoreCase)))
             {
-                var anterior = daLista.FirstOrDefault(c => c.Valor == depoisDe);
+                var anterior = daLista.FirstOrDefault(c => Textos.Igual(c.Valor, depoisDe))
+                    ?? daLista.FirstOrDefault(c => FamiliaDePreco.EhAusencia(c.Valor));
                 var posicao = (anterior?.Ordem ?? daLista[^1].Ordem) + 1;
 
                 foreach (var c in daLista.Where(c => c.Ordem >= posicao).OrderByDescending(c => c.Ordem))
@@ -312,7 +322,7 @@ public sealed class CaracteristicaRepository
                     Salvar(c);
                 }
 
-                Salvar(new Caracteristica { Grupo = lista, Valor = valor, Ordem = posicao });
+                Salvar(new Caracteristica { Grupo = lista!, Valor = valor, Ordem = posicao });
             }
 
             _store.WriteRow(EntidadeSemeados,

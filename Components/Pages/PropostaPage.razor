@@ -104,27 +104,18 @@
         (contrarrecuo ou freio). O resto é preenchido aqui na tela.
     </p>
 
-    @if (_daPlanilha.Count > 0 || _manuais.Count > 0)
+    @if (_daPlanilha.Count > 0)
     {
         <div class="aviso aviso-ok" style="margin-top:12px">
             <strong>Veio da planilha:</strong> @string.Join(" · ", _daPlanilha)
         </div>
     }
+
+    @* aviso só quando há mesmo o que resolver: o que a folha não traz já está
+       escrito no rótulo de cada campo, não precisa de lista a cada importação *@
     @foreach (var aviso in _avisos)
     {
         <div class="aviso aviso-alerta" style="margin-top:8px">@aviso</div>
-    }
-    @if (_manuais.Count > 0)
-    {
-        <div class="aviso aviso-alerta" style="margin-top:8px">
-            <strong>Preencher manual:</strong>
-            <ul style="margin:6px 0 0 18px">
-                @foreach (var m in _manuais)
-                {
-                    <li>@m</li>
-                }
-            </ul>
-        </div>
     }
 </div>
 
@@ -1051,7 +1042,6 @@
     // o que a última leitura da folha de dados trouxe, e o que ela não traz
     private List<string> _daPlanilha = new();
     private List<string> _avisos = new();
-    private List<string> _manuais = new();
 
     /// <summary>Id na rota: /axiais/proposta/{id} abre aquela proposta direto.</summary>
     [Parameter] public string? Id { get; set; }
@@ -1148,7 +1138,7 @@
 
     /// <summary>A linha da folha de dados que preenche uma lista, se houver.</summary>
     private static string? LinhaDaPlanilha(string lista) => FolhaDeDados.ListasDaPlanilha
-        .Where(l => l.Lista == lista)
+        .Where(l => Textos.Simples(lista).Contains(l.Palavra))
         .Select(l => $"linha {l.Linha}")
         .FirstOrDefault();
 
@@ -1494,7 +1484,6 @@
         _lendo = true;
         _avisos = new();
         _daPlanilha = new();
-        _manuais = new();
 
         try
         {
@@ -1505,15 +1494,11 @@
             var resultado = FolhaDeDados.Ler(fluxo, _proposta, _caracteristicas, _equipamentos);
 
             _avisos = resultado.Avisos;
-            _manuais = resultado.Manuais;
-            _daPlanilha = FolhaDeDados.CamposDaPlanilha
-                .Select(kv => $"{kv.Key} ({kv.Value})")
-                .Append($"{resultado.Equipamentos} equipamento(s), um por coluna")
-                .ToList();
+            _daPlanilha = resultado.Preenchidos;
 
             _aberto = 0;
             Aviso(resultado.Equipamentos > 0
-                ? $"Folha lida: {resultado.Equipamentos} equipamento(s) no escopo. Confira o que ficou para preencher manual."
+                ? $"Folha lida: {resultado.Equipamentos} equipamento(s) no escopo."
                 : "Folha lida, mas nenhuma coluna da linha 31 tinha quantidade.",
                 erro: resultado.Equipamentos == 0);
         }
@@ -1544,7 +1529,6 @@
         _apagandoItem = null;
         _daPlanilha = new();
         _avisos = new();
-        _manuais = new();
         Aviso("Proposta nova — o número é gerado ao gravar.");
     }
 
