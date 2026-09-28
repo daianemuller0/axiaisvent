@@ -60,9 +60,9 @@ public static class FolhaDeDados
         List<Caracteristica> caracteristicas, List<Equipamento> equipamentos)
     {
         using var wb = new XLWorkbook(arquivo);
-        var ws = wb.Worksheets.First();
 
         var avisos = new List<string>();
+        var ws = Escolher(wb, avisos);
 
         // ---------- cabeçalho ----------
         var numero = Texto(ws, CelulaNumero);
@@ -213,9 +213,59 @@ public static class FolhaDeDados
     /// <summary>Compara sem acento, sem caixa e sem espaço sobrando.</summary>
     private static bool Parecido(string a, string b) => Textos.Igual(a, b);
 
-    private static string Texto(IXLWorksheet ws, string celula) =>
-        ws.Cell(celula).GetFormattedString().Trim();
+    /// <summary>
+    /// Qual aba ler. A folha costuma ter mais de uma (instruções, listas,
+    /// revisões), e a primeira nem sempre é a do formulário — então vale a
+    /// primeira que tenha alguma das células do cabeçalho preenchida, ou algum
+    /// número na linha das quantidades.
+    /// </summary>
+    private static IXLWorksheet Escolher(XLWorkbook wb, List<string> avisos)
+    {
+        var abas = wb.Worksheets.ToList();
+
+        foreach (var aba in abas)
+        {
+            var temCabecalho = CamposDaPlanilha.Values.Any(c => Texto(aba, c).Length > 0);
+
+            var temQuantidade = Enumerable.Range(PrimeiraColuna, UltimaColuna - PrimeiraColuna + 1)
+                .Any(col => DadosExcel.Numero(Texto(aba, col, LinhaQuantidade)) is > 0);
+
+            if (!temCabecalho && !temQuantidade) continue;
+
+            if (aba != abas[0])
+                avisos.Add($"Li a aba \"{aba.Name}\" — é a que tem os campos do formulário.");
+
+            return aba;
+        }
+
+        avisos.Add($"Nenhuma aba tinha as células esperadas. O arquivo tem: " +
+                   string.Join(", ", abas.Select(a => $"\"{a.Name}\"")) +
+                   $". Confira se o cliente está mesmo em {CelulaCliente} e a quantidade na " +
+                   $"linha {LinhaQuantidade}.");
+
+        return abas[0];
+    }
+
+    /// <summary>
+    /// O texto de uma célula.
+    ///
+    /// Numa folha de formulário é comum o campo ser um bloco de células
+    /// mescladas: o valor mora só na primeira do bloco, e as outras leem vazio.
+    /// Por isso, célula vazia que faz parte de uma mesclagem devolve o valor da
+    /// mesclagem — é o que a pessoa vê na tela do Excel.
+    /// </summary>
+    private static string Texto(IXLWorksheet ws, string celula) => Texto(ws.Cell(celula));
 
     private static string Texto(IXLWorksheet ws, int coluna, int linha) =>
-        ws.Cell(linha, coluna).GetFormattedString().Trim();
+        Texto(ws.Cell(linha, coluna));
+
+    private static string Texto(IXLCell celula)
+    {
+        var direto = celula.GetFormattedString().Trim();
+        if (direto.Length > 0) return direto;
+
+        return celula.IsMerged()
+            ? celula.MergedRange().FirstCell().GetFormattedString().Trim()
+            : "";
+    }
 }
