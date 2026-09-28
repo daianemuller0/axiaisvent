@@ -971,8 +971,12 @@ ventilador. É o que evita mandar proposta pela metade achando que a planilha cu
 
 ### A parte elétrica
 
-O motor entra junto com o escopo, por equipamento: um flag **Sem / Com** e, no Com, uma
-caixa com os nove campos do catálogo — fabricante, potência, frequência, tensão, rotação,
+A **Parte Elétrica** é a seção, e dentro dela moram três itens, cada um com o seu flag:
+**motor elétrico**, **partidores** e **instrumentação**. Os três são irmãos — dizer que não
+leva motor não esconde o partidor nem a instrumentação.
+
+O **motor elétrico** tem um flag **Sem / Com** e, no Com, uma caixa com os nove campos do
+catálogo — fabricante, potência, frequência, tensão, rotação,
 nº de polos, tipo de flange, IEC/NEMA e frame. Quando o filtro chega a **um** motor, vêm o
 **código**, o **preço** na moeda da proposta e a **observação**.
 
@@ -990,8 +994,7 @@ O frame escolhido passa pela regra que já existia na guia Dados (`RegraMotor`),
 com o frame máximo da combinação e, na falta dele, com o do cubo. Aqui ela **avisa e não
 impede**: quem monta a proposta pode saber de uma exceção que o cadastro ainda não tem.
 
-Junto com o motor moram mais duas listas, e elas saíram do escopo do ventilador de
-propósito:
+As outras duas listas saíram do escopo do ventilador de propósito — o lugar delas é aqui:
 
 - **PARTIDORES** — flag Sem/Com e uma escolha. O preço vem da **potência do motor**, que já
   está definida logo acima: é a mesma tabela por referência do resto do sistema, só que no

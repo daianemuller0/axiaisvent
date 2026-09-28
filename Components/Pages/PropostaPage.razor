@@ -444,9 +444,16 @@
             </div>
         }
 
-        <!-- ---------- parte elétrica ---------- -->
+        <!-- ---------- parte elétrica: motor, partidor e instrumentação ---------- -->
         <div class="toolbar" style="flex-wrap:wrap; border-top:2px solid var(--border); padding-top:14px; margin-top:14px">
-            <strong style="min-width:210px">@Campo("Parte Elétrica")</strong>
+            <h3 style="margin:0; font-size:14px">Parte Elétrica</h3>
+            <span class="subtitle" style="margin:0">
+                o motor elétrico, o partidor e a instrumentação — cada um com o seu flag
+            </span>
+        </div>
+
+        <div class="toolbar" style="flex-wrap:wrap">
+            <strong style="min-width:210px">@Campo("Motor elétrico")</strong>
             <button class="@(atual.ComMotor ? "btn-ghost" : "btn-primary")"
                     @onclick="() => atual.ComMotor = false">Sem</button>
             <button class="@(atual.ComMotor ? "btn-primary" : "btn-ghost")"
@@ -515,77 +522,77 @@
                     <div class="aviso aviso-alerta" style="margin-top:10px">@aviso</div>
                 }
             </div>
+        }
 
-            <!-- partidor: o preço vem da potência do motor -->
-            <div class="toolbar" style="flex-wrap:wrap">
-                <strong style="min-width:210px">@ListaDosPartidores</strong>
-                <button class="@(atual.ComPartidor ? "btn-ghost" : "btn-primary")"
-                        @onclick="() => atual.ComPartidor = false">Sem</button>
-                <button class="@(atual.ComPartidor ? "btn-primary" : "btn-ghost")"
-                        @onclick="() => LigarPartidor(atual)">Com</button>
+        <!-- partidor: o preço vem da potência do motor -->
+        <div class="toolbar" style="flex-wrap:wrap">
+            <strong style="min-width:210px">@ListaDosPartidores</strong>
+            <button class="@(atual.ComPartidor ? "btn-ghost" : "btn-primary")"
+                    @onclick="() => atual.ComPartidor = false">Sem</button>
+            <button class="@(atual.ComPartidor ? "btn-primary" : "btn-ghost")"
+                    @onclick="() => LigarPartidor(atual)">Com</button>
 
-                @if (atual.ComPartidor)
-                {
-                    <select class="cell" style="min-width:260px" value="@atual.Partidor"
-                            @onchange="e => atual.Partidor = e.Value?.ToString() ?? string.Empty">
-                        <option value="">— escolher —</option>
-                        @foreach (var o in OpcoesReais(ListaDosPartidores))
-                        {
-                            <option value="@o.Valor" selected="@(o.Valor == atual.Partidor)">@o.Valor</option>
-                        }
-                    </select>
-
-                    @if (LinhaDoPartidor(atual) is { } linha)
+            @if (atual.ComPartidor)
+            {
+                <select class="cell" style="min-width:260px" value="@atual.Partidor"
+                        @onchange="e => atual.Partidor = e.Value?.ToString() ?? string.Empty">
+                    <option value="">— escolher —</option>
+                    @foreach (var o in OpcoesReais(ListaDosPartidores))
                     {
-                        <span style="flex:1"></span>
+                        <option value="@o.Valor" selected="@(o.Valor == atual.Partidor)">@o.Valor</option>
+                    }
+                </select>
+
+                @if (LinhaDoPartidor(atual) is { } linha)
+                {
+                    <span style="flex:1"></span>
+                    <span class="subtitle" style="margin:0">
+                        @(linha.Codigo.Length > 0 ? $"código {linha.Codigo}" : "sem código")
+                        ·
+                        @(linha.Valor is null ? linha.Origem : $"{Dinheiro(linha.Valor)} — {linha.Origem}")
+                    </span>
+                }
+            }
+        </div>
+
+        <!-- instrumentação: pode ser mais de uma -->
+        <div class="toolbar" style="flex-wrap:wrap">
+            <strong style="min-width:210px">@ListaDaInstrumentacao</strong>
+            <button class="@(atual.ComInstrumentacao ? "btn-ghost" : "btn-primary")"
+                    @onclick="() => DesligarInstrumentacao(atual)">Sem</button>
+            <button class="@(atual.ComInstrumentacao ? "btn-primary" : "btn-ghost")"
+                    @onclick="() => atual.ComInstrumentacao = true">Com</button>
+            @if (atual.ComInstrumentacao)
+            {
+                <span class="subtitle" style="margin:0">
+                    pode marcar mais de uma — cada uma entra com o seu código e o seu preço
+                </span>
+            }
+        </div>
+
+        @if (atual.ComInstrumentacao)
+        {
+            <div class="panel" style="margin:0 0 14px; border-left:3px solid var(--azul, #0b3d6b)">
+                @foreach (var o in OpcoesReais(ListaDaInstrumentacao))
+                {
+                    var opcao = o;
+                    var marcada = atual.Instrumentacao.Contains(opcao.Valor);
+                    var linha = Resolver(atual, opcao.Grupo, opcao.Valor);
+
+                    <div class="toolbar" style="flex-wrap:wrap; margin-bottom:6px">
+                        <label style="display:flex; align-items:center; gap:8px; min-width:380px">
+                            <input type="checkbox" checked="@marcada"
+                                   @onchange="e => MarcarInstrumentacao(atual, opcao.Valor, (bool)(e.Value ?? false))" />
+                            <span>@opcao.Valor</span>
+                        </label>
                         <span class="subtitle" style="margin:0">
                             @(linha.Codigo.Length > 0 ? $"código {linha.Codigo}" : "sem código")
                             ·
-                            @(linha.Valor is null ? linha.Origem : $"{Dinheiro(linha.Valor)} — {linha.Origem}")
+                            @(linha.Valor is null ? linha.Origem : Dinheiro(linha.Valor))
                         </span>
-                    }
+                    </div>
                 }
             </div>
-
-            <!-- instrumentação: pode ser mais de uma -->
-            <div class="toolbar" style="flex-wrap:wrap">
-                <strong style="min-width:210px">@ListaDaInstrumentacao</strong>
-                <button class="@(atual.ComInstrumentacao ? "btn-ghost" : "btn-primary")"
-                        @onclick="() => DesligarInstrumentacao(atual)">Sem</button>
-                <button class="@(atual.ComInstrumentacao ? "btn-primary" : "btn-ghost")"
-                        @onclick="() => atual.ComInstrumentacao = true">Com</button>
-                @if (atual.ComInstrumentacao)
-                {
-                    <span class="subtitle" style="margin:0">
-                        pode marcar mais de uma — cada uma entra com o seu código e o seu preço
-                    </span>
-                }
-            </div>
-
-            @if (atual.ComInstrumentacao)
-            {
-                <div class="panel" style="margin:0 0 14px; border-left:3px solid var(--azul, #0b3d6b)">
-                    @foreach (var o in OpcoesReais(ListaDaInstrumentacao))
-                    {
-                        var opcao = o;
-                        var marcada = atual.Instrumentacao.Contains(opcao.Valor);
-                        var linha = Resolver(atual, opcao.Grupo, opcao.Valor);
-
-                        <div class="toolbar" style="flex-wrap:wrap; margin-bottom:6px">
-                            <label style="display:flex; align-items:center; gap:8px; min-width:380px">
-                                <input type="checkbox" checked="@marcada"
-                                       @onchange="e => MarcarInstrumentacao(atual, opcao.Valor, (bool)(e.Value ?? false))" />
-                                <span>@opcao.Valor</span>
-                            </label>
-                            <span class="subtitle" style="margin:0">
-                                @(linha.Codigo.Length > 0 ? $"código {linha.Codigo}" : "sem código")
-                                ·
-                                @(linha.Valor is null ? linha.Origem : Dinheiro(linha.Valor))
-                            </span>
-                        </div>
-                    }
-                </div>
-            }
         }
     }
 </div>
@@ -645,7 +652,7 @@
                     {
                         var motor = MotorDe(doItem);
                         <tr>
-                            <td class="nowrap"><strong>Parte Elétrica</strong></td>
+                            <td class="nowrap"><strong>Motor elétrico</strong></td>
                             <td class="nowrap">@(motor is null ? "motor ainda não definido" : motor.Descricao)</td>
                             <td class="nowrap">@(motor is null || motor.Codigo.Length == 0 ? "—" : motor.Codigo)</td>
                             <td class="nowrap">
