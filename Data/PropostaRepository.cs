@@ -115,6 +115,27 @@ public sealed class Proposta
     public string MarketSegment { get; set; } = "";
     public string Portal { get; set; } = "Nenhum";
 
+    /// <summary>O representante escolhido, pelo nome.</summary>
+    public string Representante { get; set; } = "";
+
+    /// <summary>
+    /// O contato do representante, guardado junto com a proposta. Não aparece
+    /// na tela — a equipe escolhe pelo nome —, mas vai para o documento.
+    ///
+    /// Fica gravado <b>além</b> do nome porque um representante pode sair da
+    /// lista, e a proposta antiga não pode perder o contato de quem a
+    /// atendeu. Enquanto ele estiver na lista, quem manda é a lista: corrigir
+    /// um telefone lá vale para as propostas abertas.
+    /// </summary>
+    public string RepresentanteContato { get; set; } = "";
+
+    /// <summary>O contato que vale: o da lista, quando o representante ainda está nela.</summary>
+    public string ContatoDoRepresentante()
+    {
+        var daLista = ListasDaProposta.ContatoDoRepresentante(Representante);
+        return daLista.Length > 0 ? daLista : RepresentanteContato;
+    }
+
     // ---------- contato que sai no documento ----------
     public string ContatoNome { get; set; } = "";
     public string ContatoCargo { get; set; } = "";
@@ -218,6 +239,78 @@ public static class ListasDaProposta
 
     public static readonly string[] Arranjos = { "Teto", "Piso" };
 
+    /// <summary>
+    /// Os representantes, com o contato de cada um. O contato NÃO aparece na
+    /// tela — a equipe escolhe pelo nome —, mas vai junto para o documento, e
+    /// é por isso que ele mora aqui e é guardado na proposta.
+    ///
+    /// A divisão em dois grupos é a da própria planilha da equipe.
+    /// </summary>
+    public sealed record Representante(string Grupo, string Nome, string Contato);
+
+    public static readonly Representante[] Representantes =
+    {
+        new("Brasil", "Douglas (Mezza & Baga)",
+            "Douglas M. Matavelli por (11) 97144-3085 ou e-mail: douglas.matavelli@howden.com"),
+        new("Brasil", "Alexandre (Artman)",
+            "Alexandre B. Pereira por (91) 98883-8142 / (16) 99429-1786 ou e-mail: alexandre.pereira@artman.net.br"),
+        new("Brasil", "Gerson (Lizan)", ""),
+        new("Brasil", "Ivars (Dzelme & Leite Ltda)",
+            "Ivars Janis Dzelme por (81) 3221-0250 / (81) 99946-0506 ou e-mail: ivars@hotlink.com.br"),
+        new("Brasil", "Júlio (Doulus)",
+            "Júlio Augusto Afro por (27) 3314-1000 / (27) 98122-1177 ou e-mail: howden@doulus.com.br"),
+        new("Brasil", "Mauricio (Livimat)",
+            "Mauricio A. de Araujo por (21) 99908-1687 ou e-mail: Livimat.comercial@outlook.com"),
+        new("Brasil", "Ricardo (Sesbras)",
+            "Ricardo V. F. Martins por (21) 2532-7404 / (21) 99764-5297 ou e-mail: aviabras@aviabras.com.br"),
+        new("Brasil", "Sander (Provent)", ""),
+        new("Brasil", "Thais (InTec)",
+            "InTec – Engª Thais Werner de Lima por (71) 3289-3611 / (71) 9 9961-9278 ou e-mail: intec@inovacaotecnologia.com.br"),
+        new("Brasil", "Wander (Wanseve)",
+            "Wander S. da Silva por (16) 3627-6499 / (16) 9 9228 2928 ou e-mail: wanseve@uol.com.br"),
+        new("Brasil", "Adolpho (Atric)",
+            "Adolpho Procópio Rossi Neto por (11) 99976-1952 ou e-mail: rossi@atric.com.br"),
+
+        new("América Latina", "ASESORIA Y EQUIPO < =USD 500K", ContatoAseqsa),
+        new("América Latina", "ASESORIA Y EQUIPO < USD 1MM", ContatoAseqsa),
+        new("América Latina", "ASESORIA Y EQUIPO > USD 1MM", ContatoAseqsa),
+        new("América Latina", "FERRUNION",
+            "Gilmer Vasquez por: +51 1 4754560 ou e-mail: gsvasquez@ferrunion.net"),
+        new("América Latina", "H&T",
+            "Jorge Gonzalo Hernández Cabeza por +56 2 29970179 / +56 9 98871135 ou e-mail: jhernandez@ghis.cl"),
+        new("América Latina", "HCA",
+            "Angelo Ramirez por +56 9 4478 3695 / +56 2 5725-7371 o e-mail: angelo@hcamineria.cl"),
+        new("América Latina", "HRI S.A.",
+            "Rury Harms Orrego por +56 2 2592 3500 ou e-mail: rharms@hri.cl"),
+        new("América Latina", "IPT Colômbia < =EUR 500K", ContatoIpt),
+        new("América Latina", "IPT Colômbia < =EUR 750K", ContatoIpt),
+        new("América Latina", "IPT Colômbia < =EUR 1MM", ContatoIpt),
+        new("América Latina", "IPT Colômbia < =EUR 1,25MM", ContatoIpt),
+        new("América Latina", "IPT Colômbia >EUR 1,25MM", ContatoIpt),
+        new("América Latina", "SIMINCO",
+            "Alejandro Cadavid L. por +57 323 460 0551 o e-mail comercial@siminco.com.co " +
+            "o Carlos Contreras U. por +57 311 588 488"),
+        new("América Latina", "TEJADA",
+            "Luis Felipe Tejada por: +57 315-505-5397 ou e-mail: Tejadaingenieros@tejadaingenieros.com"),
+        new("América Latina", "Turbomaquinarias <= EUR 100 k", ContatoTurbo),
+        new("América Latina", "Turbomaquinarias <= EUR 500 k", ContatoTurbo),
+        new("América Latina", "Turbomaquinarias <= EUR 2,5 M", ContatoTurbo),
+        new("América Latina", "Turbomaquinarias <= EUR 7,0 M", ContatoTurbo),
+        new("América Latina", "Turbomaquinarias > EUR 7,0 M", ContatoTurbo),
+    };
+
+    // o mesmo contato atende a várias faixas de valor — fica em um lugar só
+    private const string ContatoAseqsa =
+        "Pablo Santamarina por +502 24285468, 24285478, 23658515, 23658669 ou e-mail: aseqsa@gmail.com";
+    private const string ContatoIpt =
+        "Ricardo Morales Castro por: +57 3125866426 / 3206737171 ou e-mail: rmorales@iptcolombia.com";
+    private const string ContatoTurbo =
+        "Carlos Daniel Weihmuller por e-mail: cweihmuller@turbomaquinarias.com";
+
+    /// <summary>O contato de um representante, pelo nome. Vazio se não achar.</summary>
+    public static string ContatoDoRepresentante(string nome) => Representantes
+        .FirstOrDefault(r => r.Nome == nome)?.Contato ?? "";
+
     /// <summary>Os contatos que assinam a proposta.</summary>
     public static readonly (string Nome, string Cargo, string Email, string Telefones)[] Contatos =
     {
@@ -242,6 +335,7 @@ public sealed class PropostaRepository
         "ano", "numero", "revisao", "bu", "idioma", "vendaPara", "destino",
         "paisDestino", "categoria", "produto", "marketSegment", "portal",
         "contatoNome", "contatoCargo", "contatoEmail", "contatoTelefones",
+        "representante", "representanteContato",
         "moeda", "equipamento", "arranjo", "escolhas", "itens",
     };
 
@@ -262,8 +356,9 @@ public sealed class PropostaRepository
             MarketSegment = S(r, 24), Portal = S(r, 25),
             ContatoNome = S(r, 26), ContatoCargo = S(r, 27),
             ContatoEmail = S(r, 28), ContatoTelefones = S(r, 29),
-            MoedaCodigo = S(r, 30),
-            Itens = Proposta.LerItens(S(r, 34), S(r, 31), S(r, 32), S(r, 33)),
+            Representante = S(r, 30), RepresentanteContato = S(r, 31),
+            MoedaCodigo = S(r, 32),
+            Itens = Proposta.LerItens(S(r, 36), S(r, 33), S(r, 34), S(r, 35)),
         })
         .OrderByDescending(p => p.Numero)
         .ToList();
@@ -283,6 +378,7 @@ public sealed class PropostaRepository
             p.Ano, p.Numero, p.Revisao, p.Bu, p.Idioma, p.VendaPara, p.Destino,
             p.PaisDestino, p.Categoria, p.Produto, p.MarketSegment, p.Portal,
             p.ContatoNome, p.ContatoCargo, p.ContatoEmail, p.ContatoTelefones,
+            p.Representante, p.RepresentanteContato,
             // as três colunas do formato antigo continuam sendo gravadas vazias:
             // o esquema do Parquet é por arquivo, e tirá-las não apagaria as que
             // já estão lá

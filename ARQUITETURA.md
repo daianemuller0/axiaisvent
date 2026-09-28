@@ -1022,6 +1022,21 @@ exatamente o número que o cadastro já dava não cria exceção nenhuma.
 É isto que destrava o caso mais comum do dia a dia: o cadastro ainda não tem aquele preço, e
 a proposta precisa sair hoje.
 
+### O representante e o contato escondido
+
+O cabeçalho tem um **Representante**, escolhido numa lista de 30 (agrupada em Brasil e
+América Latina, como a planilha da equipe). O **contato dele não aparece na tela** — quem
+monta a proposta escolhe pelo nome —, mas é gravado junto com a proposta, porque vai sair no
+documento.
+
+Por que gravar o contato, e não só o nome: um representante pode sair da lista, e a proposta
+antiga não pode perder o contato de quem a atendeu. Enquanto ele estiver na lista, porém,
+**quem manda é a lista** (`ContatoDoRepresentante()`): corrigir um telefone lá vale para as
+propostas já gravadas, e a cópia é só a rede de segurança.
+
+A lista está em `ListasDaProposta.Representantes`, junto com as outras do cabeçalho. Quando
+a equipe quiser editá-la pelo sistema, ela vira uma entidade como as outras.
+
 ### A proposta guarda a escolha, nunca o preço
 
 `Proposta` (entidade `propostas`) guarda a moeda e, por equipamento, a quantidade, o id do

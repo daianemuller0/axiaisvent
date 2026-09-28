@@ -236,6 +236,32 @@
                     <option value="@x">@x</option>
                 }
             </select></label>
+
+        @* o contato do representante não aparece aqui de propósito: ele é
+           guardado com a proposta e sai no documento *@
+        <label>@Campo("Representante")
+            <select class="cell" value="@_proposta.Representante"
+                    @onchange="e => EscolherRepresentante(e.Value?.ToString() ?? string.Empty)">
+                <option value="">— escolher —</option>
+                @foreach (var grupo in ListasDaProposta.Representantes.GroupBy(r => r.Grupo))
+                {
+                    <optgroup label="@grupo.Key">
+                        @foreach (var r in grupo)
+                        {
+                            <option value="@r.Nome" selected="@(r.Nome == _proposta.Representante)">@r.Nome</option>
+                        }
+                    </optgroup>
+                }
+            </select></label>
+
+        @if (_proposta.Representante.Length > 0)
+        {
+            <span class="subtitle" style="align-self:end; padding-bottom:9px">
+                @(_proposta.ContatoDoRepresentante().Length > 0
+                    ? "contato guardado com a proposta — sai no documento"
+                    : "esse representante ainda não tem contato cadastrado")
+            </span>
+        }
     </div>
 </div>
 
@@ -1139,6 +1165,17 @@
         _proposta.Itens.RemoveAt(PosicaoValida);
         _aberto = 0;
         _apagandoItem = null;
+    }
+
+    /// <summary>
+    /// Guarda o representante e, junto, o contato dele — que não aparece na
+    /// tela, mas vai para o documento. A cópia é para a proposta antiga não
+    /// perder o contato se o representante sair da lista depois.
+    /// </summary>
+    private void EscolherRepresentante(string nome)
+    {
+        _proposta.Representante = nome;
+        _proposta.RepresentanteContato = ListasDaProposta.ContatoDoRepresentante(nome);
     }
 
     private void EscolherContato(string nome)
