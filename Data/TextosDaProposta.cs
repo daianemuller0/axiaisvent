@@ -22,7 +22,6 @@ public enum IdiomaDaProposta { Espanhol, Portugues, Ingles }
 public sealed class TextosDaProposta
 {
     // ---------- capa e cabeçalho ----------
-    public required string OfertaTecnicaComercial { get; init; }
     public required string Cliente { get; init; }
     public required string AosCuidados { get; init; }
     public required string Cidade { get; init; }
@@ -157,7 +156,6 @@ public sealed class TextosDaProposta
 
     public static readonly TextosDaProposta Es = new()
     {
-        OfertaTecnicaComercial = "Oferta Técnica Comercial",
         Cliente = "Cliente:", AosCuidados = "Al cuidado de:", Cidade = "Ciudad:",
         Email = "E-mail:", Telefone = "Fono:", SuaReferencia = "Su referencia:",
         Projeto = "Proyecto:", NossaReferencia = "Nuestra referencia:", Data = "Fecha:",
@@ -372,7 +370,6 @@ public sealed class TextosDaProposta
 
     public static readonly TextosDaProposta Pt = new()
     {
-        OfertaTecnicaComercial = "Proposta Técnica Comercial",
         Cliente = "Cliente:", AosCuidados = "Aos cuidados de:", Cidade = "Cidade:",
         Email = "E-mail:", Telefone = "Telefone:", SuaReferencia = "Sua referência:",
         Projeto = "Projeto:", NossaReferencia = "Nossa referência:", Data = "Data:",
@@ -586,7 +583,6 @@ public sealed class TextosDaProposta
 
     public static readonly TextosDaProposta En = new()
     {
-        OfertaTecnicaComercial = "Technical and Commercial Proposal",
         Cliente = "Customer:", AosCuidados = "Attention:", Cidade = "City:",
         Email = "E-mail:", Telefone = "Phone:", SuaReferencia = "Your reference:",
         Projeto = "Project:", NossaReferencia = "Our reference:", Data = "Date:",

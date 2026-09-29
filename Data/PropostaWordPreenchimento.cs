@@ -63,8 +63,32 @@ internal sealed class Preenchimento
         Assessoria();
         Diarias();
         Fechamento();
+        TirarRealce();
 
         _doc.MainDocumentPart!.Document.Save();
+    }
+
+    /// <summary>
+    /// Tira o realce amarelo do documento inteiro.
+    ///
+    /// No modelo o amarelo não é destaque: é a marca de "escolher" ou
+    /// "preencher" para quem monta a proposta à mão. Preenchido, ele não tem
+    /// mais o que dizer — e sairia grifado na proposta do cliente.
+    /// </summary>
+    private void TirarRealce()
+    {
+        var partes = new List<OpenXmlPartRootElement?> { _doc.MainDocumentPart!.Document };
+        partes.AddRange(_doc.MainDocumentPart.HeaderParts.Select(h => (OpenXmlPartRootElement?)h.Header));
+        partes.AddRange(_doc.MainDocumentPart.FooterParts.Select(f => (OpenXmlPartRootElement?)f.Footer));
+
+        foreach (var parte in partes.Where(p => p is not null))
+        {
+            foreach (var realce in parte!.Descendants<Highlight>().ToList())
+            {
+                if (realce.Val?.Value == HighlightColorValues.Yellow) realce.Remove();
+            }
+            parte.Save();
+        }
     }
 
     // ================= propriedades do documento =================
@@ -163,6 +187,11 @@ internal sealed class Preenchimento
 
                 sdt.SdtProperties?.GetFirstChild<ShowingPlaceholder>()?.Remove();
 
+                // o campo vazio é cinza claro porque está mostrando o exemplo;
+                // preenchido, ele tem de ficar da cor do texto, como os outros
+                // dados da capa
+                foreach (var cinza in sdt.Descendants<Color>().ToList()) cinza.Remove();
+
                 var textos = sdt.Descendants<Text>().ToList();
                 if (textos.Count == 0) continue;
 
@@ -186,6 +215,14 @@ internal sealed class Preenchimento
         Rotulo(capa, "E-mail:", _p.Email);
         Rotulo(capa, "Fono:", _p.Telefone);
         Rotulo(capa, "Preparada por:", _p.PreparadaPor);
+
+        // o subtítulo da capa é "Oferta Comercial" — sem o "Técnica", que é da
+        // proposta técnica, e é escrito também em espanhol
+        if (capa.Descendants<Paragraph>()
+                .FirstOrDefault(p => Texto(p).Trim() == "Oferta Técnica Comercial") is { } subtitulo)
+        {
+            Escrever(subtitulo, _t.OfertaComercial);
+        }
 
         Rotulos(capa);
 
@@ -214,7 +251,6 @@ internal sealed class Preenchimento
             ("Ciudad:", _t.Cidade), ("Su referencia:", _t.SuaReferencia),
             ("Proyecto:", _t.Projeto), ("Nuestra referencia:", _t.NossaReferencia),
             ("Fecha:", _t.Data), ("Contactos Howden", _t.ContatosHowden),
-            ("Oferta Técnica Comercial", _t.OfertaTecnicaComercial),
             ("E-mail:", _t.Email), ("Fono:", _t.Telefone), ("Preparada por:", _t.PreparadaPor),
             ("Nuestra Ref.:", _t.NossaRefCurta), ("Su Ref.:", _t.SuaRefCurta),
         };
@@ -280,6 +316,22 @@ internal sealed class Preenchimento
 
             foreach (var p in bloco) p.Remove();
         }
+
+        // os parágrafos em branco que separavam os quatro endereços continuavam
+        // lá, ocupando altura: a célula é centrada, então o endereço subia e
+        // deixava de ficar na mesma altura da imagem do plantão. Fica um só,
+        // antes do "Web:"
+        var brancos = celula.Elements<Paragraph>()
+            .Where(p => Texto(p).Trim().Length == 0)
+            .ToList();
+
+        var web = celula.Elements<Paragraph>()
+            .FirstOrDefault(p => Texto(p).Contains("Web:", StringComparison.Ordinal));
+
+        foreach (var branco in brancos) branco.Remove();
+
+        if (web is not null && brancos.Count > 0)
+            celula.InsertBefore((Paragraph)brancos[0].CloneNode(true), web);
     }
 
     /// <summary>
@@ -290,24 +342,55 @@ internal sealed class Preenchimento
     {
         var capa = Tabelas().First();
 
-        var linhas = capa.Elements<TableRow>()
-            .Where(l => Texto(l).Contains("@chartindustries.com", StringComparison.Ordinal)
-                        && !Texto(l).Contains("Geraldini", StringComparison.Ordinal))
+        // o diretor de vendas já está numa linha de três, sozinho na célula da
+        // direita: é essa a linha da proposta, e os escolhidos entram do lado
+        // dele. As outras cinco linhas, com os quinze contatos, saem
+        var doDiretor = capa.Elements<TableRow>()
+            .FirstOrDefault(l => Texto(l).Contains("Geraldini", StringComparison.Ordinal));
+        if (doDiretor is null) return;
+
+        var dosContatos = capa.Elements<TableRow>()
+            .Where(l => l != doDiretor
+                        && Texto(l).Contains("@chartindustries.com", StringComparison.Ordinal))
             .ToList();
 
-        if (linhas.Count == 0) return;
+        var celulas = doDiretor.Elements<TableCell>().ToList();
+        if (celulas.Count < 2) return;
 
+        // a célula do diretor é o molde: é dela que vêm o negrito do nome, o
+        // centralizado e o tamanho da letra
+        var molde = celulas[^1];
         var escolhidos = Escolhidos().ToList();
-        var primeira = linhas[0];
-        var celulas = primeira.Elements<TableCell>().ToList();
 
-        for (var i = 0; i < celulas.Count; i++)
+        for (var i = 0; i < celulas.Count - 1; i++)
         {
-            if (i < escolhidos.Count) EscreverNaCelula(celulas[i], Linhas(escolhidos[i]));
+            if (i < escolhidos.Count) ComoOMolde(celulas[i], molde, Linhas(escolhidos[i]));
             else EscreverNaCelula(celulas[i], new[] { "" });
         }
 
-        foreach (var sobra in linhas.Skip(1)) sobra.Remove();
+        foreach (var sobra in dosContatos) sobra.Remove();
+    }
+
+    /// <summary>
+    /// Escreve numa célula com a formatação de outra: os parágrafos do molde
+    /// são copiados para lá antes de receberem o texto.
+    /// </summary>
+    private static void ComoOMolde(TableCell celula, TableCell molde, IReadOnlyList<string> linhas)
+    {
+        foreach (var antigo in celula.Elements<Paragraph>().ToList()) antigo.Remove();
+
+        foreach (var p in molde.Elements<Paragraph>())
+            celula.Append((Paragraph)p.CloneNode(true));
+
+        // o alinhamento vertical também é da célula, e não do parágrafo
+        if (molde.TableCellProperties?.GetFirstChild<TableCellVerticalAlignment>() is { } alinhamento)
+        {
+            celula.TableCellProperties ??= new TableCellProperties();
+            celula.TableCellProperties.GetFirstChild<TableCellVerticalAlignment>()?.Remove();
+            celula.TableCellProperties.Append((TableCellVerticalAlignment)alinhamento.CloneNode(true));
+        }
+
+        EscreverNaCelula(celula, linhas);
     }
 
     private IEnumerable<ListasDaProposta.ContatoHowden> Escolhidos()
