@@ -185,6 +185,16 @@ internal sealed class Preenchimento
                 var alias = sdt.SdtProperties?.GetFirstChild<SdtAlias>()?.Val?.Value;
                 if (alias is null || !valores.TryGetValue(alias, out var valor)) continue;
 
+                // sem valor, o campo tem de SAIR. Ele está ligado a uma
+                // propriedade do documento: vazia, o Word volta a mostrar o
+                // exemplo — e a proposta sairia para o cliente escrito
+                // "[Endereço da Empresa]"
+                if (valor.Trim().Length == 0)
+                {
+                    Desembrulhar(sdt);
+                    continue;
+                }
+
                 sdt.SdtProperties?.GetFirstChild<ShowingPlaceholder>()?.Remove();
 
                 // o campo vazio é cinza claro porque está mostrando o exemplo;
@@ -201,6 +211,32 @@ internal sealed class Preenchimento
             }
             parte.Save();
         }
+    }
+
+    /// <summary>
+    /// Tira o campo e deixa no lugar dele o que ele embrulhava, vazio: sem a
+    /// ligação com a propriedade, o Word não tem mais o que mostrar ali.
+    /// </summary>
+    private static void Desembrulhar(SdtElement sdt)
+    {
+        var conteudo = sdt.ChildElements.FirstOrDefault(e =>
+            e is SdtContentBlock or SdtContentRun or SdtContentCell or SdtContentRow);
+
+        if (conteudo is null || sdt.Parent is null)
+        {
+            sdt.Remove();
+            return;
+        }
+
+        foreach (var texto in conteudo.Descendants<Text>().ToList()) texto.Text = "";
+
+        foreach (var filho in conteudo.ChildElements.ToList())
+        {
+            filho.Remove();
+            sdt.Parent.InsertBefore(filho, sdt);
+        }
+
+        sdt.Remove();
     }
 
     // ================= capa =================
@@ -332,6 +368,29 @@ internal sealed class Preenchimento
 
         if (web is not null && brancos.Count > 0)
             celula.InsertBefore((Paragraph)brancos[0].CloneNode(true), web);
+
+        Descer(celula);
+    }
+
+    /// <summary>
+    /// Desce o bloco do endereço para ele ficar na altura da imagem do plantão.
+    ///
+    /// A linha tem altura fixa e a célula é centrada, mas quem manda na posição
+    /// é a IMAGEM: ela está ancorada ao parágrafo do endereço, então o texto
+    /// encosta no topo e a imagem desce a partir dele, sobrando espaço embaixo.
+    /// Um espaço antes do primeiro parágrafo empurra os dois juntos, que é o
+    /// que centra o conjunto.
+    ///
+    /// A medida saiu do documento gerado: a linha tem 151 pt, o conjunto
+    /// (texto mais imagem) ocupa 124, e a sobra dividida em duas dá os 17 pt.
+    /// </summary>
+    private static void Descer(TableCell celula)
+    {
+        if (celula.Elements<Paragraph>().FirstOrDefault() is not { } primeiro) return;
+
+        primeiro.ParagraphProperties ??= new ParagraphProperties();
+        primeiro.ParagraphProperties.SpacingBetweenLines ??= new SpacingBetweenLines();
+        primeiro.ParagraphProperties.SpacingBetweenLines.Before = "340";
     }
 
     /// <summary>
