@@ -409,7 +409,7 @@ public sealed class TextosDaProposta
             "por escrito.",
 
         PrecosConformeTecnica = "Preços conforme a descrição da Proposta Técnica {0}.",
-        Item = "ITEM", Quantidade = "QTDE.", Produto = "PRODUTO*",
+        Item = "ITEM", Quantidade = "QTD.", Produto = "PRODUTO*",
         ValorUnitario = "VALOR LÍQUIDO UNITÁRIO", ValorTotal = "VALOR LÍQUIDO TOTAL",
         TotalDaProposta = "TOTAL DO PREÇO LÍQUIDO",
         AvisoDaDescricao = "(*) Esta descrição do produto deverá constar na Ordem de Compra.",

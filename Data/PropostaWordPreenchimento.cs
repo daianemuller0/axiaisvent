@@ -610,8 +610,8 @@ internal sealed class Preenchimento
 
             for (var i = 0; i < celulas.Count; i++)
             {
-                celulas[i].TableCellProperties ??= new TableCellProperties();
-                celulas[i].TableCellProperties.TableCellWidth = new TableCellWidth
+                var props = celulas[i].TableCellProperties ??= new TableCellProperties();
+                props.TableCellWidth = new TableCellWidth
                 {
                     Type = TableWidthUnitValues.Pct,
                     Width = (Numero(colunas[i].Width) * 5000 / total).ToString(),
@@ -893,66 +893,35 @@ internal sealed class Preenchimento
             else Fixo(nota, _t.TextosDasNotas[i]);
         }
 
-        if (Achar("Asesoría Técnica:") is { } assessoria) Fixo(assessoria, _t.AssessoriaTecnica);
     }
 
     /// <summary>
-    /// A assessoria técnica. O modelo traz três blocos — um ventilador, de 1 a
-    /// 4, e de 5 em diante — com a instrução de apagar os que não servem. Quem
-    /// escolhe é a quantidade de ventiladores da proposta.
+    /// A nota da assessoria técnica SAI da proposta comercial.
+    ///
+    /// O modelo traz três blocos — um ventilador, de 1 a 4, e de 5 em diante —
+    /// para quem monta à mão escolher um e apagar os outros. A equipe decidiu
+    /// que o descritivo não entra na proposta comercial: o que o cliente
+    /// precisa ver sobre assessoria é a seção "Assessoria Técnica de Campo",
+    /// com as diárias, que continua.
+    ///
+    /// Sai tudo: a nota 8, a instrução de escolha e os três blocos.
     /// </summary>
     private void Assessoria()
     {
+        Achar("Asesoría Técnica:")?.Remove();
         Achar("Verificar as quantidades de assistência")?.Remove();
 
-        var blocos = new[]
+        foreach (var ancora in new[]
         {
-            Bloco("Un ventilador o un conjunto girante"),
-            Bloco("De 1 a 4 ventiladores"),
-            Bloco("De 5 a mais ventiladores"),
-        };
-
-        var quantos = CustoDaProposta.Quantidade(_p);
-        var escolhido = quantos <= 1 ? 0 : quantos <= 4 ? 1 : 2;
-
-        // até 4 ventiladores o prazo é o do modelo; de 5 em diante ele vem em
-        // branco lá, e é a equipe que diz
-        var (total, emCampo) = escolhido switch
+            "Un ventilador o un conjunto girante",
+            "De 1 a 4 ventiladores",
+            "De 5 a mais ventiladores",
+        })
         {
-            0 => (Dias("3"), Dias("1")),
-            1 => (Dias("5"), Dias("3")),
-            _ => (Dias(_p.DiasDeAssessoria), Dias(_p.DiasDeAssessoriaEmCampo)),
-        };
-
-        for (var i = 0; i < blocos.Length; i++)
-        {
-            var (cabecalho, paragrafos) = blocos[i];
-            if (cabecalho is null) continue;
-
-            // o cabeçalho é instrução para quem preenche, e não texto de
-            // proposta: sai nos três casos
-            cabecalho.Remove();
-
-            if (i != escolhido)
-            {
-                foreach (var p in paragrafos) p.Remove();
-                continue;
-            }
-
-            var linhas = string.Format(_t.TextoDaAssessoria, total, emCampo).Split('\n');
-            for (var l = 0; l < paragrafos.Count; l++)
-            {
-                if (l < linhas.Length) Escrever(paragrafos[l], linhas[l]);
-                else paragrafos[l].Remove();
-            }
+            var (cabecalho, paragrafos) = Bloco(ancora);
+            cabecalho?.Remove();
+            foreach (var p in paragrafos) p.Remove();
         }
-    }
-
-    /// <summary>"5" vira "05 (5)"; em branco fica o "XX" do modelo, para não inventar prazo.</summary>
-    private string Dias(string dias)
-    {
-        var limpo = dias.Trim();
-        return limpo.Length == 0 ? "XX (XXXX)" : $"{limpo.PadLeft(2, '0')} ({_t.PorExtenso(limpo)})";
     }
 
     /// <summary>Um bloco da assessoria: o cabeçalho e os três parágrafos dele.</summary>
@@ -1061,10 +1030,26 @@ internal sealed class Preenchimento
             .Where(p => Texto(p).Trim().Length > 0)
             .ToList();
 
+        if (entre.Count == 0) return;
+
+        // no modelo a lista mistura marcador, submarcador, negrito e letra
+        // miúda, porque ela foi escrita item a item. A nossa lista é uma só, e
+        // todos os itens saem do MOLDE do primeiro — senão um item apareceria
+        // em negrito e outro em corpo 6, do jeito que o modelo os deixou
+        var molde = (Paragraph)entre[0].CloneNode(true);
+
         for (var i = 0; i < entre.Count; i++)
         {
-            if (i < _t.TextosDasNotasGerais.Length) Escrever(entre[i], _t.TextosDasNotasGerais[i]);
-            else entre[i].Remove();
+            if (i >= _t.TextosDasNotasGerais.Length)
+            {
+                entre[i].Remove();
+                continue;
+            }
+
+            var novo = (Paragraph)molde.CloneNode(true);
+            Escrever(novo, _t.TextosDasNotasGerais[i]);
+            entre[i].Parent?.InsertBefore(novo, entre[i]);
+            entre[i].Remove();
         }
     }
 

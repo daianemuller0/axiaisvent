@@ -1184,18 +1184,6 @@
             </div>
         }
 
-        @if (CustoDaProposta.Quantidade(_proposta) >= 5)
-        {
-            @* de 5 ventiladores em diante o modelo deixa os dias de assessoria
-               em branco ("XX días"), porque o prazo é negociado *@
-            <div class="form3" style="margin-top:6px">
-                <label>@Campo("Dias de assessoria (total)")
-                    <input class="cell num" type="number" min="0" @bind="_proposta.DiasDeAssessoria" /></label>
-                <label>@Campo("Destes, dias de assessoria em campo")
-                    <input class="cell num" type="number" min="0" @bind="_proposta.DiasDeAssessoriaEmCampo" /></label>
-            </div>
-        }
-
         @if (FaltamParaProposta is { Count: > 0 } faltam)
         {
             <div class="panel" style="margin:12px 0 0; padding:12px; border-left:3px solid #c98a00">
@@ -1684,12 +1672,6 @@
             if (_proposta.Incoterm.Trim().Length == 0) faltam.Add("Entrega (incoterm)");
             if (_proposta.Armado.Trim().Length == 0) faltam.Add("Armado ou desarmado");
             if (_proposta.ContatoNome.Trim().Length == 0) faltam.Add("Contato Howden");
-
-            if (CustoDaProposta.Quantidade(_proposta) >= 5
-                && _proposta.DiasDeAssessoria.Trim().Length == 0)
-            {
-                faltam.Add("Dias de assessoria");
-            }
 
             return faltam;
         }
