@@ -369,28 +369,71 @@ internal sealed class Preenchimento
         if (web is not null && brancos.Count > 0)
             celula.InsertBefore((Paragraph)brancos[0].CloneNode(true), web);
 
-        Descer(celula);
+        Centrar(celula);
+    }
+
+    // A geometria da linha do endereço, em pontos, medida no documento gerado
+    // (a linha tem altura fixa no modelo: 3024 twips).
+    private const double AlturaDaLinha = 151.2;
+    private const double AlturaDaImagem = 107.4;
+    private const double AlturaDaLinhaDeTexto = 10.4;
+
+    /// <summary>
+    /// Põe o texto do endereço e a imagem do plantão no MESMO eixo: cada um
+    /// centrado na altura da linha, que é o que faz os dois se lerem lado a
+    /// lado.
+    ///
+    /// Sozinha, a célula centrada não resolve. Quem manda na posição da imagem
+    /// é a âncora dela, que é o parágrafo do endereço: o texto encosta no topo
+    /// e a imagem desce a partir dele. Então são duas contas — quanto o texto
+    /// desce, e quanto a imagem sobe em relação ao parágrafo que a ancora.
+    /// </summary>
+    private static void Centrar(TableCell celula)
+    {
+        var paragrafos = celula.Elements<Paragraph>().ToList();
+        if (paragrafos.Count == 0) return;
+
+        // o endereço é uma linha por parágrafo, menos o do logradouro, que é
+        // longo e quebra em duas
+        var linhasDeTexto = paragrafos.Count + 1;
+        var alturaDoTexto = linhasDeTexto * AlturaDaLinhaDeTexto;
+
+        var acimaDoTexto = (AlturaDaLinha - alturaDoTexto) / 2;
+        Espaco(paragrafos[0], acimaDoTexto);
+
+        // a imagem está ancorada ao segundo parágrafo; o deslocamento dela é
+        // contado do alto DESSE parágrafo, e por isso é negativo — ela começa
+        // acima de onde está ancorada
+        var acimaDaImagem = (AlturaDaLinha - AlturaDaImagem) / 2;
+        var altoDaAncora = acimaDoTexto + AlturaDaLinhaDeTexto;
+        Deslocar(celula, acimaDaImagem - altoDaAncora);
+    }
+
+    /// <summary>Espaço antes do parágrafo, em pontos (o Word guarda em 1/20).</summary>
+    private static void Espaco(Paragraph p, double pontos)
+    {
+        p.ParagraphProperties ??= new ParagraphProperties();
+        p.ParagraphProperties.SpacingBetweenLines ??= new SpacingBetweenLines();
+        p.ParagraphProperties.SpacingBetweenLines.Before =
+            Math.Max(0, Math.Round(pontos * 20)).ToString("F0");
     }
 
     /// <summary>
-    /// Desce o bloco do endereço para ele ficar na altura da imagem do plantão.
-    ///
-    /// A linha tem altura fixa e a célula é centrada, mas quem manda na posição
-    /// é a IMAGEM: ela está ancorada ao parágrafo do endereço, então o texto
-    /// encosta no topo e a imagem desce a partir dele, sobrando espaço embaixo.
-    /// Um espaço antes do primeiro parágrafo empurra os dois juntos, que é o
-    /// que centra o conjunto.
-    ///
-    /// A medida saiu do documento gerado: a linha tem 151 pt, o conjunto
-    /// (texto mais imagem) ocupa 124, e a sobra dividida em duas dá os 17 pt.
+    /// Sobe ou desce a imagem ancorada, em pontos. O Word mede em EMU, que são
+    /// 12.700 por ponto.
     /// </summary>
-    private static void Descer(TableCell celula)
+    private static void Deslocar(TableCell celula, double pontos)
     {
-        if (celula.Elements<Paragraph>().FirstOrDefault() is not { } primeiro) return;
+        var emu = (long)Math.Round(pontos * 12700);
 
-        primeiro.ParagraphProperties ??= new ParagraphProperties();
-        primeiro.ParagraphProperties.SpacingBetweenLines ??= new SpacingBetweenLines();
-        primeiro.ParagraphProperties.SpacingBetweenLines.Before = "340";
+        foreach (var posicao in celula.Descendants<DocumentFormat.OpenXml.Drawing.Wordprocessing.VerticalPosition>())
+        {
+            posicao.RelativeFrom = DocumentFormat.OpenXml.Drawing.Wordprocessing
+                .VerticalRelativePositionValues.Paragraph;
+            posicao.RemoveAllChildren<DocumentFormat.OpenXml.Drawing.Wordprocessing.VerticalAlignment>();
+            posicao.PositionOffset ??= new DocumentFormat.OpenXml.Drawing.Wordprocessing.PositionOffset();
+            posicao.PositionOffset.Text = emu.ToString();
+        }
     }
 
     /// <summary>
