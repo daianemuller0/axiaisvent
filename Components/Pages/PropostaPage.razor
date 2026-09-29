@@ -1134,6 +1134,77 @@
     </p>
 </div>
 
+<!-- ---------- proposta comercial ---------- -->
+<div class="panel" style="margin-bottom:18px">
+    <div class="toolbar" style="flex-wrap:wrap">
+        <h2 style="margin:0; font-size:15px">Proposta comercial</h2>
+        <span class="subtitle" style="margin:0">
+            o documento em espanhol, com o preço de VENDA — não o custo
+        </span>
+        <span style="flex:1"></span>
+        <button class="btn-primary" @onclick="GerarProposta">⬇ Gerar proposta</button>
+    </div>
+
+    @if (_proposta.Itens.Count == 0)
+    {
+        <div class="panel empty" style="padding:16px; margin-top:14px">
+            Escolha ao menos um equipamento no escopo — a proposta comercial é a lista deles.
+        </div>
+    }
+    else
+    {
+        <p class="subtitle" style="margin:12px 0 10px">
+            Cada equipamento vira um item da tabela <strong>PRECIO</strong>. A descrição abaixo
+            é um rascunho montado do escopo: <strong>corrija o que não interessa ao cliente</strong>
+            — é ela que sai no documento. Em branco, o sistema monta de novo.
+        </p>
+
+        @for (var i = 0; i < _proposta.Itens.Count; i++)
+        {
+            var indice = i;
+            var item = _proposta.Itens[indice];
+            var rascunho = EscopoEmTexto.Texto(item, _custo, _proposta.Moeda);
+
+            <div class="panel" style="margin:0 0 12px; padding:14px">
+                <div class="toolbar" style="margin-bottom:8px">
+                    <strong>Item @((indice + 1).ToString("D2"))</strong>
+                    <span class="subtitle">@item.Quantos un. · @Dinheiro(PrecoDeVenda(indice))</span>
+                    <span style="flex:1"></span>
+                    @if (item.Descricao.Trim().Length > 0)
+                    {
+                        <button class="btn-ghost" title="Voltar ao rascunho do sistema"
+                                @onclick="() => VoltarDescricao(indice)">↺ rascunho</button>
+                    }
+                </div>
+
+                <textarea class="cell" rows="@(rascunho.Split('\n').Length + 1)" style="width:100%; font-family:inherit"
+                          value="@(item.Descricao.Trim().Length > 0 ? item.Descricao : rascunho)"
+                          @onchange="e => MudarDescricao(indice, e.Value?.ToString() ?? string.Empty)"></textarea>
+            </div>
+        }
+
+        @if (CustoDaProposta.Quantidade(_proposta) >= 5)
+        {
+            @* de 5 ventiladores em diante o modelo deixa os dias de assessoria
+               em branco ("XX días"), porque o prazo é negociado *@
+            <div class="form3" style="margin-top:6px">
+                <label>@Campo("Dias de assessoria (total)")
+                    <input class="cell num" type="number" min="0" @bind="_proposta.DiasDeAssessoria" /></label>
+                <label>@Campo("Destes, dias de assessoria em campo")
+                    <input class="cell num" type="number" min="0" @bind="_proposta.DiasDeAssessoriaEmCampo" /></label>
+            </div>
+        }
+
+        @if (FaltamParaProposta is { Count: > 0 } faltam)
+        {
+            <div class="panel" style="margin:12px 0 0; padding:12px; border-left:3px solid #c98a00">
+                <div style="font-size:12.5px"><strong>Falta preencher para o documento sair completo:</strong></div>
+                <div class="subtitle" style="margin-top:4px">@string.Join(" · ", faltam)</div>
+            </div>
+        }
+    }
+</div>
+
 @code {
     private Proposta _proposta = Nascer();
     private List<Proposta> _gravadas = new();
@@ -1564,33 +1635,84 @@
 
     private string Pct(decimal v) => (v * 100m).ToString("N2", Br) + "%";
 
-    private CalculoPricing.Entrada EntradaDoPricing() => new(
-        CustoTotal: Total,
-        RiscoAdicional: Risco,
-        MargemNegociacao: Negociacao,
-        Destino: _proposta.Destino,
-        Estado: EstadoDoPricing,
-        VendaPara: _proposta.VendaPara,
-        Beneficio: EhBrasil ? _proposta.Beneficio : "Sem benefício",
-        Bu: ListasDaProposta.CodigoDaBu(_proposta.Bu),
-        ComPortal: Proposta.TemPortal(_proposta.Portal),
-        Rep1: _proposta.Representante,
-        Rep2: _proposta.Representante2,
-        ComFianca: Textos.Igual(_proposta.Fianca, "Sim"),
-        Pais: _proposta.Pais);
+    private CalculoPricing.Entrada EntradaDoPricing() =>
+        CalculoPricing.EntradaDe(_proposta, Total);
 
-    private CalculoPricing.Resultado Pricing()
+    private CalculoPricing.Resultado Pricing() => CalculoPricing.Da(_proposta, Total);
+
+    // ---------- proposta comercial ----------
+
+    /// <summary>
+    /// O preço de VENDA de um item — o mesmo rateio que o documento faz, para
+    /// a tela não mostrar um número e o Word sair com outro.
+    /// </summary>
+    private decimal PrecoDeVenda(int indice) =>
+        PropostaWord.PrecosDeVenda(_proposta, _custo) is { } precos && indice < precos.Count
+            ? precos[indice]
+            : 0m;
+
+    private void MudarDescricao(int indice, string texto)
     {
-        var entrada = EntradaDoPricing();
+        // igual ao rascunho não é edição: guardar vazio faz a descrição
+        // continuar acompanhando o escopo quando ele mudar
+        var rascunho = EscopoEmTexto.Texto(_proposta.Itens[indice], _custo, _proposta.Moeda);
+        _proposta.Itens[indice].Descricao = Textos.Igual(texto.Trim(), rascunho) ? "" : texto.Trim();
+    }
 
-        if (PelaMargem)
+    private void VoltarDescricao(int indice) => _proposta.Itens[indice].Descricao = "";
+
+    /// <summary>
+    /// O que o documento vai deixar em branco. Não impede de gerar — muita
+    /// proposta sai para conferência antes de estar fechada —, mas ninguém
+    /// deveria descobrir no PDF que faltava a condição de pagamento.
+    /// </summary>
+    private List<string> FaltamParaProposta
+    {
+        get
         {
-            var alvo = Proposta.Percentual(_proposta.MargemAlvo, CalculoPricing.MargemAlvoPadrao);
-            return CalculoPricing.PelaMargem(entrada, alvo);
+            var faltam = new List<string>();
+
+            if (_proposta.Cliente.Trim().Length == 0) faltam.Add("Cliente");
+            if (_proposta.AosCuidados.Trim().Length == 0) faltam.Add("Aos cuidados de");
+            if (_proposta.Cidade.Trim().Length == 0) faltam.Add("Cidade");
+            if (_proposta.CondicaoPagamento.Trim().Length == 0) faltam.Add("Condição de pagamento");
+            if (_proposta.Incoterm.Trim().Length == 0) faltam.Add("Entrega (incoterm)");
+            if (_proposta.Armado.Trim().Length == 0) faltam.Add("Armado ou desarmado");
+            if (_proposta.ContatoNome.Trim().Length == 0) faltam.Add("Contato Howden");
+
+            if (CustoDaProposta.Quantidade(_proposta) >= 5
+                && _proposta.DiasDeAssessoria.Trim().Length == 0)
+            {
+                faltam.Add("Dias de assessoria");
+            }
+
+            return faltam;
+        }
+    }
+
+    private async Task GerarProposta()
+    {
+        if (_proposta.Itens.Count == 0)
+        {
+            Aviso("A proposta ainda não tem equipamento nenhum.", erro: true);
+            return;
         }
 
-        var meta = DadosExcel.Numero(_proposta.PrecoMeta) ?? 0m;
-        return CalculoPricing.PeloPreco(entrada, meta);
+        try
+        {
+            var bytes = PropostaWord.Gerar(_proposta, _custo);
+
+            await JS.InvokeVoidAsync("appDownload",
+                PropostaWord.NomeDoArquivo(_proposta),
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                Convert.ToBase64String(bytes));
+
+            Aviso($"Proposta gerada: {PropostaWord.NomeDoArquivo(_proposta)}.");
+        }
+        catch (Exception ex)
+        {
+            Aviso($"Não consegui gerar a proposta: {ex.Message}", erro: true);
+        }
     }
 
     private async Task GerarPricing()

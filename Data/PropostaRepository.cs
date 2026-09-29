@@ -62,6 +62,14 @@ public sealed class ItemProposta
     public Dictionary<string, string> PrecosManuais { get; set; } = new();
 
     /// <summary>
+    /// A descrição deste equipamento na proposta comercial, quando a equipe
+    /// escreveu a dela. Vazia, vale o rascunho que o sistema monta do escopo
+    /// (ver <see cref="EscopoEmTexto"/>) — é a mesma regra do preço: puxa, mas
+    /// dá para corrigir.
+    /// </summary>
+    public string Descricao { get; set; } = "";
+
+    /// <summary>
     /// A coluna da planilha de onde este item veio ("D", "E"…), quando veio de
     /// uma. Serve para a tela dizer de onde cada coisa saiu.
     /// </summary>
@@ -139,6 +147,17 @@ public sealed class Proposta
 
     /// <summary>Como o equipamento é entregue: "Armado" ou "Desarmado".</summary>
     public string Armado { get; set; } = "";
+
+    /// <summary>
+    /// Os dias de assessoria técnica, quando a proposta tem 5 ventiladores ou
+    /// mais. Até 4, o modelo já traz o prazo pronto (3 dias para um, 5 de 1 a
+    /// 4) e estes campos nem aparecem; de 5 em diante ele deixa "XX días" em
+    /// branco, porque o prazo é negociado.
+    /// </summary>
+    public string DiasDeAssessoria { get; set; } = "";
+
+    /// <summary>Destes, quantos são de assessoria mesmo (fora ida e volta).</summary>
+    public string DiasDeAssessoriaEmCampo { get; set; } = "";
 
     // ---------- cabeçalho ----------
     public string Ano { get; set; } = "";
@@ -715,6 +734,7 @@ public sealed class PropostaRepository
         "condicaoPagamento", "incoterm", "incotermDestino", "armado",
         "contatoArea",
         "contato2Nome", "contato2Cargo", "contato2Area", "contato2Email", "contato2Telefones",
+        "diasDeAssessoria", "diasDeAssessoriaEmCampo",
     };
 
     private readonly ParquetStore _store;
@@ -749,6 +769,7 @@ public sealed class PropostaRepository
             ContatoArea = S(r, 54),
             Contato2Nome = S(r, 55), Contato2Cargo = S(r, 56), Contato2Area = S(r, 57),
             Contato2Email = S(r, 58), Contato2Telefones = S(r, 59),
+            DiasDeAssessoria = S(r, 60), DiasDeAssessoriaEmCampo = S(r, 61),
         })
         .OrderByDescending(p => p.Numero)
         .ToList();
@@ -783,6 +804,7 @@ public sealed class PropostaRepository
             p.ContatoArea,
             p.Contato2Nome, p.Contato2Cargo, p.Contato2Area,
             p.Contato2Email, p.Contato2Telefones,
+            p.DiasDeAssessoria, p.DiasDeAssessoriaEmCampo,
         };
 
         _store.WriteRow(Entidade, Campos

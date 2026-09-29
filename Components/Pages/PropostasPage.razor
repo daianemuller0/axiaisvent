@@ -162,25 +162,7 @@ else
         var custo = _custo.Total(p);
         if (custo <= 0m) return "—";
 
-        var entrada = new CalculoPricing.Entrada(
-            CustoTotal: custo,
-            RiscoAdicional: Proposta.Percentual(p.RiscoAdicional, CalculoPricing.RiscoAdicionalPadrao),
-            MargemNegociacao: Proposta.Percentual(p.MargemNegociacao, CalculoPricing.MargemNegociacaoPadrao),
-            Destino: p.Destino,
-            Estado: ListasDaProposta.EstadoDoPricing(p.Pais, p.Estado),
-            VendaPara: p.VendaPara,
-            Beneficio: p.Beneficio,
-            Bu: ListasDaProposta.CodigoDaBu(p.Bu),
-            ComPortal: Proposta.TemPortal(p.Portal),
-            Rep1: p.Representante,
-            Rep2: p.Representante2,
-            ComFianca: Textos.Igual(p.Fianca, "Sim"),
-            Pais: p.Pais);
-
-        var pricing = p.ModoDoPreco == "preco"
-            ? CalculoPricing.PeloPreco(entrada, DadosExcel.Numero(p.PrecoMeta) ?? 0m)
-            : CalculoPricing.PelaMargem(entrada,
-                Proposta.Percentual(p.MargemAlvo, CalculoPricing.MargemAlvoPadrao));
+        var pricing = CalculoPricing.Da(p, custo);
 
         return $"{p.Moeda.Rotulo()} {pricing.VendaLiquida.ToString("N2", Br)}";
     }

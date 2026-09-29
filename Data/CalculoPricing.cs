@@ -240,6 +240,40 @@ public static class CalculoPricing
         return ComMarkup(e, markup);
     }
 
+    /// <summary>
+    /// O pricing de uma proposta, do jeito que ela está gravada.
+    ///
+    /// Mora aqui, e não em cada tela, porque três lugares precisam do MESMO
+    /// número — a tela da proposta, a lista de propostas e a proposta
+    /// comercial que sai em Word. Enquanto cada um montava a sua
+    /// <see cref="Entrada"/>, bastava um esquecer o benefício fora do Brasil
+    /// para a lista mostrar um valor e o documento sair com outro.
+    /// </summary>
+    public static Entrada EntradaDe(Proposta p, decimal custoTotal) => new(
+        CustoTotal: custoTotal,
+        RiscoAdicional: Proposta.Percentual(p.RiscoAdicional, RiscoAdicionalPadrao),
+        MargemNegociacao: Proposta.Percentual(p.MargemNegociacao, MargemNegociacaoPadrao),
+        Destino: p.Destino,
+        Estado: ListasDaProposta.EstadoDoPricing(p.Pais, p.Estado),
+        VendaPara: p.VendaPara,
+        Beneficio: ListasDaProposta.TemImpostosBrasileiros(p.Pais) ? p.Beneficio : "Sem benefício",
+        Bu: ListasDaProposta.CodigoDaBu(p.Bu),
+        ComPortal: Proposta.TemPortal(p.Portal),
+        Rep1: p.Representante,
+        Rep2: p.Representante2,
+        ComFianca: Textos.Igual(p.Fianca, "Sim"),
+        Pais: p.Pais);
+
+    /// <summary>O pricing de uma proposta, pelo modo que ela escolheu.</summary>
+    public static Resultado Da(Proposta p, decimal custoTotal)
+    {
+        var entrada = EntradaDe(p, custoTotal);
+
+        return p.ModoDoPreco == "preco"
+            ? PeloPreco(entrada, DadosExcel.Numero(p.PrecoMeta) ?? 0m)
+            : PelaMargem(entrada, Proposta.Percentual(p.MargemAlvo, MargemAlvoPadrao));
+    }
+
     /// <summary>A alíquota de ICMS do estado, pela BU que emite.</summary>
     public static decimal? IcmsDoEstado(string estado, string bu)
     {
