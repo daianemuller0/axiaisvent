@@ -39,15 +39,15 @@ public static class EscopoEmTexto
     /// A descrição de um equipamento: a linha do ventilador e o que ele inclui.
     /// </summary>
     public static (string Titulo, List<string> Inclui) De(
-        ItemProposta item, CustoDaProposta custo, Moeda moeda)
+        ItemProposta item, CustoDaProposta custo, Moeda moeda, TextosDaProposta textos)
     {
         var modelo = custo.Modelo(item);
-        var arranjo = Arranjo(item.Arranjo);
+        var teto = Textos.Simples(item.Arranjo).Contains("teto");
 
-        var titulo = modelo is null
-            ? "Ventilador Axial HOWDEN"
-            : $"Ventilador Axial HOWDEN modelo {modelo.Rotulo} {arranjo.Eixo} " +
-              $"instalado al {arranjo.Lugar}";
+        var titulo = string.Format(textos.LinhaDoVentilador,
+            modelo?.Rotulo ?? "—",
+            teto ? textos.Vertical : textos.Horizontal,
+            teto ? textos.NoTeto : textos.NoPiso);
 
         var inclui = new List<string>();
 
@@ -57,7 +57,7 @@ public static class EscopoEmTexto
         }
 
         if (custo.MotorDe(item) is { } motor)
-            inclui.Add($"Motor eléctrico {motor.Fabricante} {motor.Frame} {motor.PotenciaCv} CV".Trim());
+            inclui.Add($"{motor.Fabricante} {motor.Frame} {motor.PotenciaCv} CV".Trim());
 
         if (custo.LinhaDoPartidor(item, moeda) is { } partidor && !partidor.Ausencia)
             inclui.Add(partidor.Opcao.Trim());
@@ -72,32 +72,62 @@ public static class EscopoEmTexto
     }
 
     /// <summary>A descrição inteira em texto, que é o que a tela deixa editar.</summary>
-    public static string Texto(ItemProposta item, CustoDaProposta custo, Moeda moeda)
+    public static string Texto(ItemProposta item, CustoDaProposta custo, Moeda moeda,
+        TextosDaProposta textos)
     {
-        var (titulo, inclui) = De(item, custo, moeda);
+        var (titulo, inclui) = De(item, custo, moeda, textos);
 
-        // sem nada escolhido, "Incluye:" sozinho só faz o cliente procurar a
+        // sem nada escolhido, "Inclui:" sozinho só faz o cliente procurar a
         // lista que não existe
         if (inclui.Count == 0) return titulo;
 
-        return string.Join("\n", new[] { titulo, "Incluye:" }.Concat(inclui.Select(i => "- " + i)));
+        return string.Join("\n",
+            new[] { titulo, textos.Inclui }.Concat(inclui.Select(i => "- " + i)));
     }
+
+    /// <summary>
+    /// As partes da descrição que vale — o título e a lista.
+    ///
+    /// Quando a equipe escreveu a dela, é o TEXTO DELA que é lido de volta em
+    /// partes: a primeira linha é o título, e cada linha que começa com "-" é
+    /// um item. É o que permite editar na tela e o documento sair com os
+    /// marcadores do modelo, em vez de um parágrafo só com traços dentro.
+    /// </summary>
+    public static (string Titulo, List<string> Inclui) Partes(ItemProposta item,
+        CustoDaProposta custo, Moeda moeda, TextosDaProposta textos)
+    {
+        if (item.Descricao.Trim().Length == 0) return De(item, custo, moeda, textos);
+
+        var linhas = item.Descricao.Trim().Split('\n')
+            .Select(l => l.Trim())
+            .Where(l => l.Length > 0)
+            .ToList();
+
+        if (linhas.Count == 0) return De(item, custo, moeda, textos);
+
+        var titulo = linhas[0];
+        var inclui = linhas.Skip(1)
+            .Where(l => !EhOInclui(l, textos))
+            .Select(l => l.StartsWith('-') ? l[1..].Trim() : l)
+            .ToList();
+
+        return (titulo, inclui);
+    }
+
+    /// <summary>A linha "Inclui:" em qualquer das três línguas.</summary>
+    private static bool EhOInclui(string linha, TextosDaProposta textos) =>
+        Textos.Igual(linha, textos.Inclui)
+        || Textos.Igual(linha, "Incluye:")
+        || Textos.Igual(linha, "Inclui:")
+        || Textos.Igual(linha, "Includes:");
 
     /// <summary>
     /// A descrição que vale: a que a equipe escreveu, quando escreveu; o
     /// rascunho, quando não. Mesma regra do preço — puxa, mas dá para corrigir.
     /// </summary>
-    public static string Efetivo(ItemProposta item, CustoDaProposta custo, Moeda moeda) =>
-        item.Descricao.Trim().Length > 0 ? item.Descricao.Trim() : Texto(item, custo, moeda);
-
-    /// <summary>
-    /// Como o arranjo aparece na frase: o modelo traz "horizontal/vertical
-    /// instalado al piso/techo", e é o arranjo do sistema que escolhe.
-    /// </summary>
-    private static (string Eixo, string Lugar) Arranjo(string arranjo) =>
-        Textos.Simples(arranjo).Contains("teto")
-            ? ("vertical", "techo")
-            : ("horizontal", "piso");
+    public static string Efetivo(ItemProposta item, CustoDaProposta custo, Moeda moeda,
+        TextosDaProposta textos) =>
+        item.Descricao.Trim().Length > 0 ? item.Descricao.Trim() : Texto(item, custo, moeda, textos);
 
     /// <summary>Uma linha do escopo, ou vazio quando ela não entra.</summary>
     private static string Linha(string lista, string opcao)

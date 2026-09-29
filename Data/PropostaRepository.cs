@@ -677,11 +677,15 @@ public static class ListasDaProposta
     /// Valparaíso". Só o começo exato é cortado, para não mutilar um lugar que
     /// se chame assim (Puerto Montt continua inteiro).
     /// </summary>
-    private static string SoOLugar(string destino)
+    public static string SoOLugar(string destino)
     {
         var texto = destino.Trim();
 
-        foreach (var repetido in new[] { "puerto de ", "ubicación de ", "ubicacion de " })
+        foreach (var repetido in new[]
+                 {
+                     "puerto de ", "ubicación de ", "ubicacion de ",
+                     "porto de ", "local de ", "port of ", "location of ",
+                 })
             if (texto.StartsWith(repetido, StringComparison.OrdinalIgnoreCase))
                 return texto[repetido.Length..].Trim();
 

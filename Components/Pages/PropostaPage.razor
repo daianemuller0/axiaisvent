@@ -1139,7 +1139,7 @@
     <div class="toolbar" style="flex-wrap:wrap">
         <h2 style="margin:0; font-size:15px">Proposta comercial</h2>
         <span class="subtitle" style="margin:0">
-            o documento em espanhol, com o preço de VENDA — não o custo
+            o modelo em Word da equipe, preenchido — com o preço de VENDA, não o custo
         </span>
         <span style="flex:1"></span>
         <button class="btn-primary" @onclick="GerarProposta">⬇ Gerar proposta</button>
@@ -1154,16 +1154,17 @@
     else
     {
         <p class="subtitle" style="margin:12px 0 10px">
-            Cada equipamento vira um item da tabela <strong>PRECIO</strong>. A descrição abaixo
-            é um rascunho montado do escopo: <strong>corrija o que não interessa ao cliente</strong>
-            — é ela que sai no documento. Em branco, o sistema monta de novo.
+            Sai em <strong>@_proposta.Idioma</strong> (muda no cabeçalho). Cada equipamento vira um
+            item da tabela de preço; a descrição abaixo é um rascunho montado do escopo:
+            <strong>corrija o que não interessa ao cliente</strong> — é ela que sai no documento.
+            Em branco, o sistema monta de novo.
         </p>
 
         @for (var i = 0; i < _proposta.Itens.Count; i++)
         {
             var indice = i;
             var item = _proposta.Itens[indice];
-            var rascunho = EscopoEmTexto.Texto(item, _custo, _proposta.Moeda);
+            var rascunho = EscopoEmTexto.Texto(item, _custo, _proposta.Moeda, TextosDaProposta.Do(Idioma));
 
             <div class="panel" style="margin:0 0 12px; padding:14px">
                 <div class="toolbar" style="margin-bottom:8px">
@@ -1642,6 +1643,9 @@
 
     // ---------- proposta comercial ----------
 
+    /// <summary>A língua em que a proposta vai sair — a do cabeçalho.</summary>
+    private IdiomaDaProposta Idioma => TextosDaProposta.Ler(_proposta.Idioma);
+
     /// <summary>
     /// O preço de VENDA de um item — o mesmo rateio que o documento faz, para
     /// a tela não mostrar um número e o Word sair com outro.
@@ -1655,7 +1659,8 @@
     {
         // igual ao rascunho não é edição: guardar vazio faz a descrição
         // continuar acompanhando o escopo quando ele mudar
-        var rascunho = EscopoEmTexto.Texto(_proposta.Itens[indice], _custo, _proposta.Moeda);
+        var rascunho = EscopoEmTexto.Texto(_proposta.Itens[indice], _custo, _proposta.Moeda,
+            TextosDaProposta.Do(Idioma));
         _proposta.Itens[indice].Descricao = Textos.Igual(texto.Trim(), rascunho) ? "" : texto.Trim();
     }
 
@@ -1700,7 +1705,15 @@
 
         try
         {
-            var bytes = PropostaWord.Gerar(_proposta, _custo);
+            var modelo = Path.Combine(Ambiente.ContentRootPath, PropostaWord.CaminhoDoModelo);
+
+            if (!File.Exists(modelo))
+            {
+                Aviso($"O modelo da proposta não está em {PropostaWord.CaminhoDoModelo}.", erro: true);
+                return;
+            }
+
+            var bytes = PropostaWord.Gerar(_proposta, _custo, modelo);
 
             await JS.InvokeVoidAsync("appDownload",
                 PropostaWord.NomeDoArquivo(_proposta),
