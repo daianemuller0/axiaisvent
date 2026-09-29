@@ -69,11 +69,12 @@ internal sealed class Preenchimento
     }
 
     /// <summary>
-    /// Tira o realce amarelo do documento inteiro.
+    /// Tira o realce do documento inteiro — de qualquer cor.
     ///
-    /// No modelo o amarelo não é destaque: é a marca de "escolher" ou
-    /// "preencher" para quem monta a proposta à mão. Preenchido, ele não tem
-    /// mais o que dizer — e sairia grifado na proposta do cliente.
+    /// No modelo o grifo não é destaque: é a marca de "escolher", "preencher"
+    /// ou "conferir" para quem monta a proposta à mão. O amarelo é o mais
+    /// comum, mas há verde nas notas. Nenhum deles tem o que dizer depois de
+    /// preenchido — e todos sairiam grifados na proposta do cliente.
     /// </summary>
     private void TirarRealce()
     {
@@ -83,10 +84,7 @@ internal sealed class Preenchimento
 
         foreach (var parte in partes.Where(p => p is not null))
         {
-            foreach (var realce in parte!.Descendants<Highlight>().ToList())
-            {
-                if (realce.Val?.Value == HighlightColorValues.Yellow) realce.Remove();
-            }
+            foreach (var realce in parte!.Descendants<Highlight>().ToList()) realce.Remove();
             parte.Save();
         }
     }
@@ -558,11 +556,72 @@ internal sealed class Preenchimento
         var revisao = PropostaWord.Ou(_p.Revisao, "0");
         EscreverNaCelula(celulas[0], new[] { revisao });
         EscreverNaCelula(celulas[1], new[] { _p.PreparadaPor });
+
+        // a coluna de quem executou nasceu do tamanho de "XX"; com um nome
+        // dentro ela quebrava em quatro linhas. Alarga o bastante para caber
+        // numa linha só, e o espaço sai da coluna da descrição, que é a larga
+        Alargar(tabela, coluna: 1, texto: _p.PreparadaPor);
         EscreverNaCelula(celulas[3], new[]
         {
             revisao.TrimStart('0').Length == 0 ? _t.EmissaoInicial : _t.RevisaoDaOferta,
         });
     }
+
+    /// <summary>
+    /// Alarga uma coluna até o texto caber numa linha, tirando a diferença da
+    /// última coluna da tabela.
+    ///
+    /// A largura de uma letra é uma ESTIMATIVA (a fonte não está aqui para
+    /// medir), folgada de propósito: sobrar um pouco não incomoda ninguém, e
+    /// faltar quebra a linha de novo.
+    /// </summary>
+    private static void Alargar(Table tabela, int coluna, string texto)
+    {
+        const int PorLetra = 120;   // twips, com folga
+        const int Margem = 280;     // o respiro das duas bordas da célula
+
+        var grade = tabela.GetFirstChild<TableGrid>();
+        if (grade is null) return;
+
+        var colunas = grade.Elements<GridColumn>().ToList();
+        if (coluna >= colunas.Count || colunas.Count < 2) return;
+
+        var atual = Numero(colunas[coluna].Width);
+        var preciso = texto.Trim().Length * PorLetra + Margem;
+        if (preciso <= atual) return;
+
+        var ultima = colunas.Count - 1;
+        var sobra = Numero(colunas[ultima].Width);
+        var ganho = Math.Min(preciso - atual, sobra / 2);
+        if (ganho <= 0) return;
+
+        colunas[coluna].Width = (atual + ganho).ToString();
+        colunas[ultima].Width = (sobra - ganho).ToString();
+
+        // a largura vive em dois lugares: na grade da tabela e em cada célula.
+        // Mexer só na grade deixa o Word decidindo pelo que está na célula
+        var total = colunas.Sum(c => Numero(c.Width));
+        if (total <= 0) return;
+
+        foreach (var linha in tabela.Elements<TableRow>())
+        {
+            var celulas = linha.Elements<TableCell>().ToList();
+            if (celulas.Count != colunas.Count) continue;
+
+            for (var i = 0; i < celulas.Count; i++)
+            {
+                celulas[i].TableCellProperties ??= new TableCellProperties();
+                celulas[i].TableCellProperties.TableCellWidth = new TableCellWidth
+                {
+                    Type = TableWidthUnitValues.Pct,
+                    Width = (Numero(colunas[i].Width) * 5000 / total).ToString(),
+                };
+            }
+        }
+    }
+
+    private static int Numero(StringValue? valor) =>
+        int.TryParse(valor?.Value, out var n) ? n : 0;
 
     // ================= preço =================
 
