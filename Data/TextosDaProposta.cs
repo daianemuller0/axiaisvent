@@ -49,6 +49,26 @@ public sealed class TextosDaProposta
     // ---------- seções ----------
     public required string Introducao { get; init; }
     public required string OfertaComercial { get; init; }
+    public required string OfertaTecnica { get; init; }
+    public required string DadosDoVentilador { get; init; }
+    public required string CaracteristicasGerais { get; init; }
+    public required string ReferenciaDoCliente { get; init; }
+    public required string CurvaDePerformance { get; init; }
+    public required string Materiais { get; init; }
+    public required string[][] LinhasDosMateriais { get; init; }
+    public required string Normas { get; init; }
+    public required string[] LinhasDasNormas { get; init; }
+    public required string Ventilador { get; init; }
+
+    /// <summary>
+    /// Os rótulos da tabela do ventilador, na ordem de
+    /// <see cref="DadosDoVentilador.De"/>. A pressão é a única que muda com o
+    /// arquivo da seleção, e por isso vem em três pedaços.
+    /// </summary>
+    public required string[] RotulosDoVentilador { get; init; }
+    public required string Pressao { get; init; }
+    public required string PressaoTotal { get; init; }
+    public required string PressaoEstatica { get; init; }
     public required string Preco { get; init; }
     public required string Impostos { get; init; }
     public required string CondicoesDePagamento { get; init; }
@@ -168,6 +188,47 @@ public sealed class TextosDaProposta
         EmissaoInicial = "Emisión Inicial", RevisaoDaOferta = "Revisión de la oferta",
 
         Introducao = "Introducción", OfertaComercial = "Oferta Comercial", Preco = "Precio",
+        OfertaTecnica = "Oferta Técnica",
+        DadosDoVentilador = "DATOS DEL VENTILADOR",
+        CaracteristicasGerais = "Características generales",
+        ReferenciaDoCliente = "Referencia del cliente",
+        CurvaDePerformance = "CURVA DE PERFORMANCE",
+        Ventilador = "Ventilador",
+        RotulosDoVentilador = new[]
+        {
+            "Cantidad de ventiladores", "Modelo Howden", "Aplicación", "Ángulo de las aspas",
+            "Tipo de montaje", "Diámetro del ventilador (mm)", "Régimen de trabajo",
+            "Altitud (m.s.n.m)", "Densidad", "Caudal del ventilador", "", "Eficiencia",
+            "Velocidad de giro", "Consumo de potencia", "Ruido a 1 m de distancia",
+            "Motor Eléctrico",
+        },
+        Pressao = "Presión", PressaoTotal = "Presión total", PressaoEstatica = "Presión estática",
+        Materiais = "Materiales de Fabricación",
+        LinhasDosMateriais = new[]
+        {
+            new[] { "Placa de identificación", "AISI 304L" },
+            new[] { "Hub y aspas del ventilador", "Aluminio" },
+            new[] { "Carcasa del ventilador", "ASTM A36 pintado" },
+            new[] { "Rejilla de protección", "Acero pintado" },
+            new[] { "Soportes para la fijación a la base", "ASTM A36 pintado" },
+        },
+        Normas = "Estándar y normas",
+        LinhasDasNormas = new[]
+        {
+            "ISO 21940 – Gr 2,5 Balanceo estático y dinámico de rodete",
+            "Criterio de aceptación según ISO 13348 Grau AN3",
+            "El rendimiento de un ventilador se basa en que su montaje se ha realizado de acuerdo " +
+            "con las instrucciones de Howden y que la distribución de velocidad en la admisión del " +
+            "ventilador es según la norma ISO 5802.",
+            "Pintura de terminación según ISO 12944 - categoría de corrosión atmosférica (C3)",
+            "LIMPIEZA: Estándar SA 2 ½ donde aplicable.\n" +
+            "PRIMERA CAPA: Una capa de aproximadamente 190 µm de Epóxi poliamida bi componente, " +
+            "dupla función, con pigmentación base fosfato de zinc.\n" +
+            "ACABADO: Una capa de aproximadamente 50 µm de Poliuretano Alifático bi componente en " +
+            "el color Azul RAL 5005 según Estándar ETP C3 Desabrigado",
+            "Soldadura según especificación técnica de Howden South America, basada ASME y AWS",
+            "Arreglo según norma AMCA 2404",
+        },
         Impostos = "Impuestos", CondicoesDePagamento = "Condiciones de Pago",
         PrazoDeEntrega = "Plazo de Entrega",
         CondicoesDeEntrega = "Condiciones de entrega (INCOTERMS 2020)",
@@ -382,6 +443,47 @@ public sealed class TextosDaProposta
         EmissaoInicial = "Emissão inicial", RevisaoDaOferta = "Revisão da proposta",
 
         Introducao = "Introdução", OfertaComercial = "Proposta Comercial", Preco = "Preço",
+        OfertaTecnica = "Proposta Técnica",
+        DadosDoVentilador = "DADOS DO VENTILADOR",
+        CaracteristicasGerais = "Características gerais",
+        ReferenciaDoCliente = "Referência do cliente",
+        CurvaDePerformance = "CURVA DE PERFORMANCE",
+        Ventilador = "Ventilador",
+        RotulosDoVentilador = new[]
+        {
+            "Quantidade de ventiladores", "Modelo Howden", "Aplicação", "Ângulo das pás",
+            "Tipo de montagem", "Diâmetro do ventilador (mm)", "Regime de trabalho",
+            "Altitude (m.s.n.m)", "Densidade", "Vazão do ventilador", "", "Eficiência",
+            "Rotação", "Consumo de potência", "Ruído a 1 m de distância",
+            "Motor elétrico",
+        },
+        Pressao = "Pressão", PressaoTotal = "Pressão total", PressaoEstatica = "Pressão estática",
+        Materiais = "Materiais de Fabricação",
+        LinhasDosMateriais = new[]
+        {
+            new[] { "Placa de identificação", "AISI 304L" },
+            new[] { "Cubo e pás do ventilador", "Alumínio" },
+            new[] { "Carcaça do ventilador", "ASTM A36 pintado" },
+            new[] { "Grade de proteção", "Aço pintado" },
+            new[] { "Suportes para a fixação à base", "ASTM A36 pintado" },
+        },
+        Normas = "Padrões e normas",
+        LinhasDasNormas = new[]
+        {
+            "ISO 21940 – Gr 2,5 Balanceamento estático e dinâmico do rotor",
+            "Critério de aceitação segundo ISO 13348 Grau AN3",
+            "O rendimento de um ventilador parte do princípio de que a sua montagem foi feita de " +
+            "acordo com as instruções da Howden e de que a distribuição de velocidade na admissão " +
+            "do ventilador é conforme a norma ISO 5802.",
+            "Pintura de acabamento segundo ISO 12944 - categoria de corrosão atmosférica (C3)",
+            "LIMPEZA: Padrão SA 2 ½ onde aplicável.\n" +
+            "PRIMEIRA DEMÃO: Uma demão de aproximadamente 190 µm de epóxi poliamida bicomponente, " +
+            "dupla função, com pigmentação à base de fosfato de zinco.\n" +
+            "ACABAMENTO: Uma demão de aproximadamente 50 µm de poliuretano alifático bicomponente " +
+            "na cor Azul RAL 5005 segundo o Padrão ETP C3 Desabrigado",
+            "Soldagem segundo especificação técnica da Howden South America, baseada em ASME e AWS",
+            "Arranjo segundo a norma AMCA 2404",
+        },
         Impostos = "Impostos", CondicoesDePagamento = "Condições de Pagamento",
         PrazoDeEntrega = "Prazo de Entrega",
         CondicoesDeEntrega = "Condições de entrega (INCOTERMS 2020)",
@@ -595,6 +697,47 @@ public sealed class TextosDaProposta
         EmissaoInicial = "Initial issue", RevisaoDaOferta = "Proposal revision",
 
         Introducao = "Introduction", OfertaComercial = "Commercial Proposal", Preco = "Price",
+        OfertaTecnica = "Technical Proposal",
+        DadosDoVentilador = "FAN DATA",
+        CaracteristicasGerais = "General characteristics",
+        ReferenciaDoCliente = "Customer reference",
+        CurvaDePerformance = "PERFORMANCE CURVE",
+        Ventilador = "Fan",
+        RotulosDoVentilador = new[]
+        {
+            "Number of fans", "Howden model", "Application", "Blade angle",
+            "Mounting type", "Fan diameter (mm)", "Duty",
+            "Altitude (m.a.s.l)", "Density", "Fan flow", "", "Efficiency",
+            "Speed", "Power consumption", "Noise at 1 m",
+            "Electric motor",
+        },
+        Pressao = "Pressure", PressaoTotal = "Total pressure", PressaoEstatica = "Static pressure",
+        Materiais = "Materials of Construction",
+        LinhasDosMateriais = new[]
+        {
+            new[] { "Nameplate", "AISI 304L" },
+            new[] { "Fan hub and blades", "Aluminium" },
+            new[] { "Fan casing", "ASTM A36 painted" },
+            new[] { "Protection guard", "Painted steel" },
+            new[] { "Supports for fixing to the base", "ASTM A36 painted" },
+        },
+        Normas = "Standards",
+        LinhasDasNormas = new[]
+        {
+            "ISO 21940 – Gr 2.5 static and dynamic impeller balancing",
+            "Acceptance criteria according to ISO 13348 Grade AN3",
+            "Fan performance assumes that the fan has been installed in accordance with Howden's " +
+            "instructions and that the velocity distribution at the fan inlet complies with " +
+            "ISO 5802.",
+            "Finish painting according to ISO 12944 - atmospheric corrosion category (C3)",
+            "CLEANING: SA 2 ½ standard where applicable.\n" +
+            "PRIMER: One coat of approximately 190 µm of two-component polyamide epoxy, dual " +
+            "function, with zinc phosphate based pigmentation.\n" +
+            "TOP COAT: One coat of approximately 50 µm of two-component aliphatic polyurethane in " +
+            "Blue RAL 5005 according to the ETP C3 Exposed standard",
+            "Welding according to Howden South America technical specification, based on ASME and AWS",
+            "Arrangement according to AMCA 2404",
+        },
         Impostos = "Taxes", CondicoesDePagamento = "Payment Terms",
         PrazoDeEntrega = "Delivery Time",
         CondicoesDeEntrega = "Delivery terms (INCOTERMS 2020)",

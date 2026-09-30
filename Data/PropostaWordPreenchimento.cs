@@ -16,13 +16,19 @@ namespace HowdenAxiais.Poc.Data;
 /// existe risco de a tradução discordar do modelo.
 /// </para>
 /// </summary>
-internal sealed class Preenchimento
+internal sealed partial class Preenchimento
 {
     private readonly WordprocessingDocument _doc;
     private readonly Proposta _p;
     private readonly CustoDaProposta _custo;
     private readonly TextosDaProposta _t;
     private readonly bool _espanhol;
+
+    /// <summary>
+    /// Qual das duas propostas está sendo gerada. Muda o subtítulo da capa e,
+    /// daí em diante, o documento inteiro.
+    /// </summary>
+    private bool _tecnica;
     private readonly Body _corpo;
     private readonly Moeda _moeda;
     private readonly List<decimal> _precos;
@@ -255,7 +261,7 @@ internal sealed class Preenchimento
         if (capa.Descendants<Paragraph>()
                 .FirstOrDefault(p => Texto(p).Trim() == "Oferta Técnica Comercial") is { } subtitulo)
         {
-            Escrever(subtitulo, _t.OfertaComercial);
+            Escrever(subtitulo, _tecnica ? _t.OfertaTecnica : _t.OfertaComercial);
         }
 
         Rotulos(capa);

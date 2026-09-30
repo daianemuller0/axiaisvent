@@ -1225,6 +1225,8 @@
         <span class="subtitle" style="margin:0">
             a seleção e a curva de cada equipamento
         </span>
+        <span style="flex:1"></span>
+        <button class="btn-primary" @onclick="GerarTecnica">⬇ Gerar proposta técnica</button>
     </div>
 
     @if (_proposta.Itens.Count == 0)
@@ -1302,7 +1304,7 @@
                     <div class="panel" style="padding:0; overflow-x:auto; margin:0">
                         <table class="grid">
                             <tbody>
-                                @foreach (var linha in DadosDoVentilador.De(item, ModeloDe(item), MotorDe(item)))
+                                @foreach (var linha in DadosDoVentilador.De(item, ModeloDe(item), MotorDe(item), TextosDaProposta.Do(Idioma)))
                                 {
                                     <tr>
                                         <td class="nowrap" style="width:280px">@linha.Rotulo</td>
@@ -1912,6 +1914,48 @@
         {
             Aviso($"Não consegui gerar a proposta: {ex.Message}", erro: true);
         }
+    }
+
+    private async Task GerarTecnica()
+    {
+        if (_proposta.Itens.Count == 0)
+        {
+            Aviso("A proposta ainda não tem equipamento nenhum.", erro: true);
+            return;
+        }
+
+        try
+        {
+            var modelo = Path.Combine(Ambiente.ContentRootPath, PropostaWord.CaminhoDoModelo);
+
+            if (!File.Exists(modelo))
+            {
+                Aviso($"O modelo da proposta não está em {PropostaWord.CaminhoDoModelo}.", erro: true);
+                return;
+            }
+
+            var bytes = PropostaTecnicaWord.Gerar(_proposta, _custo, modelo, LerCurva);
+
+            await JS.InvokeVoidAsync("appDownload",
+                PropostaTecnicaWord.NomeDoArquivo(_proposta),
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                Convert.ToBase64String(bytes));
+
+            Aviso($"Proposta técnica gerada: {PropostaTecnicaWord.NomeDoArquivo(_proposta)}.");
+        }
+        catch (Exception ex)
+        {
+            Aviso($"Não consegui gerar a proposta técnica: {ex.Message}", erro: true);
+        }
+    }
+
+    /// <summary>A curva lida da pasta de anexos, para entrar no documento.</summary>
+    private ImagemDaCurva? LerCurva(CurvaAnexada curva)
+    {
+        var caminho = Anexos.Caminho(_proposta.Id, curva.Imagem);
+        if (caminho is null) return null;
+
+        return new ImagemDaCurva(File.ReadAllBytes(caminho), Path.GetExtension(caminho));
     }
 
     private async Task GerarPricing()

@@ -25,29 +25,36 @@ public static class DadosDoVentilador
     /// <summary>O arranjo é sempre 4 nos axiais da equipe.</summary>
     public const string Arranjo = "4";
 
-    public static List<Linha> De(ItemProposta item, Equipamento? modelo, Motor? motor)
+    public static List<Linha> De(ItemProposta item, Equipamento? modelo, Motor? motor,
+        TextosDaProposta textos)
     {
         var t = item.Tecnicos;
+        var r = textos.RotulosDoVentilador;
 
-        return new List<Linha>
+        var valores = new (string Valor, string Origem)[]
         {
-            new("Cantidad de ventiladores", item.Quantos.ToString(), "escopo"),
-            new("Modelo Howden", modelo?.Rotulo ?? "", "escopo"),
-            new("Aplicación", item.Aplicacao.Trim(), "escopo"),
-            new("Ángulo de las aspas", Dado(t, "angulo"), "seleção"),
-            new("Tipo de montaje", Montagem(item), "escopo"),
-            new("Diámetro del ventilador (mm)", "", ""),
-            new("Régimen de trabajo", RegimeDeTrabalho, ""),
-            new("Altitud (m.s.n.m)", "", ""),
-            new("Densidad", Dado(t, "densidade"), "seleção"),
-            new("Caudal del ventilador", Dado(t, "vazao"), "seleção"),
-            new(RotuloDaPressao(t), Dado(t, "pressao"), "seleção"),
-            new("Eficiencia", Dado(t, "eficiencia"), "seleção"),
-            new("Velocidad de giro", Dado(t, "rotacao"), "seleção"),
-            new("Consumo de potencia", Dado(t, "potencia"), "seleção"),
-            new("Ruido a 1 m de distancia", "", ""),
-            new("Motor Eléctrico", DoMotor(motor), "parte elétrica"),
+            (item.Quantos.ToString(), "escopo"),
+            (modelo?.Rotulo ?? "", "escopo"),
+            (item.Aplicacao.Trim(), "escopo"),
+            (Dado(t, "angulo"), "seleção"),
+            (Montagem(item), "escopo"),
+            ("", ""),
+            (RegimeDeTrabalho, ""),
+            ("", ""),
+            (Dado(t, "densidade"), "seleção"),
+            (Dado(t, "vazao"), "seleção"),
+            (Dado(t, "pressao"), "seleção"),
+            (Dado(t, "eficiencia"), "seleção"),
+            (Dado(t, "rotacao"), "seleção"),
+            (Dado(t, "potencia"), "seleção"),
+            ("", ""),
+            (DoMotor(motor), "parte elétrica"),
         };
+
+        return valores
+            .Select((v, i) => new Linha(
+                r[i].Length > 0 ? r[i] : RotuloDaPressao(t, textos), v.Valor, v.Origem))
+            .ToList();
     }
 
     /// <summary>
@@ -58,14 +65,16 @@ public static class DadosDoVentilador
     /// Quando a seleção não diz qual é, fica só "Presión": afirmar uma das
     /// duas sem o arquivo dizer seria inventar.
     /// </summary>
-    private static string RotuloDaPressao(Dictionary<string, DadoTecnico> tecnicos)
+    private static string RotuloDaPressao(Dictionary<string, DadoTecnico> tecnicos,
+        TextosDaProposta textos)
     {
         var tipo = Dado(tecnicos, "pressaoTipo").Trim();
-        if (tipo.Length == 0) return "Presión";
+        if (tipo.Length == 0) return textos.Pressao;
 
-        return Textos.Igual(tipo, SelecaoTecnica.Estatica)
-            ? "Presión estática"
-            : Textos.Igual(tipo, SelecaoTecnica.Total) ? "Presión total" : $"Presión {tipo}";
+        if (Textos.Igual(tipo, SelecaoTecnica.Estatica)) return textos.PressaoEstatica;
+        if (Textos.Igual(tipo, SelecaoTecnica.Total)) return textos.PressaoTotal;
+
+        return $"{textos.Pressao} {tipo}";
     }
 
     /// <summary>

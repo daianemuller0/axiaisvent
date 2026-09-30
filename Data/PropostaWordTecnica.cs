@@ -1,0 +1,316 @@
+using DocumentFormat.OpenXml;
+using DocumentFormat.OpenXml.Packaging;
+using DocumentFormat.OpenXml.Wordprocessing;
+using Desenho = DocumentFormat.OpenXml.Drawing;
+using DesenhoWord = DocumentFormat.OpenXml.Drawing.Wordprocessing;
+using Figura = DocumentFormat.OpenXml.Drawing.Pictures;
+
+namespace HowdenAxiais.Poc.Data;
+
+/// <summary>Uma curva lida da pasta de anexos, pronta para entrar no documento.</summary>
+public sealed record ImagemDaCurva(byte[] Bytes, string Extensao);
+
+/// <summary>
+/// A parte TÉCNICA do documento.
+///
+/// A proposta técnica é o mesmo arquivo da comercial até a terceira página —
+/// capa, índice e introdução —, e daí em diante troca de assunto: no lugar do
+/// preço vêm os dados de cada ventilador e as curvas dele.
+///
+/// <para>
+/// As páginas técnicas são ESCRITAS aqui, e não preenchidas, porque o modelo
+/// que a equipe mandou não as tem: o índice dele cita "DATOS DEL VENTILADOR"
+/// e "ALCANCE DEL SUMINISTRO", mas o corpo do arquivo vai da introdução ao
+/// preço e termina nos repostos. O que dá para reaproveitar — e é reaproveitado
+/// — são os ESTILOS do modelo: as tabelas usam a mesma faixa azul e as mesmas
+/// fontes do resto do documento, e não uma aparência inventada aqui.
+/// </para>
+/// </summary>
+internal sealed partial class Preenchimento
+{
+    /// <summary>A faixa azul dos cabeçalhos de tabela, copiada do modelo.</summary>
+    private const string AzulDaFaixa = "00648C";
+
+    private const int LarguraUtil = 9638;
+
+    /// <summary>
+    /// Escreve a proposta técnica no lugar da comercial: some tudo da "Oferta
+    /// Comercial" para baixo, e entra um bloco por equipamento.
+    /// </summary>
+    public void Tecnica(Func<CurvaAnexada, ImagemDaCurva?> lerCurva)
+    {
+        _tecnica = true;
+
+        Propriedades();
+        CamposLigados();
+        Capa();
+        EnderecoDaBu();
+        Contatos();
+        Representante();
+        Revisoes();
+        Introducao();
+
+        TrocarOComercialPeloTecnico(lerCurva);
+        TirarRealce();
+
+        _doc.MainDocumentPart!.Document.Save();
+    }
+
+    private void TrocarOComercialPeloTecnico(Func<CurvaAnexada, ImagemDaCurva?> lerCurva)
+    {
+        var titulo = Achar("Oferta Comercial");
+        if (titulo is null) return;
+
+        // tudo o que vem depois do título é da proposta comercial e sai; o
+        // sectPr é o fim da seção e fica, senão o documento perde as margens,
+        // o cabeçalho e o rodapé
+        foreach (var elemento in _corpo.ChildElements
+                     .SkipWhile(e => e != titulo)
+                     .Skip(1)
+                     .Where(e => e is not SectionProperties)
+                     .ToList())
+        {
+            elemento.Remove();
+        }
+
+        Escrever(titulo, _t.OfertaTecnica);
+
+        var fim = _corpo.GetFirstChild<SectionProperties>();
+        var varios = _p.Itens.Count > 1;
+
+        for (var i = 0; i < _p.Itens.Count; i++)
+        {
+            if (i > 0) Antes(fim, QuebraDePagina());
+            Equipamento(fim, _p.Itens[i], i, varios, lerCurva);
+        }
+    }
+
+    /// <summary>Um equipamento: os dados, os materiais, as normas e as curvas.</summary>
+    private void Equipamento(OpenXmlElement? fim, ItemProposta item, int indice, bool varios,
+        Func<CurvaAnexada, ImagemDaCurva?> lerCurva)
+    {
+        var cabecalho = varios
+            ? $"{_t.DadosDoVentilador} — {_t.Ventilador} {indice + 1:D2}"
+            : _t.DadosDoVentilador;
+
+        Antes(fim, Titulo(cabecalho));
+        Antes(fim, Tabela(DuasColunas(
+            (_t.CaracteristicasGerais, _t.ReferenciaDoCliente),
+            DadosDoVentilador.De(item, _custo.Modelo(item), _custo.MotorDe(item), _t)
+                .Select(l => (l.Rotulo, l.Valor))
+                .ToList())));
+
+        // nestas duas a faixa azul JÁ é o nome da seção, como no modelo — um
+        // título por cima dela sairia escrito duas vezes
+        Antes(fim, Vazio());
+        Antes(fim, Tabela(DuasColunas((_t.Materiais, ""),
+            _t.LinhasDosMateriais.Select(l => (l[0], l[1])).ToList())));
+
+        Antes(fim, Vazio());
+        Antes(fim, Tabela(UmaColuna(_t.Normas, _t.LinhasDasNormas)));
+
+        // as curvas ficam na página seguinte à dos dados, como a equipe pediu
+        if (item.Curvas.Count == 0) return;
+
+        Antes(fim, QuebraDePagina());
+        Antes(fim, Titulo(_t.CurvaDePerformance));
+
+        foreach (var curva in item.Curvas)
+        {
+            if (lerCurva(curva) is not { } arquivo) continue;
+            Antes(fim, Imagem(arquivo));
+        }
+    }
+
+    // ================= peças =================
+
+    private void Antes(OpenXmlElement? fim, OpenXmlElement novo)
+    {
+        if (fim is null) _corpo.AppendChild(novo);
+        else _corpo.InsertBefore(novo, fim);
+    }
+
+    /// <summary>Um título de seção, com o estilo do próprio modelo.</summary>
+    private static Paragraph Titulo(string texto) => new(
+        new ParagraphProperties(
+            new ParagraphStyleId { Val = "HSA-TTULO2" },
+            new SpacingBetweenLines { Before = "240", After = "120" }),
+        new Run(new Text(texto) { Space = SpaceProcessingModeValues.Preserve }));
+
+    private static Paragraph Vazio() => new();
+
+    private static Paragraph QuebraDePagina() =>
+        new(new Run(new Break { Type = BreakValues.Page }));
+
+    /// <param name="Faixa">true na linha de cabeçalho, que sai em azul com letra branca.</param>
+    private sealed record Quadro(string Texto, bool Faixa = false, int Colunas = 1);
+
+    private static List<List<Quadro>> DuasColunas((string, string)? cabecalho,
+        List<(string Rotulo, string Valor)> linhas)
+    {
+        var tabela = new List<List<Quadro>>();
+
+        if (cabecalho is { } c)
+            tabela.Add(new() { new(c.Item1, Faixa: true), new(c.Item2, Faixa: true) });
+
+        foreach (var (rotulo, valor) in linhas)
+            tabela.Add(new() { new(rotulo), new(valor) });
+
+        return tabela;
+    }
+
+    private static List<List<Quadro>> UmaColuna(string cabecalho, IEnumerable<string> linhas)
+    {
+        var tabela = new List<List<Quadro>>
+        {
+            new() { new(cabecalho, Faixa: true, Colunas: 2) },
+        };
+
+        foreach (var linha in linhas) tabela.Add(new() { new(linha, Colunas: 2) });
+        return tabela;
+    }
+
+    /// <summary>
+    /// Monta a tabela com a cara das do modelo: faixa azul no cabeçalho, letra
+    /// branca, e linhas finas entre as células.
+    /// </summary>
+    private static Table Tabela(List<List<Quadro>> linhas)
+    {
+        var props = new TableProperties(
+            new TableWidth { Width = "5000", Type = TableWidthUnitValues.Pct },
+            new TableBorders(
+                new TopBorder { Val = BorderValues.Single, Size = 4, Color = "BFBFBF" },
+                new LeftBorder { Val = BorderValues.None },
+                new BottomBorder { Val = BorderValues.Single, Size = 4, Color = "BFBFBF" },
+                new RightBorder { Val = BorderValues.None },
+                new InsideHorizontalBorder { Val = BorderValues.Single, Size = 4, Color = "BFBFBF" },
+                new InsideVerticalBorder { Val = BorderValues.None }));
+
+        var grade = new TableGrid(
+            new GridColumn { Width = (LarguraUtil / 2).ToString() },
+            new GridColumn { Width = (LarguraUtil / 2).ToString() });
+
+        var tabela = new Table(props, grade);
+
+        foreach (var linha in linhas)
+        {
+            var tr = new TableRow();
+
+            foreach (var quadro in linha)
+            {
+                var tcPr = new TableCellProperties(
+                    new TableCellWidth
+                    {
+                        Type = TableWidthUnitValues.Pct,
+                        Width = (quadro.Colunas == 2 ? 5000 : 2500).ToString(),
+                    });
+
+                if (quadro.Colunas == 2) tcPr.Append(new GridSpan { Val = 2 });
+
+                if (quadro.Faixa)
+                    tcPr.Append(new Shading { Val = ShadingPatternValues.Clear, Fill = AzulDaFaixa });
+
+                tr.Append(new TableCell(tcPr, Linha(quadro)));
+            }
+
+            tabela.Append(tr);
+        }
+
+        return tabela;
+    }
+
+    /// <summary>O parágrafo de dentro da célula; "\n" vira quebra de linha.</summary>
+    private static Paragraph Linha(Quadro quadro)
+    {
+        var formato = new RunProperties(new RunFonts { Ascii = "Arial", HighAnsi = "Arial" },
+            new FontSize { Val = "18" });
+
+        if (quadro.Faixa)
+        {
+            formato.Append(new Bold());
+            formato.Append(new Color { Val = "FFFFFF" });
+        }
+
+        var run = new Run(formato);
+        var primeiro = true;
+
+        foreach (var parte in quadro.Texto.Split('\n'))
+        {
+            if (!primeiro) run.Append(new Break());
+            run.Append(new Text(parte) { Space = SpaceProcessingModeValues.Preserve });
+            primeiro = false;
+        }
+
+        // à esquerda, e não justificado: o documento é justificado por padrão,
+        // e numa célula estreita isso espalha as palavras de ponta a ponta
+        // ("LIMPEZA:      Padrão      SA      2      ½      onde      aplicável.")
+        return new Paragraph(
+            new ParagraphProperties(
+                new Justification { Val = JustificationValues.Left },
+                new SpacingBetweenLines { Before = "20", After = "20" }),
+            run);
+    }
+
+    /// <summary>
+    /// A curva, do tamanho da largura útil da página. A altura acompanha a
+    /// proporção da imagem, para o gráfico não sair achatado.
+    /// </summary>
+    private Paragraph Imagem(ImagemDaCurva arquivo)
+    {
+        var bytes = arquivo.Bytes;
+
+        var parte = _doc.MainDocumentPart!.AddImagePart(
+            arquivo.Extensao.ToLowerInvariant() switch
+            {
+                ".jpg" or ".jpeg" => ImagePartType.Jpeg,
+                ".gif" => ImagePartType.Gif,
+                ".bmp" => ImagePartType.Bmp,
+                _ => ImagePartType.Png,
+            });
+
+        using (var fluxo = new MemoryStream(bytes)) parte.FeedData(fluxo);
+
+        var id = _doc.MainDocumentPart.GetIdOfPart(parte);
+
+        using var mapa = SkiaSharp.SKBitmap.Decode(bytes);
+
+        // 1 cm são 360.000 EMU. A largura é a da mancha da página; a altura
+        // segue a proporção da imagem, para o gráfico não sair achatado, mas
+        // com um teto: sem ele uma curva quadrada ocuparia a folha inteira e
+        // empurraria o título dela para a página anterior
+        var largura = 15L * 360_000;
+        var altura = mapa is { Width: > 0 } ? largura * mapa.Height / mapa.Width : largura;
+
+        const long Teto = 11L * 360_000;
+        if (altura > Teto)
+        {
+            largura = largura * Teto / altura;
+            altura = Teto;
+        }
+
+        var desenho = new Drawing(new DesenhoWord.Inline(
+            new DesenhoWord.Extent { Cx = largura, Cy = altura },
+            new DesenhoWord.DocProperties { Id = (uint)(900 + _figuras++), Name = "curva" },
+            new Desenho.Graphic(new Desenho.GraphicData(
+                new Figura.Picture(
+                    new Figura.NonVisualPictureProperties(
+                        new Figura.NonVisualDrawingProperties { Id = 0, Name = "curva" },
+                        new Figura.NonVisualPictureDrawingProperties()),
+                    new Figura.BlipFill(
+                        new Desenho.Blip { Embed = id },
+                        new Desenho.Stretch(new Desenho.FillRectangle())),
+                    new Figura.ShapeProperties(
+                        new Desenho.Transform2D(
+                            new Desenho.Offset { X = 0, Y = 0 },
+                            new Desenho.Extents { Cx = largura, Cy = altura }),
+                        new Desenho.PresetGeometry(new Desenho.AdjustValueList())
+                        { Preset = Desenho.ShapeTypeValues.Rectangle })))
+            { Uri = "http://schemas.openxmlformats.org/drawingml/2006/picture" })));
+
+        return new Paragraph(
+            new ParagraphProperties(new Justification { Val = JustificationValues.Center }),
+            new Run(desenho));
+    }
+
+    private int _figuras;
+}
