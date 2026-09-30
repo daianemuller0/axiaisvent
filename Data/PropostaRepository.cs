@@ -62,6 +62,19 @@ public sealed class ItemProposta
     public Dictionary<string, string> PrecosManuais { get; set; } = new();
 
     /// <summary>
+    /// Os dados técnicos deste equipamento, lidos do relatório de seleção
+    /// (ver <see cref="SelecaoTecnica"/>) e conferidos na tela.
+    ///
+    /// Ficam no ITEM, e não na proposta, porque cada equipamento tem a sua
+    /// seleção: dois ventiladores da mesma proposta têm vazão, pressão e
+    /// potência diferentes.
+    /// </summary>
+    public Dictionary<string, DadoTecnico> Tecnicos { get; set; } = new();
+
+    /// <summary>O nome do arquivo de seleção de onde os dados vieram.</summary>
+    public string ArquivoDaSelecao { get; set; } = "";
+
+    /// <summary>
     /// A descrição deste equipamento na proposta comercial, quando a equipe
     /// escreveu a dela. Vazia, vale o rascunho que o sistema monta do escopo
     /// (ver <see cref="EscopoEmTexto"/>) — é a mesma regra do preço: puxa, mas

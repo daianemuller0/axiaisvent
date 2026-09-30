@@ -657,6 +657,52 @@
             </div>
         }
 
+        <!-- ---------- dados técnicos da seleção ---------- -->
+        <div class="panel" style="margin:14px 0; border-left:3px solid var(--azul, #0b3d6b)">
+            <div class="toolbar" style="flex-wrap:wrap">
+                <h3 style="margin:0; font-size:13.5px">Dados técnicos (seleção)</h3>
+                <span class="subtitle" style="margin:0">
+                    o relatório que o programa de seleção exporta
+                </span>
+                <span style="flex:1"></span>
+                <InputFile OnChange="@(e => SubirSelecao(e, PosicaoValida))" accept=".txt" class="cell" />
+            </div>
+
+            @if (atual.ArquivoDaSelecao.Length > 0)
+            {
+                <p class="subtitle" style="margin:8px 0 0">
+                    Lido de <strong>@atual.ArquivoDaSelecao</strong>. Os valores saem do arquivo
+                    como estão escritos nele, com a unidade ao lado — confira e corrija o que
+                    precisar.
+                </p>
+            }
+
+            @if (_faltouNaSelecao.Count > 0)
+            {
+                <p class="subtitle" style="margin:8px 0 0; color:#c98a00">
+                    Não achei no arquivo: @string.Join(", ", _faltouNaSelecao) — preencher à mão.
+                </p>
+            }
+
+            <div class="form3" style="margin-top:12px">
+                @foreach (var (chave, rotulo) in SelecaoTecnica.Campos)
+                {
+                    var campo = chave;
+                    var dado = atual.Tecnicos.GetValueOrDefault(campo, new DadoTecnico("", ""));
+
+                    <label>@Campo(rotulo, atual.Tecnicos.ContainsKey(campo) ? "da seleção" : null)
+                        <div class="toolbar" style="gap:6px; margin:0">
+                            <input class="cell" style="flex:1" value="@dado.Valor"
+                                   @onchange="e => MudarTecnico(atual, campo, e.Value?.ToString() ?? string.Empty, dado.Unidade)" />
+                            <input class="cell" style="width:90px" placeholder="unid."
+                                   value="@dado.Unidade"
+                                   @onchange="e => MudarTecnico(atual, campo, dado.Valor, e.Value?.ToString() ?? string.Empty)" />
+                        </div>
+                    </label>
+                }
+            </div>
+        </div>
+
         <!-- ---------- parte elétrica: motor, partidor e instrumentação ---------- -->
         <div class="toolbar" style="flex-wrap:wrap; border-top:2px solid var(--border); padding-top:14px; margin-top:14px">
             <h3 style="margin:0; font-size:14px">Parte Elétrica</h3>
@@ -1221,6 +1267,9 @@
     // o que a última leitura da folha de dados trouxe, e o que ela não traz
     private List<string> _daPlanilha = new();
     private List<string> _avisos = new();
+
+    /// <summary>O que o último relatório de seleção lido não trouxe.</summary>
+    private List<string> _faltouNaSelecao = new();
 
     // ---------- entrega e pagamento ----------
     private List<CondicaoPagamento> _condicoes = new();
@@ -1863,6 +1912,57 @@
         Pagamentos.Apagar(c.Id);
         _condicoes = Pagamentos.Todas();
         AjustarEscolhasLivres();
+    }
+
+    // ---------- seleção do ventilador ----------
+
+    /// <summary>
+    /// Lê o relatório de seleção e põe os dados no equipamento aberto.
+    ///
+    /// Vale por equipamento, e não pela proposta: cada ventilador tem a sua
+    /// seleção, e é por isso que o botão fica dentro da aba dele.
+    /// </summary>
+    private async Task SubirSelecao(InputFileChangeEventArgs e, int indice)
+    {
+        _faltouNaSelecao = new();
+
+        try
+        {
+            await using var fluxo = e.File.OpenReadStream(10 * 1024 * 1024);
+            using var leitor = new StreamReader(fluxo);
+            var texto = await leitor.ReadToEndAsync();
+
+            var resultado = SelecaoTecnica.Ler(texto);
+
+            if (resultado.Dados.Count == 0)
+            {
+                Aviso("Não reconheci esse arquivo como um relatório de seleção.", erro: true);
+                return;
+            }
+
+            var item = _proposta.Itens[indice];
+            foreach (var (chave, dado) in resultado.Dados) item.Tecnicos[chave] = dado;
+            item.ArquivoDaSelecao = e.File.Name;
+
+            _faltouNaSelecao = resultado.NaoAchados;
+
+            Aviso($"Seleção lida: {resultado.Dados.Count} dado(s) do equipamento {indice + 1}.");
+        }
+        catch (Exception ex)
+        {
+            Aviso($"Não consegui ler a seleção: {ex.Message}", erro: true);
+        }
+    }
+
+    private static void MudarTecnico(ItemProposta item, string chave, string valor, string unidade)
+    {
+        if (valor.Trim().Length == 0 && unidade.Trim().Length == 0)
+        {
+            item.Tecnicos.Remove(chave);
+            return;
+        }
+
+        item.Tecnicos[chave] = new DadoTecnico(valor.Trim(), unidade.Trim());
     }
 
     // ---------- folha de dados ----------
