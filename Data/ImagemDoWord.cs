@@ -22,24 +22,29 @@ public static class ImagemDoWord
     public sealed record Figura(byte[] Bytes, string Extensao);
 
     /// <summary>
-    /// A primeira figura grande do documento, na ordem em que ela aparece —
-    /// que é a da primeira página. Nulo quando não há nenhuma.
+    /// As figuras grandes do documento, na ordem em que aparecem.
     ///
-    /// A ordem importa mais do que o tamanho: se o documento tiver mais de um
-    /// gráfico, o da primeira página é o que vale.
+    /// São VÁRIAS de propósito: a seleção do VAX traz dois gráficos na
+    /// primeira página — potência e pressão —, e os dois são a curva do
+    /// equipamento. Vem tudo, na ordem do documento, que é a ordem em que a
+    /// equipe está acostumada a vê-los.
+    ///
+    /// Figura pequena não entra: logotipo e ícone também são figuras.
     /// </summary>
-    public static Figura? Curva(Stream docx)
+    public static List<Figura> Curvas(Stream docx)
     {
+        var figuras = new List<Figura>();
+
         using var doc = WordprocessingDocument.Open(docx, false);
         var principal = doc.MainDocumentPart;
-        if (principal?.Document?.Body is null) return null;
+        if (principal?.Document?.Body is null) return figuras;
 
         foreach (var parte in NaOrdemDoDocumento(principal))
         {
-            if (Ler(parte) is { } figura) return figura;
+            if (Ler(parte) is { } figura) figuras.Add(figura);
         }
 
-        return null;
+        return figuras;
     }
 
     /// <summary>

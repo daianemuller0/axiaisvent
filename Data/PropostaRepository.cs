@@ -10,6 +10,25 @@ namespace HowdenAxiais.Poc.Data;
 /// Dois equipamentos iguais são UMA linha com quantidade 2; dois diferentes são
 /// duas colunas, e aqui, dois itens.
 /// </summary>
+/// <summary>
+/// Uma curva de performance anexada a um equipamento.
+/// </summary>
+public sealed class CurvaAnexada
+{
+    /// <summary>O arquivo como foi guardado em <see cref="Anexos"/>.</summary>
+    public string Arquivo { get; set; } = "";
+
+    /// <summary>O nome que ele tinha na máquina de quem subiu — é o que a tela mostra.</summary>
+    public string Nome { get; set; } = "";
+
+    /// <summary>
+    /// A curva já em IMAGEM: é ela que a tela mostra e que vai para a proposta
+    /// técnica. Num PDF, é a página desenhada; numa imagem, é o próprio
+    /// arquivo.
+    /// </summary>
+    public string Imagem { get; set; } = "";
+}
+
 public sealed class ItemProposta
 {
     public string Quantidade { get; set; } = "1";
@@ -75,20 +94,18 @@ public sealed class ItemProposta
     public string ArquivoDaSelecao { get; set; } = "";
 
     /// <summary>
-    /// A curva de performance deste equipamento: o nome com que o arquivo foi
-    /// guardado em <see cref="Anexos"/>. Vazio quando ainda não subiu.
+    /// As curvas de performance deste equipamento.
+    ///
+    /// São VÁRIAS porque a seleção traz mais de um gráfico: no VAX, a de
+    /// potência e a de pressão vêm uma embaixo da outra na primeira página do
+    /// documento.
     /// </summary>
+    public List<CurvaAnexada> Curvas { get; set; } = new();
+
+    // As três colunas de quando a curva era uma só. Ficam para as propostas
+    // gravadas antes: ao abrir, viram a primeira da lista (ver LerItens).
     public string Curva { get; set; } = "";
-
-    /// <summary>O nome que o arquivo da curva tinha na máquina de quem subiu.</summary>
     public string CurvaNome { get; set; } = "";
-
-    /// <summary>
-    /// A curva já em IMAGEM — é ela que a tela mostra e que vai para a
-    /// proposta técnica. Quando a equipe sobe um PDF, a página é desenhada
-    /// numa imagem e guardada aqui ao lado do original; quando sobe uma
-    /// imagem, é o mesmo arquivo.
-    /// </summary>
     public string CurvaImagem { get; set; } = "";
 
     /// <summary>
@@ -328,6 +345,25 @@ public sealed class Proposta
     /// colunas soltas — vira o primeiro item da lista, para nenhuma proposta
     /// antiga abrir vazia.
     /// </summary>
+    /// <summary>
+    /// A proposta gravada quando a curva era uma só abre com ela na lista.
+    /// </summary>
+    private static void TrazerCurvaAntiga(ItemProposta item)
+    {
+        if (item.Curvas.Count > 0 || item.Curva.Trim().Length == 0) return;
+
+        item.Curvas.Add(new CurvaAnexada
+        {
+            Arquivo = item.Curva,
+            Nome = item.CurvaNome,
+            Imagem = item.CurvaImagem.Length > 0 ? item.CurvaImagem : item.Curva,
+        });
+
+        item.Curva = "";
+        item.CurvaNome = "";
+        item.CurvaImagem = "";
+    }
+
     public static List<ItemProposta> LerItens(string json, string equipamentoLegado,
         string arranjoLegado, string escolhasLegadas)
     {
@@ -336,7 +372,11 @@ public sealed class Proposta
             try
             {
                 var lista = JsonSerializer.Deserialize<List<ItemProposta>>(json);
-                if (lista is not null) return lista;
+                if (lista is not null)
+                {
+                    foreach (var item in lista) TrazerCurvaAntiga(item);
+                    return lista;
+                }
             }
             catch (JsonException)
             {

@@ -1269,42 +1269,52 @@
                     }
                 </div>
 
-                @* ----- curva ----- *@
+                @* ----- curvas ----- *@
                 <div class="toolbar" style="flex-wrap:wrap; margin-top:14px; padding-top:12px;
                                             border-top:1px solid var(--linha, #e6e8ec)">
-                    <strong style="min-width:150px; font-size:12.5px">Curva de performance</strong>
-
-                    @if (item.Curva.Length > 0)
-                    {
-                        <span class="val-count">@item.CurvaNome</span>
-                        <span class="subtitle">@TamanhoDaCurva(item)</span>
-                        <button class="btn-link" @onclick="() => TirarCurva(indice)">✕ tirar</button>
-                    }
-                    else
-                    {
-                        <InputFile OnChange="@(e => SubirCurva(e, indice))"
-                                   accept=".pdf,.png,.jpg,.jpeg" class="cell" />
-                        <span class="subtitle">PDF ou imagem</span>
-                    }
+                    <strong style="min-width:150px; font-size:12.5px">
+                        Curvas de performance
+                        @if (item.Curvas.Count > 0)
+                        {
+                            <span class="val-count" style="margin-left:6px">@item.Curvas.Count</span>
+                        }
+                    </strong>
+                    <InputFile OnChange="@(e => SubirCurva(e, indice))"
+                               accept=".pdf,.png,.jpg,.jpeg" class="cell" />
+                    <span class="subtitle">PDF ou imagem — dá para juntar mais de uma</span>
                 </div>
 
                 @* o que a tela mostra é a IMAGEM, que é o que vai para o
                    documento — não o PDF que foi anexado *@
-                @if (item.CurvaImagem.Length > 0)
+                @for (var c = 0; c < item.Curvas.Count; c++)
                 {
+                    var posicao = c;
+                    var curva = item.Curvas[posicao];
+
                     <div style="margin-top:10px; text-align:center">
-                        <img src="/axiais/anexo/@_proposta.Id/@item.CurvaImagem"
-                             alt="Curva do item @(indice + 1)"
-                             style="max-width:100%; max-height:420px; border:1px solid var(--linha, #e6e8ec); border-radius:6px" />
-                        <div class="subtitle" style="margin-top:4px">
-                            é esta imagem que vai para a proposta técnica
+                        <div class="toolbar" style="justify-content:center">
+                            <span class="val-count">@curva.Nome</span>
+                            <span class="subtitle">@TamanhoDaCurva(curva)</span>
+                            <button class="btn-link" @onclick="() => TirarCurva(indice, posicao)">✕ tirar</button>
                         </div>
+                        <img src="/axiais/anexo/@_proposta.Id/@curva.Imagem"
+                             alt="Curva @(posicao + 1) do item @(indice + 1)"
+                             style="max-width:100%; max-height:420px; border:1px solid var(--linha, #e6e8ec); border-radius:6px" />
+                    </div>
+                }
+
+                @if (item.Curvas.Count > 0)
+                {
+                    <div class="subtitle" style="margin-top:4px; text-align:center">
+                        @(item.Curvas.Count == 1
+                            ? "é esta imagem que vai para a proposta técnica"
+                            : "são estas imagens que vão para a proposta técnica")
                     </div>
                 }
             </div>
         }
 
-        @if (SemCurva is { Count: > 0 } semCurva)
+        @if (SemCurvas is { Count: > 0 } semCurva)
         {
             <div class="panel" style="margin:0; padding:12px; border-left:3px solid #c98a00">
                 <div style="font-size:12.5px">
@@ -1710,10 +1720,10 @@
     {
         if (_proposta.Itens.Count == 0) return;
 
-        // os anexos do equipamento vão com ele: sem isso a curva ficaria na
-        // pasta sem ninguém que a mencione, e ninguém saberia que dá para
+        // os anexos do equipamento vão com ele: sem isso as curvas ficariam na
+        // pasta sem ninguém que as mencione, e ninguém saberia que dá para
         // apagar
-        TirarCurva(PosicaoValida);
+        foreach (var curva in _proposta.Itens[PosicaoValida].Curvas) Apagar(curva);
 
         _proposta.Itens.RemoveAt(PosicaoValida);
         _faltouNaSelecao.Clear();
@@ -2047,10 +2057,15 @@
 
             if (resultado.NaoAchados.Count > 0) _faltouNaSelecao[indice] = resultado.NaoAchados;
 
-            var comCurva = extensao == ".docx" && await CurvaDoWord(memoria, indice);
+            var curvas = extensao == ".docx" ? await CurvasDoWord(memoria, indice) : 0;
 
             Aviso($"Seleção lida: {resultado.Dados.Count} dado(s) do equipamento {indice + 1}"
-                + (comCurva ? ", e a curva veio junto." : "."));
+                + curvas switch
+                {
+                    0 => ".",
+                    1 => ", e a curva veio junto.",
+                    _ => $", e as {curvas} curvas vieram juntas.",
+                });
         }
         catch (Exception ex)
         {
@@ -2081,23 +2096,32 @@
     /// mão escolheu aquela, e subir a seleção depois não pode trocá-la sem
     /// avisar.
     /// </summary>
-    private async Task<bool> CurvaDoWord(MemoryStream docx, int indice)
+    private async Task<int> CurvasDoWord(MemoryStream docx, int indice)
     {
         var item = _proposta.Itens[indice];
-        if (item.Curva.Length > 0) return false;
+        if (item.Curvas.Count > 0) return 0;
 
         docx.Position = 0;
-        if (ImagemDoWord.Curva(docx) is not { } figura) return false;
+        var figuras = ImagemDoWord.Curvas(docx);
+        if (figuras.Count == 0) return 0;
 
         if (_proposta.Id.Trim().Length == 0) _proposta.Id = Guid.NewGuid().ToString("n");
 
-        using var imagem = new MemoryStream(figura.Bytes);
-        item.Curva = await Anexos.Guardar(_proposta.Id, imagem, "curva" + figura.Extensao);
-        item.CurvaNome = $"curva da seleção ({item.ArquivoDaSelecao})";
+        for (var i = 0; i < figuras.Count; i++)
+        {
+            using var imagem = new MemoryStream(figuras[i].Bytes);
+            var arquivo = await Anexos.Guardar(_proposta.Id, imagem, "curva" + figuras[i].Extensao);
 
-        // já é imagem: não há PDF para desenhar
-        item.CurvaImagem = item.Curva;
-        return true;
+            item.Curvas.Add(new CurvaAnexada
+            {
+                Arquivo = arquivo,
+                Nome = $"curva {i + 1} da seleção",
+                // já é imagem: não há PDF para desenhar
+                Imagem = arquivo,
+            });
+        }
+
+        return figuras.Count;
     }
 
     private static void MudarTecnico(ItemProposta item, string chave, string valor, string unidade)
@@ -2124,10 +2148,6 @@
         {
             if (_proposta.Id.Trim().Length == 0) _proposta.Id = Guid.NewGuid().ToString("n");
 
-            // trocar a curva apaga a anterior — as DUAS, o original e a
-            // imagem: ninguém vai procurar por elas, e ficariam ocupando a
-            // pasta de anexos para sempre
-            TirarCurva(indice);
             var item = _proposta.Itens[indice];
 
             await using var fluxo = e.File.OpenReadStream(20 * 1024 * 1024);
@@ -2135,8 +2155,11 @@
             await fluxo.CopyToAsync(memoria);
 
             memoria.Position = 0;
-            item.Curva = await Anexos.Guardar(_proposta.Id, memoria, e.File.Name);
-            item.CurvaNome = e.File.Name;
+            var curva = new CurvaAnexada
+            {
+                Arquivo = await Anexos.Guardar(_proposta.Id, memoria, e.File.Name),
+                Nome = e.File.Name,
+            };
 
             // a curva é um desenho, e é como imagem que ela vai para a
             // proposta: o PDF vira PNG aqui, já aparado, e a tela mostra
@@ -2145,14 +2168,15 @@
             {
                 var png = CurvaEmImagem.De(memoria.ToArray());
                 using var imagem = new MemoryStream(png);
-                item.CurvaImagem = await Anexos.Guardar(_proposta.Id, imagem, "curva.png");
+                curva.Imagem = await Anexos.Guardar(_proposta.Id, imagem, "curva.png");
             }
             else
             {
-                item.CurvaImagem = item.Curva;
+                curva.Imagem = curva.Arquivo;
             }
 
-            Aviso($"Curva do equipamento {indice + 1} anexada.");
+            item.Curvas.Add(curva);
+            Aviso($"Curva anexada ao equipamento {indice + 1}.");
         }
         catch (Exception ex)
         {
@@ -2160,22 +2184,27 @@
         }
     }
 
-    private void TirarCurva(int indice)
+    private void TirarCurva(int indice, int posicao)
     {
         var item = _proposta.Itens[indice];
+        if (posicao < 0 || posicao >= item.Curvas.Count) return;
 
-        if (item.Curva.Length > 0) Anexos.Apagar(_proposta.Id, item.Curva);
-        if (item.CurvaImagem.Length > 0 && item.CurvaImagem != item.Curva)
-            Anexos.Apagar(_proposta.Id, item.CurvaImagem);
-
-        item.Curva = "";
-        item.CurvaNome = "";
-        item.CurvaImagem = "";
+        Apagar(item.Curvas[posicao]);
+        item.Curvas.RemoveAt(posicao);
     }
 
-    private string TamanhoDaCurva(ItemProposta item)
+    /// <summary>Apaga os arquivos de uma curva: o original e a imagem dele.</summary>
+    private void Apagar(CurvaAnexada curva)
     {
-        var bytes = Anexos.Tamanho(_proposta.Id, item.Curva);
+        if (curva.Arquivo.Length > 0) Anexos.Apagar(_proposta.Id, curva.Arquivo);
+
+        if (curva.Imagem.Length > 0 && curva.Imagem != curva.Arquivo)
+            Anexos.Apagar(_proposta.Id, curva.Imagem);
+    }
+
+    private string TamanhoDaCurva(CurvaAnexada curva)
+    {
+        var bytes = Anexos.Tamanho(_proposta.Id, curva.Arquivo);
         if (bytes <= 0) return "arquivo não encontrado";
 
         return bytes < 1024 * 1024
@@ -2184,9 +2213,9 @@
     }
 
     /// <summary>Os equipamentos que ainda não têm curva, para o aviso do rodapé.</summary>
-    private List<string> SemCurva => _proposta.Itens
+    private List<string> SemCurvas => _proposta.Itens
         .Select((item, i) => (item, i))
-        .Where(x => x.item.Curva.Trim().Length == 0)
+        .Where(x => x.item.Curvas.Count == 0)
         .Select(x => $"item {(x.i + 1):D2}")
         .ToList();
 
