@@ -2047,7 +2047,10 @@
 
             if (resultado.NaoAchados.Count > 0) _faltouNaSelecao[indice] = resultado.NaoAchados;
 
-            Aviso($"Seleção lida: {resultado.Dados.Count} dado(s) do equipamento {indice + 1}.");
+            var comCurva = extensao == ".docx" && await CurvaDoWord(memoria, indice);
+
+            Aviso($"Seleção lida: {resultado.Dados.Count} dado(s) do equipamento {indice + 1}"
+                + (comCurva ? ", e a curva veio junto." : "."));
         }
         catch (Exception ex)
         {
@@ -2069,6 +2072,32 @@
         item.Tecnicos.Clear();
         item.ArquivoDaSelecao = "";
         _faltouNaSelecao.Remove(indice);
+    }
+
+    /// <summary>
+    /// Traz a curva de dentro do Word da seleção, que é onde ela vem no VAX.
+    ///
+    /// Só entra quando o equipamento ainda não tem curva: quem anexou uma à
+    /// mão escolheu aquela, e subir a seleção depois não pode trocá-la sem
+    /// avisar.
+    /// </summary>
+    private async Task<bool> CurvaDoWord(MemoryStream docx, int indice)
+    {
+        var item = _proposta.Itens[indice];
+        if (item.Curva.Length > 0) return false;
+
+        docx.Position = 0;
+        if (ImagemDoWord.Curva(docx) is not { } figura) return false;
+
+        if (_proposta.Id.Trim().Length == 0) _proposta.Id = Guid.NewGuid().ToString("n");
+
+        using var imagem = new MemoryStream(figura.Bytes);
+        item.Curva = await Anexos.Guardar(_proposta.Id, imagem, "curva" + figura.Extensao);
+        item.CurvaNome = $"curva da seleção ({item.ArquivoDaSelecao})";
+
+        // já é imagem: não há PDF para desenhar
+        item.CurvaImagem = item.Curva;
+        return true;
     }
 
     private static void MudarTecnico(ItemProposta item, string chave, string valor, string unidade)
