@@ -46,6 +46,7 @@ public static class SelecaoTecnica
         ("rotacao", "Rotação"),
         ("vazao", "Vazão"),
         ("pressao", "Pressão"),
+        ("pressaoTipo", "Pressão é"),
         ("densidade", "Densidade"),
         ("potencia", "Potência consumida"),
         ("eficiencia", "Eficiência"),
@@ -116,8 +117,31 @@ public static class SelecaoTecnica
             dados[chave] = Separar(valor);
         }
 
+        // o rótulo da pressão diz qual das duas ela é: "Pressure (SP)" é a
+        // estática, "(TP)" é a total
+        if (Linha(linhas, "Pressure") is { } daPressao && TipoDaPressao(daPressao) is { } tipo)
+            dados["pressaoTipo"] = new(tipo, "");
+
         return dados;
     }
+
+    /// <summary>
+    /// Qual pressão o texto anuncia: a total ou a estática. Nulo quando ele
+    /// não diz — e aí a proposta sai só com "Presión", sem afirmar o que não
+    /// está escrito em lugar nenhum.
+    /// </summary>
+    private static string? TipoDaPressao(string texto)
+    {
+        var t = texto.ToLowerInvariant();
+
+        if (t.Contains("(tp)") || t.Contains("total pressure")) return Total;
+        if (t.Contains("(sp)") || t.Contains("static pressure")) return Estatica;
+
+        return null;
+    }
+
+    public const string Total = "Total";
+    public const string Estatica = "Estática";
 
     /// <summary>
     /// A primeira linha com conteúdo depois da linha do rótulo. Um rótulo sem
@@ -197,6 +221,7 @@ public static class SelecaoTecnica
                 is { } pressao)
             {
                 dados["pressao"] = pressao;
+                if (TipoDaPressao(duty) is { } tipo) dados["pressaoTipo"] = new(tipo, "");
             }
         }
 
@@ -206,6 +231,7 @@ public static class SelecaoTecnica
             && Achar(total, @"Total Pressure is\s+([\d.,]+)\s+(in W\.G\.|[^\s,]+)") is { } pressaoTotal)
         {
             dados["pressao"] = pressaoTotal;
+            dados["pressaoTipo"] = new(Total, "");
         }
 
         // "Density = ,066 Lb/Ft3"  ou  "Density = 1,080 Kg/m3"

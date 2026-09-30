@@ -41,13 +41,31 @@ public static class DadosDoVentilador
             new("Altitud (m.s.n.m)", "", ""),
             new("Densidad", Dado(t, "densidade"), "seleção"),
             new("Caudal del ventilador", Dado(t, "vazao"), "seleção"),
-            new("Presión", Dado(t, "pressao"), "seleção"),
+            new(RotuloDaPressao(t), Dado(t, "pressao"), "seleção"),
             new("Eficiencia", Dado(t, "eficiencia"), "seleção"),
             new("Velocidad de giro", Dado(t, "rotacao"), "seleção"),
             new("Consumo de potencia", Dado(t, "potencia"), "seleção"),
             new("Ruido a 1 m de distancia", "", ""),
             new("Motor Eléctrico", DoMotor(motor), "parte elétrica"),
         };
+    }
+
+    /// <summary>
+    /// "Presión total" ou "Presión estática", conforme a SELEÇÃO disser — o
+    /// relatório do Joy dá a total e o do VAX dá a estática, e o documento não
+    /// pode chamar as duas da mesma coisa.
+    ///
+    /// Quando a seleção não diz qual é, fica só "Presión": afirmar uma das
+    /// duas sem o arquivo dizer seria inventar.
+    /// </summary>
+    private static string RotuloDaPressao(Dictionary<string, DadoTecnico> tecnicos)
+    {
+        var tipo = Dado(tecnicos, "pressaoTipo").Trim();
+        if (tipo.Length == 0) return "Presión";
+
+        return Textos.Igual(tipo, SelecaoTecnica.Estatica)
+            ? "Presión estática"
+            : Textos.Igual(tipo, SelecaoTecnica.Total) ? "Presión total" : $"Presión {tipo}";
     }
 
     /// <summary>
