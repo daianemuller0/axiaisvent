@@ -1285,6 +1285,20 @@
                         <span class="subtitle">PDF ou imagem</span>
                     }
                 </div>
+
+                @* o que a tela mostra é a IMAGEM, que é o que vai para o
+                   documento — não o PDF que foi anexado *@
+                @if (item.CurvaImagem.Length > 0)
+                {
+                    <div style="margin-top:10px; text-align:center">
+                        <img src="/axiais/anexo/@_proposta.Id/@item.CurvaImagem"
+                             alt="Curva do item @(indice + 1)"
+                             style="max-width:100%; max-height:420px; border:1px solid var(--linha, #e6e8ec); border-radius:6px" />
+                        <div class="subtitle" style="margin-top:4px">
+                            é esta imagem que vai para a proposta técnica
+                        </div>
+                    </div>
+                }
             </div>
         }
 
@@ -2047,8 +2061,26 @@
             if (item.Curva.Length > 0) Anexos.Apagar(_proposta.Id, item.Curva);
 
             await using var fluxo = e.File.OpenReadStream(20 * 1024 * 1024);
-            item.Curva = await Anexos.Guardar(_proposta.Id, fluxo, e.File.Name);
+            using var memoria = new MemoryStream();
+            await fluxo.CopyToAsync(memoria);
+
+            memoria.Position = 0;
+            item.Curva = await Anexos.Guardar(_proposta.Id, memoria, e.File.Name);
             item.CurvaNome = e.File.Name;
+
+            // a curva é um desenho, e é como imagem que ela vai para a
+            // proposta: o PDF vira PNG aqui, já aparado, e a tela mostra
+            // exatamente o que vai ser colado no documento
+            if (Path.GetExtension(e.File.Name).Equals(".pdf", StringComparison.OrdinalIgnoreCase))
+            {
+                var png = CurvaEmImagem.De(memoria.ToArray());
+                using var imagem = new MemoryStream(png);
+                item.CurvaImagem = await Anexos.Guardar(_proposta.Id, imagem, "curva.png");
+            }
+            else
+            {
+                item.CurvaImagem = item.Curva;
+            }
 
             Aviso($"Curva do equipamento {indice + 1} anexada.");
         }
@@ -2061,10 +2093,14 @@
     private void TirarCurva(int indice)
     {
         var item = _proposta.Itens[indice];
+
         if (item.Curva.Length > 0) Anexos.Apagar(_proposta.Id, item.Curva);
+        if (item.CurvaImagem.Length > 0 && item.CurvaImagem != item.Curva)
+            Anexos.Apagar(_proposta.Id, item.CurvaImagem);
 
         item.Curva = "";
         item.CurvaNome = "";
+        item.CurvaImagem = "";
     }
 
     private string TamanhoDaCurva(ItemProposta item)

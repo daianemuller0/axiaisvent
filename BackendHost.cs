@@ -188,6 +188,26 @@ public static class BackendHost
             return Results.Redirect("/login");
         }).DisableAntiforgery();
 
+        // A tela precisa MOSTRAR a curva. Servir o arquivo por aqui evita
+        // carregar a imagem inteira dentro da página: o navegador pede, o
+        // servidor manda, e nada disso passa pelo circuito do Blazor.
+        app.MapGet("/axiais/anexo/{proposta}/{arquivo}",
+            (string proposta, string arquivo, Anexos anexos) =>
+            {
+                var caminho = anexos.Caminho(proposta, arquivo);
+                if (caminho is null) return Results.NotFound();
+
+                var tipo = Path.GetExtension(caminho).ToLowerInvariant() switch
+                {
+                    ".png" => "image/png",
+                    ".jpg" or ".jpeg" => "image/jpeg",
+                    ".pdf" => "application/pdf",
+                    _ => "application/octet-stream",
+                };
+
+                return Results.File(caminho, tipo);
+            }).RequireAuthorization();
+
         app.MapRazorComponents<App>()
             .AddInteractiveServerRenderMode();
 

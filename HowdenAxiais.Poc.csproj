@@ -18,6 +18,10 @@
     <!-- Geração da proposta comercial em Word. A versão é a que o ClosedXML aceita
          (ele exige <PackageReference Include="DocumentFormat.OpenXml" Version="3.1.0" />lt; 3.0.0), para as duas bibliotecas conviverem. -->
     <PackageReference Include="DocumentFormat.OpenXml" Version="2.20.0" />
+    <!-- Converte a página do PDF da curva em imagem, para colar no documento.
+         Leva um componente nativo (PDFium); o publicar.ps1 já publica
+         self-contained para win-x64, então ele vai junto. -->
+    <PackageReference Include="PDFtoImage" Version="4.1.1" />
   </ItemGroup>
 
 </Project>

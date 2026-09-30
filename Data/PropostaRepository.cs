@@ -84,6 +84,14 @@ public sealed class ItemProposta
     public string CurvaNome { get; set; } = "";
 
     /// <summary>
+    /// A curva já em IMAGEM — é ela que a tela mostra e que vai para a
+    /// proposta técnica. Quando a equipe sobe um PDF, a página é desenhada
+    /// numa imagem e guardada aqui ao lado do original; quando sobe uma
+    /// imagem, é o mesmo arquivo.
+    /// </summary>
+    public string CurvaImagem { get; set; } = "";
+
+    /// <summary>
     /// A descrição deste equipamento na proposta comercial, quando a equipe
     /// escreveu a dela. Vazia, vale o rascunho que o sistema monta do escopo
     /// (ver <see cref="EscopoEmTexto"/>) — é a mesma regra do preço: puxa, mas
