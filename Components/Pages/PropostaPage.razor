@@ -572,6 +572,29 @@
                 <button class="@(atual.Arranjo == arranjo ? "btn-primary" : "btn-ghost")"
                         @onclick="() => atual.Arranjo = arranjo">@arranjo</button>
             }
+
+            @* a montagem se junta ao arranjo na proposta técnica:
+               "Horizontal ao piso, arranjo 4" *@
+            <strong style="margin-left:14px">@Campo("Montagem")</strong>
+            @foreach (var m in new[] { "Horizontal", "Vertical" })
+            {
+                var montagem = m;
+                <button class="@(Textos.Igual(atual.Montagem, montagem) ? "btn-primary" : "btn-ghost")"
+                        @onclick="() => atual.Montagem = montagem">@montagem</button>
+            }
+
+            @if (DadosDoVentilador.Montagem(atual) is { Length: > 0 } linhaDaMontagem)
+            {
+                <span class="val-count">@linhaDaMontagem</span>
+            }
+        </div>
+
+        <div class="toolbar" style="flex-wrap:wrap">
+            <strong style="min-width:210px">@Campo("Aplicação")</strong>
+            <input class="cell" style="flex:1; max-width:520px"
+                   placeholder="onde o ventilador vai trabalhar"
+                   value="@atual.Aplicacao"
+                   @onchange="e => atual.Aplicacao = e.Value?.ToString() ?? string.Empty" />
         </div>
 
         @if (modelo is not null)
@@ -1267,6 +1290,43 @@
                             </div>
                         </label>
                     }
+                </div>
+
+                @* ----- o que vai na tabela do documento ----- *@
+                <div style="margin-top:14px; padding-top:12px;
+                            border-top:1px solid var(--linha, #e6e8ec)">
+                    <div class="subtitle" style="margin-bottom:8px">
+                        <strong>DATOS DEL VENTILADOR</strong> — como a tabela vai sair no documento
+                    </div>
+
+                    <div class="panel" style="padding:0; overflow-x:auto; margin:0">
+                        <table class="grid">
+                            <tbody>
+                                @foreach (var linha in DadosDoVentilador.De(item, ModeloDe(item), MotorDe(item)))
+                                {
+                                    <tr>
+                                        <td class="nowrap" style="width:280px">@linha.Rotulo</td>
+                                        <td>
+                                            @if (linha.Falta)
+                                            {
+                                                <span class="subtitle">— em branco —</span>
+                                            }
+                                            else
+                                            {
+                                                <strong>@linha.Valor</strong>
+                                            }
+                                        </td>
+                                        <td class="nowrap right" style="width:120px">
+                                            @if (linha.Origem.Length > 0)
+                                            {
+                                                <span class="val-count">@linha.Origem</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
 
                 @* ----- curvas ----- *@

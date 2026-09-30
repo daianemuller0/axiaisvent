@@ -39,6 +39,19 @@ public sealed class ItemProposta
     /// <summary>Arranjo / instalação: "Teto" ou "Piso".</summary>
     public string Arranjo { get; set; } = "";
 
+    /// <summary>
+    /// A aplicação do ventilador ("Aplicación" na proposta técnica): onde ele
+    /// vai trabalhar. Texto livre, porque é o cliente que a descreve.
+    /// </summary>
+    public string Aplicacao { get; set; } = "";
+
+    /// <summary>
+    /// Como o ventilador é montado: "Horizontal" ou "Vertical". Com o
+    /// <see cref="Arranjo"/> forma a linha "Tipo de montaje" da proposta
+    /// técnica — ver <see cref="DadosDoVentilador.Montagem"/>.
+    /// </summary>
+    public string Montagem { get; set; } = "";
+
     /// <summary>A opção marcada em cada lista de característica.</summary>
     public Dictionary<string, string> Escolhas { get; set; } = new();
 
