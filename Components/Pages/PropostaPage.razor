@@ -12,6 +12,7 @@
 @inject MotorRepository Motores
 @inject LimiteMotorRepository Limites
 @inject CondicaoPagamentoRepository Pagamentos
+@inject Anexos Anexos
 
 <div class="page-head">
     <div>
@@ -657,52 +658,6 @@
             </div>
         }
 
-        <!-- ---------- dados técnicos da seleção ---------- -->
-        <div class="panel" style="margin:14px 0; border-left:3px solid var(--azul, #0b3d6b)">
-            <div class="toolbar" style="flex-wrap:wrap">
-                <h3 style="margin:0; font-size:13.5px">Dados técnicos (seleção)</h3>
-                <span class="subtitle" style="margin:0">
-                    o relatório que o programa de seleção exporta
-                </span>
-                <span style="flex:1"></span>
-                <InputFile OnChange="@(e => SubirSelecao(e, PosicaoValida))" accept=".txt" class="cell" />
-            </div>
-
-            @if (atual.ArquivoDaSelecao.Length > 0)
-            {
-                <p class="subtitle" style="margin:8px 0 0">
-                    Lido de <strong>@atual.ArquivoDaSelecao</strong>. Os valores saem do arquivo
-                    como estão escritos nele, com a unidade ao lado — confira e corrija o que
-                    precisar.
-                </p>
-            }
-
-            @if (_faltouNaSelecao.Count > 0)
-            {
-                <p class="subtitle" style="margin:8px 0 0; color:#c98a00">
-                    Não achei no arquivo: @string.Join(", ", _faltouNaSelecao) — preencher à mão.
-                </p>
-            }
-
-            <div class="form3" style="margin-top:12px">
-                @foreach (var (chave, rotulo) in SelecaoTecnica.Campos)
-                {
-                    var campo = chave;
-                    var dado = atual.Tecnicos.GetValueOrDefault(campo, new DadoTecnico("", ""));
-
-                    <label>@Campo(rotulo, atual.Tecnicos.ContainsKey(campo) ? "da seleção" : null)
-                        <div class="toolbar" style="gap:6px; margin:0">
-                            <input class="cell" style="flex:1" value="@dado.Valor"
-                                   @onchange="e => MudarTecnico(atual, campo, e.Value?.ToString() ?? string.Empty, dado.Unidade)" />
-                            <input class="cell" style="width:90px" placeholder="unid."
-                                   value="@dado.Unidade"
-                                   @onchange="e => MudarTecnico(atual, campo, dado.Valor, e.Value?.ToString() ?? string.Empty)" />
-                        </div>
-                    </label>
-                }
-            </div>
-        </div>
-
         <!-- ---------- parte elétrica: motor, partidor e instrumentação ---------- -->
         <div class="toolbar" style="flex-wrap:wrap; border-top:2px solid var(--border); padding-top:14px; margin-top:14px">
             <h3 style="margin:0; font-size:14px">Parte Elétrica</h3>
@@ -1240,6 +1195,110 @@
     }
 </div>
 
+<!-- ---------- proposta técnica ---------- -->
+<div class="panel" style="margin-bottom:18px">
+    <div class="toolbar" style="flex-wrap:wrap">
+        <h2 style="margin:0; font-size:15px">Proposta técnica</h2>
+        <span class="subtitle" style="margin:0">
+            a seleção e a curva de cada equipamento
+        </span>
+    </div>
+
+    @if (_proposta.Itens.Count == 0)
+    {
+        <div class="panel empty" style="padding:16px; margin-top:14px">
+            Escolha os equipamentos no escopo — é deles que sai a lista aqui embaixo.
+        </div>
+    }
+    else
+    {
+        <p class="subtitle" style="margin:12px 0 10px">
+            Um bloco por equipamento do escopo (@_proposta.Itens.Count no momento). Os valores
+            saem do relatório de seleção como estão escritos nele, com a unidade ao lado —
+            confira e corrija o que precisar.
+        </p>
+
+        @for (var i = 0; i < _proposta.Itens.Count; i++)
+        {
+            var indice = i;
+            var item = _proposta.Itens[indice];
+            var modelo = ModeloDe(item);
+
+            <div class="panel" style="margin:0 0 14px; padding:14px">
+                <div class="toolbar" style="flex-wrap:wrap; margin-bottom:10px">
+                    <strong>Item @((indice + 1).ToString("D2"))</strong>
+                    <span class="subtitle">
+                        @(modelo is not null ? modelo.Rotulo : "sem modelo escolhido")
+                    </span>
+                </div>
+
+                @* ----- seleção ----- *@
+                <div class="toolbar" style="flex-wrap:wrap">
+                    <strong style="min-width:150px; font-size:12.5px">Seleção (.txt)</strong>
+                    <InputFile OnChange="@(e => SubirSelecao(e, indice))" accept=".txt" class="cell" />
+                    @if (item.ArquivoDaSelecao.Length > 0)
+                    {
+                        <span class="val-count">@item.ArquivoDaSelecao</span>
+                    }
+                </div>
+
+                @if (_faltouNaSelecao.TryGetValue(indice, out var faltou) && faltou.Count > 0)
+                {
+                    <p class="subtitle" style="margin:8px 0 0; color:#c98a00">
+                        Não achei no arquivo: @string.Join(", ", faltou) — preencher à mão.
+                    </p>
+                }
+
+                <div class="form3" style="margin-top:12px">
+                    @foreach (var (chave, rotulo) in SelecaoTecnica.Campos)
+                    {
+                        var campo = chave;
+                        var dado = item.Tecnicos.GetValueOrDefault(campo, new DadoTecnico("", ""));
+
+                        <label>@Campo(rotulo, item.Tecnicos.ContainsKey(campo) ? "da seleção" : null)
+                            <div class="toolbar" style="gap:6px; margin:0">
+                                <input class="cell" style="flex:1" value="@dado.Valor"
+                                       @onchange="e => MudarTecnico(item, campo, e.Value?.ToString() ?? string.Empty, dado.Unidade)" />
+                                <input class="cell" style="width:90px" placeholder="unid."
+                                       value="@dado.Unidade"
+                                       @onchange="e => MudarTecnico(item, campo, dado.Valor, e.Value?.ToString() ?? string.Empty)" />
+                            </div>
+                        </label>
+                    }
+                </div>
+
+                @* ----- curva ----- *@
+                <div class="toolbar" style="flex-wrap:wrap; margin-top:14px; padding-top:12px;
+                                            border-top:1px solid var(--linha, #e6e8ec)">
+                    <strong style="min-width:150px; font-size:12.5px">Curva de performance</strong>
+
+                    @if (item.Curva.Length > 0)
+                    {
+                        <span class="val-count">@item.CurvaNome</span>
+                        <span class="subtitle">@TamanhoDaCurva(item)</span>
+                        <button class="btn-link" @onclick="() => TirarCurva(indice)">✕ tirar</button>
+                    }
+                    else
+                    {
+                        <InputFile OnChange="@(e => SubirCurva(e, indice))"
+                                   accept=".pdf,.png,.jpg,.jpeg" class="cell" />
+                        <span class="subtitle">PDF ou imagem</span>
+                    }
+                </div>
+            </div>
+        }
+
+        @if (SemCurva is { Count: > 0 } semCurva)
+        {
+            <div class="panel" style="margin:0; padding:12px; border-left:3px solid #c98a00">
+                <div style="font-size:12.5px">
+                    <strong>Falta a curva de:</strong> @string.Join(", ", semCurva)
+                </div>
+            </div>
+        }
+    }
+</div>
+
 @code {
     private Proposta _proposta = Nascer();
     private List<Proposta> _gravadas = new();
@@ -1268,8 +1327,12 @@
     private List<string> _daPlanilha = new();
     private List<string> _avisos = new();
 
-    /// <summary>O que o último relatório de seleção lido não trouxe.</summary>
-    private List<string> _faltouNaSelecao = new();
+    /// <summary>
+    /// O que o relatório de seleção não trouxe, por equipamento. É por
+    /// equipamento porque cada um tem o seu arquivo — o aviso de um não pode
+    /// aparecer embaixo do outro.
+    /// </summary>
+    private Dictionary<int, List<string>> _faltouNaSelecao = new();
 
     // ---------- entrega e pagamento ----------
     private List<CondicaoPagamento> _condicoes = new();
@@ -1924,7 +1987,7 @@
     /// </summary>
     private async Task SubirSelecao(InputFileChangeEventArgs e, int indice)
     {
-        _faltouNaSelecao = new();
+        _faltouNaSelecao.Remove(indice);
 
         try
         {
@@ -1944,7 +2007,7 @@
             foreach (var (chave, dado) in resultado.Dados) item.Tecnicos[chave] = dado;
             item.ArquivoDaSelecao = e.File.Name;
 
-            _faltouNaSelecao = resultado.NaoAchados;
+            if (resultado.NaoAchados.Count > 0) _faltouNaSelecao[indice] = resultado.NaoAchados;
 
             Aviso($"Seleção lida: {resultado.Dados.Count} dado(s) do equipamento {indice + 1}.");
         }
@@ -1964,6 +2027,62 @@
 
         item.Tecnicos[chave] = new DadoTecnico(valor.Trim(), unidade.Trim());
     }
+
+    /// <summary>
+    /// Guarda a curva de performance do equipamento.
+    ///
+    /// O arquivo vai para a pasta de anexos, e a proposta guarda só o nome —
+    /// ver <see cref="Anexos"/>. Como o anexo é gravado na hora, a proposta
+    /// precisa de um id antes: sem ele, a curva não teria pasta onde morar.
+    /// </summary>
+    private async Task SubirCurva(InputFileChangeEventArgs e, int indice)
+    {
+        try
+        {
+            if (_proposta.Id.Trim().Length == 0) _proposta.Id = Guid.NewGuid().ToString("n");
+
+            var item = _proposta.Itens[indice];
+
+            // trocar a curva apaga a anterior: ninguém vai procurar por ela
+            if (item.Curva.Length > 0) Anexos.Apagar(_proposta.Id, item.Curva);
+
+            await using var fluxo = e.File.OpenReadStream(20 * 1024 * 1024);
+            item.Curva = await Anexos.Guardar(_proposta.Id, fluxo, e.File.Name);
+            item.CurvaNome = e.File.Name;
+
+            Aviso($"Curva do equipamento {indice + 1} anexada.");
+        }
+        catch (Exception ex)
+        {
+            Aviso($"Não consegui anexar a curva: {ex.Message}", erro: true);
+        }
+    }
+
+    private void TirarCurva(int indice)
+    {
+        var item = _proposta.Itens[indice];
+        if (item.Curva.Length > 0) Anexos.Apagar(_proposta.Id, item.Curva);
+
+        item.Curva = "";
+        item.CurvaNome = "";
+    }
+
+    private string TamanhoDaCurva(ItemProposta item)
+    {
+        var bytes = Anexos.Tamanho(_proposta.Id, item.Curva);
+        if (bytes <= 0) return "arquivo não encontrado";
+
+        return bytes < 1024 * 1024
+            ? $"{bytes / 1024d:N0} KB"
+            : $"{bytes / (1024d * 1024d):N1} MB";
+    }
+
+    /// <summary>Os equipamentos que ainda não têm curva, para o aviso do rodapé.</summary>
+    private List<string> SemCurva => _proposta.Itens
+        .Select((item, i) => (item, i))
+        .Where(x => x.item.Curva.Trim().Length == 0)
+        .Select(x => $"item {(x.i + 1):D2}")
+        .ToList();
 
     // ---------- folha de dados ----------
 

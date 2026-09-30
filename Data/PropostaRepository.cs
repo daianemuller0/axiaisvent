@@ -75,6 +75,15 @@ public sealed class ItemProposta
     public string ArquivoDaSelecao { get; set; } = "";
 
     /// <summary>
+    /// A curva de performance deste equipamento: o nome com que o arquivo foi
+    /// guardado em <see cref="Anexos"/>. Vazio quando ainda não subiu.
+    /// </summary>
+    public string Curva { get; set; } = "";
+
+    /// <summary>O nome que o arquivo da curva tinha na máquina de quem subiu.</summary>
+    public string CurvaNome { get; set; } = "";
+
+    /// <summary>
     /// A descrição deste equipamento na proposta comercial, quando a equipe
     /// escreveu a dela. Vazia, vale o rascunho que o sistema monta do escopo
     /// (ver <see cref="EscopoEmTexto"/>) — é a mesma regra do preço: puxa, mas
