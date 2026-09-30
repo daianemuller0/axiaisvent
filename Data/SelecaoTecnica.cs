@@ -42,9 +42,10 @@ public static class SelecaoTecnica
     public static readonly (string Chave, string Rotulo)[] Campos =
     {
         ("serie", "Série / modelo"),
+        ("pa", "Tipo de pá"),
         ("rotacao", "Rotação"),
         ("vazao", "Vazão"),
-        ("pressao", "Pressão total"),
+        ("pressao", "Pressão"),
         ("densidade", "Densidade"),
         ("potencia", "Potência consumida"),
         ("eficiencia", "Eficiência"),
@@ -61,10 +62,103 @@ public static class SelecaoTecnica
     /// <summary>
     /// Lê o texto do relatório. O que não for achado NÃO entra no resultado e
     /// é listado à parte — a tela avisa, e a equipe preenche à mão.
+    ///
+    /// Os dois programas de seleção escrevem de jeitos diferentes, e o formato
+    /// é reconhecido pelo próprio conteúdo: o do Joy conta o resultado em
+    /// frases ("The Specified Duty is 15000 CFM…"), o do VAX lista rótulo e
+    /// valor em linhas alternadas ("Flow:" / "100,000.0 CFM").
     /// </summary>
     public static Resultado Ler(string texto)
     {
         var linhas = texto.Replace("\r\n", "\n").Split('\n');
+
+        var dados = EhDoVax(linhas) ? DoVax(linhas) : DoJoy(linhas);
+
+        var naoAchados = Campos
+            .Where(c => !dados.ContainsKey(c.Chave))
+            .Select(c => c.Rotulo)
+            .ToList();
+
+        return new Resultado(dados, naoAchados);
+    }
+
+    /// <summary>
+    /// O relatório do VAX se reconhece pelos rótulos com dois pontos numa
+    /// linha só — o do Joy não tem nenhum deles.
+    /// </summary>
+    private static bool EhDoVax(string[] linhas) => linhas
+        .Any(l => l.Trim().Equals("Blade Angle:", StringComparison.OrdinalIgnoreCase)
+                  || l.Trim().Equals("Blade Type:", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// O relatório do VAX: cada rótulo numa linha, o valor na linha seguinte.
+    /// A unidade vem colada no valor ("880 RPM", "2.00 in wg").
+    /// </summary>
+    private static Dictionary<string, DadoTecnico> DoVax(string[] linhas)
+    {
+        var dados = new Dictionary<string, DadoTecnico>();
+
+        var deParaVax = new (string Chave, string Rotulo)[]
+        {
+            ("serie", "Fan:"),
+            ("pa", "Blade Type:"),
+            ("rotacao", "Speed:"),
+            ("vazao", "Flow:"),
+            ("pressao", "Pressure"),
+            ("densidade", "Density:"),
+            ("potencia", "Power:"),
+            ("angulo", "Blade Angle:"),
+        };
+
+        foreach (var (chave, rotulo) in deParaVax)
+        {
+            if (DepoisDoRotulo(linhas, rotulo) is not { } valor) continue;
+            dados[chave] = Separar(valor);
+        }
+
+        return dados;
+    }
+
+    /// <summary>
+    /// A primeira linha com conteúdo depois da linha do rótulo. Um rótulo sem
+    /// valor embaixo ("Tag:" seguido de linha em branco) não vale — pegar a
+    /// linha seguinte daria o rótulo seguinte como se fosse o valor.
+    /// </summary>
+    private static string? DepoisDoRotulo(string[] linhas, string rotulo)
+    {
+        for (var i = 0; i < linhas.Length - 1; i++)
+        {
+            if (!linhas[i].TrimStart().StartsWith(rotulo, StringComparison.OrdinalIgnoreCase)) continue;
+
+            var valor = linhas[i + 1].Trim();
+            if (valor.Length == 0 || valor.EndsWith(':')) return null;
+
+            return valor;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Separa o número da unidade.
+    ///
+    /// Só separa quando há ESPAÇO entre os dois ("880 RPM", "2.00 in wg").
+    /// Sem o espaço, o texto é um nome e não um número com unidade: o modelo
+    /// "7200-VAX-2700" começa com dígitos, e separar ali daria "7200" de valor
+    /// e "-VAX-2700" de unidade.
+    /// </summary>
+    private static DadoTecnico Separar(string texto)
+    {
+        var m = Regex.Match(texto.Trim(), @"^([\d.,]+)\s+(.+)$");
+
+        return m.Success
+            ? new DadoTecnico(m.Groups[1].Value.Trim(), m.Groups[2].Value.Trim())
+            : new DadoTecnico(texto.Trim(), "");
+    }
+
+    /// <summary>O relatório do Joy, contado em frases.</summary>
+    private static Dictionary<string, DadoTecnico> DoJoy(string[] linhas)
+    {
         var dados = new Dictionary<string, DadoTecnico>();
 
         // "27-21 Series  2000 Half-Bladed, 3.560 Rpm"
@@ -72,6 +166,19 @@ public static class SelecaoTecnica
         {
             var semRotacao = Regex.Replace(serie, @",?\s*[\d.,]+\s*Rpm\b.*$", "",
                 RegexOptions.IgnoreCase).Trim();
+
+            // o tipo de pá vem grudado na série aqui ("2000 Half-Bladed"), e
+            // no VAX vem num campo próprio: sai daqui e vai para o mesmo campo
+            var tipoDePa = Regex.Match(semRotacao, @"(Full|Half)[\s-]*Bladed", RegexOptions.IgnoreCase);
+            if (tipoDePa.Success)
+            {
+                dados["pa"] = new(tipoDePa.Value.Trim(), "");
+                semRotacao = semRotacao.Replace(tipoDePa.Value, "").TrimEnd(' ', ',', '-');
+            }
+
+            // o relatório alinha a série com espaços; o documento não precisa
+            // deles
+            semRotacao = Regex.Replace(semRotacao, @"\s{2,}", " ").Trim();
 
             if (semRotacao.Length > 0) dados["serie"] = new(semRotacao, "");
 
@@ -128,12 +235,7 @@ public static class SelecaoTecnica
             dados["angulo"] = new(lidoAngulo.Valor, "°");
         }
 
-        var faltaram = Campos
-            .Where(c => !dados.ContainsKey(c.Chave))
-            .Select(c => c.Rotulo)
-            .ToList();
-
-        return new Resultado(dados, faltaram);
+        return dados;
     }
 
     /// <summary>A primeira linha que contém o trecho.</summary>

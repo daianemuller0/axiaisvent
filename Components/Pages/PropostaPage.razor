@@ -1234,8 +1234,9 @@
 
                 @* ----- seleção ----- *@
                 <div class="toolbar" style="flex-wrap:wrap">
-                    <strong style="min-width:150px; font-size:12.5px">Seleção (.txt)</strong>
-                    <InputFile OnChange="@(e => SubirSelecao(e, indice))" accept=".txt" class="cell" />
+                    <strong style="min-width:150px; font-size:12.5px">Seleção</strong>
+                    <InputFile OnChange="@(e => SubirSelecao(e, indice))" accept=".txt,.docx" class="cell" />
+                    <span class="subtitle">.txt (Joy) ou .docx (VAX)</span>
                     @if (item.ArquivoDaSelecao.Length > 0)
                     {
                         <span class="val-count">@item.ArquivoDaSelecao</span>
@@ -2012,9 +2013,25 @@
 
         try
         {
+            var extensao = Path.GetExtension(e.File.Name).ToLowerInvariant();
+
+            if (extensao == ".doc")
+            {
+                Aviso("O Word antigo (.doc) não abre aqui — salve como .docx e suba de novo.",
+                    erro: true);
+                return;
+            }
+
             await using var fluxo = e.File.OpenReadStream(10 * 1024 * 1024);
-            using var leitor = new StreamReader(fluxo);
-            var texto = await leitor.ReadToEndAsync();
+            using var memoria = new MemoryStream();
+            await fluxo.CopyToAsync(memoria);
+            memoria.Position = 0;
+
+            // a seleção do VAX vem em Word, e a do Joy em texto puro; do Word
+            // o que interessa é o texto, que é o mesmo relatório
+            var texto = extensao == ".docx"
+                ? TextoDoWord.Ler(memoria)
+                : new StreamReader(memoria).ReadToEnd();
 
             var resultado = SelecaoTecnica.Ler(texto);
 
