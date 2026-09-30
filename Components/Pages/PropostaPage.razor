@@ -1239,6 +1239,7 @@
                     @if (item.ArquivoDaSelecao.Length > 0)
                     {
                         <span class="val-count">@item.ArquivoDaSelecao</span>
+                        <button class="btn-link" @onclick="() => TirarSelecao(indice)">✕ tirar</button>
                     }
                 </div>
 
@@ -1708,7 +1709,13 @@
     {
         if (_proposta.Itens.Count == 0) return;
 
+        // os anexos do equipamento vão com ele: sem isso a curva ficaria na
+        // pasta sem ninguém que a mencione, e ninguém saberia que dá para
+        // apagar
+        TirarCurva(PosicaoValida);
+
         _proposta.Itens.RemoveAt(PosicaoValida);
+        _faltouNaSelecao.Clear();
         _aberto = 0;
         _apagandoItem = null;
     }
@@ -2031,6 +2038,22 @@
         }
     }
 
+    /// <summary>
+    /// Desfaz a leitura da seleção — para quando o arquivo subiu errado.
+    ///
+    /// Apaga os dados junto com o nome do arquivo: subir o certo por cima não
+    /// bastaria, porque um campo que só existia no arquivo errado ficaria lá,
+    /// parecendo ter vindo do novo.
+    /// </summary>
+    private void TirarSelecao(int indice)
+    {
+        var item = _proposta.Itens[indice];
+
+        item.Tecnicos.Clear();
+        item.ArquivoDaSelecao = "";
+        _faltouNaSelecao.Remove(indice);
+    }
+
     private static void MudarTecnico(ItemProposta item, string chave, string valor, string unidade)
     {
         if (valor.Trim().Length == 0 && unidade.Trim().Length == 0)
@@ -2055,10 +2078,11 @@
         {
             if (_proposta.Id.Trim().Length == 0) _proposta.Id = Guid.NewGuid().ToString("n");
 
+            // trocar a curva apaga a anterior — as DUAS, o original e a
+            // imagem: ninguém vai procurar por elas, e ficariam ocupando a
+            // pasta de anexos para sempre
+            TirarCurva(indice);
             var item = _proposta.Itens[indice];
-
-            // trocar a curva apaga a anterior: ninguém vai procurar por ela
-            if (item.Curva.Length > 0) Anexos.Apagar(_proposta.Id, item.Curva);
 
             await using var fluxo = e.File.OpenReadStream(20 * 1024 * 1024);
             using var memoria = new MemoryStream();
