@@ -734,6 +734,16 @@ internal sealed partial class Preenchimento
 
         Escrever(paragrafos[0], titulo);
 
+        // o código vai numa linha própria, logo abaixo do título: ele é gerado
+        // e não faz parte do texto que a equipe edita, senão congelaria junto
+        // com a descrição e deixaria de acompanhar o escopo
+        if (_custo.Codigo(item, _moeda) is { Length: > 0 } codigo)
+        {
+            var pCodigo = (Paragraph)paragrafos[0].CloneNode(true);
+            Escrever(pCodigo, $"{_t.Codigo}: {codigo}");
+            celula.InsertAfter(pCodigo, paragrafos[0]);
+        }
+
         var pInclui = paragrafos.Count > 1 ? paragrafos[1] : null;
         var pItem = paragrafos.Count > 2 ? paragrafos[2] : null;
 

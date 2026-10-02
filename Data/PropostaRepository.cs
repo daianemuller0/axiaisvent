@@ -161,6 +161,13 @@ public sealed class ItemProposta
     public string EscopoExcluido { get; set; } = "";
 
     /// <summary>
+    /// Equipamento especial, e não padrão. É a segunda letra do código:
+    /// <b>E</b> de especial, <b>P</b> de padrão (ver
+    /// <see cref="CodigoDoEquipamento"/>).
+    /// </summary>
+    public bool Especial { get; set; }
+
+    /// <summary>
     /// A coluna da planilha de onde este item veio ("D", "E"…), quando veio de
     /// uma. Serve para a tela dizer de onde cada coisa saiu.
     /// </summary>

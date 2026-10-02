@@ -25,8 +25,13 @@ public static class DadosDoVentilador
     /// <summary>O arranjo é sempre 4 nos axiais da equipe.</summary>
     public const string Arranjo = "4";
 
+    /// <param name="codigo">
+    /// O código do equipamento (ver <see cref="CodigoDoEquipamento"/>). Vem de
+    /// fora porque montá-lo pede o cadastro inteiro, e esta classe só conhece a
+    /// proposta.
+    /// </param>
     public static List<Linha> De(ItemProposta item, Equipamento? modelo, Motor? motor,
-        TextosDaProposta textos)
+        TextosDaProposta textos, string codigo = "")
     {
         var t = item.Tecnicos;
         var r = textos.RotulosDoVentilador;
@@ -35,6 +40,7 @@ public static class DadosDoVentilador
         {
             (item.Quantos.ToString(), "escopo"),
             (modelo?.Rotulo ?? "", "escopo"),
+            (codigo, "escopo"),
             (item.Aplicacao.Trim(), "escopo"),
             (Dado(t, "angulo"), "seleção"),
             (Montagem(item), "escopo"),

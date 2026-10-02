@@ -174,24 +174,13 @@ public sealed class CustoDaProposta
         LinhasDePreco(item, proposta.Moeda).Count(l => Efetivo(item, l.Chave, l.Puxado) is null));
 
     /// <summary>
-    /// O código do equipamento: modelo + cada opção + o motor + o partidor + a
-    /// instrumentação, na ordem em que são escolhidos.
+    /// O código do equipamento, nos sete grupos que a equipe escreve à mão —
+    /// ver <see cref="CodigoDoEquipamento"/>. Mora lá porque a tela, a proposta
+    /// comercial e a técnica precisam todas do mesmo, e um código montado em
+    /// três lugares vira três códigos.
     /// </summary>
-    public string Codigo(ItemProposta item, Moeda moeda)
-    {
-        var codigo = EscopoProposta.Codigo(Modelo(item), Itens(item, moeda));
-
-        if (MotorDe(item) is { } motor) codigo += motor.Codigo;
-        if (LinhaDoPartidor(item, moeda) is { } partidor) codigo += partidor.Codigo;
-
-        if (item.ComInstrumentacao)
-        {
-            foreach (var nome in item.Instrumentacao)
-                codigo += Resolver(item, ListaDaInstrumentacao, nome, moeda).Codigo;
-        }
-
-        return codigo;
-    }
+    public string Codigo(ItemProposta item, Moeda moeda) =>
+        CodigoDoEquipamento.De(item, this, moeda);
 
     /// <summary>Quantos equipamentos a proposta tem, somando as quantidades.</summary>
     public static int Quantidade(Proposta proposta) => proposta.Itens.Sum(i => i.Quantos);

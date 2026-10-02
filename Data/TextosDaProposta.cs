@@ -109,6 +109,9 @@ public sealed class TextosDaProposta
     public required string NoTeto { get; init; }
     public required string Inclui { get; init; }
 
+    /// <summary>O rótulo do código do equipamento na proposta comercial.</summary>
+    public required string Codigo { get; init; }
+
     // ---------- impostos e entrega ----------
     public required string SemImpostos { get; init; }
     public required string TariffCode { get; init; }
@@ -196,7 +199,8 @@ public sealed class TextosDaProposta
         Ventilador = "Ventilador",
         RotulosDoVentilador = new[]
         {
-            "Cantidad de ventiladores", "Modelo Howden", "Aplicación", "Ángulo de las aspas",
+            "Cantidad de ventiladores", "Modelo Howden", "Código Howden", "Aplicación",
+            "Ángulo de las aspas",
             "Tipo de montaje", "Diámetro del ventilador (mm)", "Régimen de trabajo",
             "Altitud (m.s.n.m)", "Densidad", "Caudal del ventilador", "", "Eficiencia",
             "Velocidad de giro", "Consumo de potencia", "Ruido a 1 m de distancia",
@@ -264,6 +268,7 @@ public sealed class TextosDaProposta
         LinhaDoVentilador = "Ventilador Axial HOWDEN modelo {0} {1} instalado al {2}",
         Horizontal = "horizontal", Vertical = "vertical", NoPiso = "piso", NoTeto = "techo",
         Inclui = "Incluye:",
+        Codigo = "Código",
 
         SemImpostos = "Impuestos o retenciones no incluidos",
         TariffCode = "Tariff Code: no 84.14.59.90",
@@ -451,7 +456,8 @@ public sealed class TextosDaProposta
         Ventilador = "Ventilador",
         RotulosDoVentilador = new[]
         {
-            "Quantidade de ventiladores", "Modelo Howden", "Aplicação", "Ângulo das pás",
+            "Quantidade de ventiladores", "Modelo Howden", "Código Howden", "Aplicação",
+            "Ângulo das pás",
             "Tipo de montagem", "Diâmetro do ventilador (mm)", "Regime de trabalho",
             "Altitude (m.s.n.m)", "Densidade", "Vazão do ventilador", "", "Eficiência",
             "Rotação", "Consumo de potência", "Ruído a 1 m de distância",
@@ -519,6 +525,7 @@ public sealed class TextosDaProposta
         LinhaDoVentilador = "Ventilador Axial HOWDEN modelo {0} {1} instalado no {2}",
         Horizontal = "horizontal", Vertical = "vertical", NoPiso = "piso", NoTeto = "teto",
         Inclui = "Inclui:",
+        Codigo = "Código",
 
         SemImpostos = "Impostos ou retenções não incluídos",
         TariffCode = "Tariff Code: no 84.14.59.90",
@@ -705,7 +712,7 @@ public sealed class TextosDaProposta
         Ventilador = "Fan",
         RotulosDoVentilador = new[]
         {
-            "Number of fans", "Howden model", "Application", "Blade angle",
+            "Number of fans", "Howden model", "Howden code", "Application", "Blade angle",
             "Mounting type", "Fan diameter (mm)", "Duty",
             "Altitude (m.a.s.l)", "Density", "Fan flow", "", "Efficiency",
             "Speed", "Power consumption", "Noise at 1 m",
@@ -771,6 +778,7 @@ public sealed class TextosDaProposta
         LinhaDoVentilador = "HOWDEN Axial Fan model {0} {1} {2} mounted",
         Horizontal = "horizontal", Vertical = "vertical", NoPiso = "floor", NoTeto = "ceiling",
         Inclui = "Includes:",
+        Codigo = "Code",
 
         SemImpostos = "Taxes or withholdings not included",
         TariffCode = "Tariff Code: no 84.14.59.90",

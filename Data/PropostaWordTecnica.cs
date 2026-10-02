@@ -266,7 +266,8 @@ internal sealed partial class Preenchimento
         Antes(fim, Titulo(cabecalho));
         Antes(fim, Tabela(DuasColunas(
             (_t.CaracteristicasGerais, _t.ReferenciaDoCliente),
-            DadosDoVentilador.De(item, _custo.Modelo(item), _custo.MotorDe(item), _t)
+            DadosDoVentilador.De(item, _custo.Modelo(item), _custo.MotorDe(item), _t,
+                    _custo.Codigo(item, _moeda))
                 .Select(l => (l.Rotulo, l.Valor))
                 .ToList())));
 

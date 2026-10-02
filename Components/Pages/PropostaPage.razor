@@ -567,6 +567,13 @@
                 <span class="subtitle" style="margin:0">preencher manual</span>
             }
 
+            <strong style="margin-left:10px">Tipo</strong>
+            <button class="@(atual.Especial ? "btn-ghost" : "btn-primary")"
+                    @onclick="() => atual.Especial = false">Padrão</button>
+            <button class="@(atual.Especial ? "btn-primary" : "btn-ghost")"
+                    @onclick="() => atual.Especial = true">Especial</button>
+            <span class="subtitle" style="margin:0">a 2ª letra do código</span>
+
             <span style="flex:1"></span>
             @if (_apagandoItem == PosicaoValida)
             {
@@ -652,6 +659,27 @@
                 puxados.
             </div>
         }
+
+        <div class="toolbar" style="flex-wrap:wrap; border-top:1px solid var(--border);
+                                    padding-top:12px">
+            <strong style="min-width:210px">Código do equipamento</strong>
+            <span class="val-count" style="font-size:14px; letter-spacing:.5px">@CodigoDe(atual)</span>
+
+            @if (CodigoDoEquipamento.SemCodigo(atual, _custo, _proposta.Moeda)
+                 is { Count: > 0 } semCodigo)
+            {
+                <span class="subtitle" style="margin:0; color:#c98a00">
+                    sem código no cadastro: @string.Join(", ", semCodigo) — cada um vira um
+                    <strong>?</strong>
+                </span>
+            }
+            else
+            {
+                <span class="subtitle" style="margin:0">
+                    sai na proposta comercial e na técnica
+                </span>
+            }
+        </div>
 
         @foreach (var lista in _listas)
         {
@@ -1340,7 +1368,7 @@
                     <div class="panel" style="padding:0; overflow-x:auto; margin:0">
                         <table class="grid">
                             <tbody>
-                                @foreach (var linha in DadosDoVentilador.De(item, ModeloDe(item), MotorDe(item), TextosDaProposta.Do(Idioma)))
+                                @foreach (var linha in DadosDoVentilador.De(item, ModeloDe(item), MotorDe(item), TextosDaProposta.Do(Idioma), CodigoDe(item)))
                                 {
                                     <tr>
                                         <td class="nowrap" style="width:280px">@linha.Rotulo</td>
