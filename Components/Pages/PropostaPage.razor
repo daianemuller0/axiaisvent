@@ -542,19 +542,30 @@
 
             <strong style="margin-left:10px">Modelo</strong>
             <select class="cell" style="min-width:380px" value="@atual.EquipamentoId"
-                    @onchange="e => atual.EquipamentoId = e.Value?.ToString() ?? string.Empty">
+                    @onchange="e => TrocarModelo(atual, e.Value?.ToString() ?? string.Empty)">
                 <option value="">— escolher o equipamento —</option>
                 @foreach (var serie in _equipamentos.GroupBy(x => x.Serie))
                 {
-                    <optgroup label="@serie.Key">
+                    <optgroup label="@RotuloDaSerie(serie.Key, serie)">
                         @foreach (var eq in serie)
                         {
-                            <option value="@eq.Id" selected="@(eq.Id == atual.EquipamentoId)">@eq.Rotulo</option>
+                            <option value="@eq.Id" selected="@(eq.Id == atual.EquipamentoId)">@RotuloDoModelo(eq)</option>
                         }
                     </optgroup>
                 }
             </select>
-            <span class="subtitle" style="margin:0">preencher manual</span>
+
+            @if (ModeloDe(atual) is { } escolhidoAgora && PrecoDoEquipamento(escolhidoAgora) is null
+                 && !EhManual(atual, "equipamento"))
+            {
+                <span class="subtitle" style="margin:0; color:#c98a00">
+                    este modelo não tem preço em @_proposta.Moeda.Rotulo() — ponha à mão abaixo
+                </span>
+            }
+            else
+            {
+                <span class="subtitle" style="margin:0">preencher manual</span>
+            }
 
             <span style="flex:1"></span>
             @if (_apagandoItem == PosicaoValida)
@@ -1886,6 +1897,59 @@
     private int FaltaPreco => _custo.FaltaPreco(_proposta);
 
     private string CodigoDe(ItemProposta item) => _custo.Codigo(item, _proposta.Moeda);
+
+    /// <summary>
+    /// Troca o modelo do equipamento.
+    ///
+    /// Joga fora o preço que tinha sido digitado à mão para a linha do
+    /// equipamento: ele era o preço do modelo ANTERIOR, e carregá-lo para o
+    /// novo é cotar um ventilador pelo valor de outro. Os preços à mão das
+    /// outras linhas ficam — eles são da opção, não do modelo.
+    /// </summary>
+    private void TrocarModelo(ItemProposta item, string id)
+    {
+        if (item.EquipamentoId == id) return;
+
+        var tinha = item.PrecosManuais.TryGetValue("equipamento", out var antigo)
+            && antigo.Trim().Length > 0;
+
+        item.EquipamentoId = id;
+
+        if (!tinha) return;
+
+        item.PrecosManuais.Remove("equipamento");
+        Aviso($"Modelo trocado: o preço à mão do anterior ({antigo}) foi descartado.");
+    }
+
+    // ---------- quais modelos têm preço ----------
+
+    /// <summary>O preço de um equipamento do catálogo na moeda da proposta.</summary>
+    private decimal? PrecoDoEquipamento(Equipamento e) =>
+        DadosExcel.Numero(EscopoProposta.PrecoDoEquipamento(e, _proposta.Moeda));
+
+    /// <summary>
+    /// O modelo como aparece na lista: o rótulo e o preço do cadastro.
+    ///
+    /// O preço vai no próprio nome porque é dentro da lista aberta que a
+    /// escolha acontece — descobrir só depois de escolher que aquele modelo
+    /// não tem preço é tarde. Sai sem a moeda, que já está no nome da série,
+    /// para a linha não ficar comprida.
+    /// </summary>
+    private string RotuloDoModelo(Equipamento e) => PrecoDoEquipamento(e) is { } preco
+        ? $"{e.Rotulo} · {preco.ToString("N2", new System.Globalization.CultureInfo("pt-BR"))}"
+        : $"{e.Rotulo} · sem preço";
+
+    /// <summary>
+    /// A série com a conta de quantos modelos dela têm preço — para dar a
+    /// medida do que falta no cadastro antes de abrir a lista inteira.
+    /// </summary>
+    private string RotuloDaSerie(string serie, IEnumerable<Equipamento> modelos)
+    {
+        var todos = modelos.ToList();
+        var comPreco = todos.Count(e => PrecoDoEquipamento(e) is not null);
+
+        return $"{serie} — {comPreco} de {todos.Count} com preço em {_proposta.Moeda.Rotulo()}";
+    }
 
     private string Dinheiro(decimal? valor) => valor is null
         ? "—"
