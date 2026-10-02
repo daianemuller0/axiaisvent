@@ -22,6 +22,7 @@ internal sealed partial class Preenchimento
     private readonly Proposta _p;
     private readonly CustoDaProposta _custo;
     private readonly TextosDaProposta _t;
+    private readonly TextosDoEscopo _te;
     private readonly bool _espanhol;
 
     /// <summary>
@@ -43,6 +44,7 @@ internal sealed partial class Preenchimento
 
         var idioma = TextosDaProposta.Ler(p.Idioma);
         _t = TextosDaProposta.Do(idioma);
+        _te = TextosDoEscopo.Do(idioma);
         _espanhol = idioma == IdiomaDaProposta.Espanhol;
 
         _corpo = doc.MainDocumentPart!.Document.Body!;

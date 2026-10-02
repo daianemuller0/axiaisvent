@@ -130,6 +130,37 @@ public sealed class ItemProposta
     public string Descricao { get; set; } = "";
 
     /// <summary>
+    /// A lista de "INCLUSO NO ESCOPO DA HOWDEN" deste equipamento na proposta
+    /// técnica, uma linha por item, quando a equipe escreveu a dela. Vazia,
+    /// vale o rascunho que o sistema monta da seleção
+    /// (ver <see cref="EscopoDaHowden"/>).
+    /// </summary>
+    public string EscopoIncluso { get; set; } = "";
+
+    /// <summary>
+    /// As peças do catálogo que vocês juntaram à mão — câmara anti-stall,
+    /// mancal monobloco, acoplamento elástico —, guardadas pela CHAVE do
+    /// catálogo e não pelo texto.
+    ///
+    /// Pela chave porque a proposta sai em três línguas: guardar "Câmara
+    /// anti-stall" faria a linha aparecer em português dentro do documento em
+    /// espanhol, e quem junta uma peça na tela não está escolhendo o idioma do
+    /// documento.
+    /// </summary>
+    public List<string> EscopoExtra { get; set; } = new();
+
+    /// <summary>
+    /// A lista de "EXCLUÍDO DO FORNECIMENTO HOWDEN" deste equipamento, uma
+    /// linha por item.
+    ///
+    /// Não tem rascunho de propósito: o que fica de fora depende do que o
+    /// cliente pediu e não está na seleção, então só vocês sabem. Vazia, a
+    /// seção não sai no documento — os comentários fixos, que valem para toda
+    /// proposta, saem sempre.
+    /// </summary>
+    public string EscopoExcluido { get; set; } = "";
+
+    /// <summary>
     /// A coluna da planilha de onde este item veio ("D", "E"…), quando veio de
     /// uma. Serve para a tela dizer de onde cada coisa saiu.
     /// </summary>

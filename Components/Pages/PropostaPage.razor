@@ -1373,6 +1373,85 @@
                             : "são estas imagens que vão para a proposta técnica")
                     </div>
                 }
+
+                @* ----- alcance de fornecimento ----- *@
+                @{
+                    var rascunhoEscopo = EscopoDaHowden.Rascunho(item, _custo, _proposta.Moeda,
+                        EscopoTextos);
+                    var escopoDoItem = item.EscopoIncluso.Trim().Length > 0
+                        ? item.EscopoIncluso
+                        : rascunhoEscopo;
+                }
+
+                <div style="margin-top:14px; padding-top:12px;
+                            border-top:1px solid var(--linha, #e6e8ec)">
+                    <div class="toolbar" style="flex-wrap:wrap; margin-bottom:8px">
+                        <strong style="font-size:12.5px">@EscopoTextos.Incluso</strong>
+                        <span class="subtitle">uma linha por item — é o que sai na lista</span>
+                        <span style="flex:1"></span>
+                        @if (item.EscopoIncluso.Trim().Length > 0)
+                        {
+                            <button class="btn-ghost" title="Voltar ao rascunho do sistema"
+                                    @onclick="() => VoltarEscopo(indice)">↺ rascunho</button>
+                        }
+                    </div>
+
+                    <textarea class="cell" rows="@(escopoDoItem.Split('\n').Length + 1)"
+                              style="width:100%; font-family:inherit"
+                              value="@escopoDoItem"
+                              @onchange="e => MudarEscopoIncluso(indice, e.Value?.ToString() ?? string.Empty)"></textarea>
+
+                    @if (item.EscopoExtra.Count > 0)
+                    {
+                        <div class="toolbar" style="flex-wrap:wrap; gap:6px; margin-top:8px">
+                            <span class="subtitle" style="margin:0">juntadas à mão:</span>
+                            @foreach (var chave in item.EscopoExtra.ToList())
+                            {
+                                var daLista = chave;
+                                <button class="btn-primary" style="font-size:11.5px"
+                                        title="Tirar da lista"
+                                        @onclick="() => TirarDoEscopo(indice, daLista)">
+                                    @EscopoTextos.Catalogo.GetValueOrDefault(daLista, daLista) ✕
+                                </button>
+                            }
+                        </div>
+                    }
+
+                    @if (ForaDoCatalogo(item) is { Count: > 0 } faltamNoEscopo)
+                    {
+                        <div class="subtitle" style="margin-top:8px">
+                            O cadastro não escolhe estes — clique para juntar à lista:
+                        </div>
+                        <div class="toolbar" style="flex-wrap:wrap; gap:6px; margin-top:6px">
+                            @foreach (var chave in faltamNoEscopo)
+                            {
+                                var daLista = chave;
+                                <button class="btn-ghost" style="font-size:11.5px"
+                                        @onclick="() => JuntarAoEscopo(indice, daLista)">
+                                    + @EscopoTextos.Catalogo[daLista]
+                                </button>
+                            }
+                        </div>
+                    }
+
+                    <div class="toolbar" style="flex-wrap:wrap; margin:16px 0 8px">
+                        <strong style="font-size:12.5px">@EscopoTextos.Excluido</strong>
+                        <span class="subtitle">
+                            o que o cliente pediu e não vai — em branco, a seção não sai
+                        </span>
+                    </div>
+
+                    <textarea class="cell" rows="3" style="width:100%; font-family:inherit"
+                              placeholder="uma linha por item"
+                              value="@item.EscopoExcluido"
+                              @onchange="e => MudarEscopoExcluido(indice, e.Value?.ToString() ?? string.Empty)"></textarea>
+
+                    <p class="subtitle" style="margin:8px 0 0">
+                        A documentação, os comentários e as normas são iguais em toda proposta e
+                        saem sozinhos; o texto do ventilador sai pela série do equipamento
+                        (@(SerieDoItem(item) is { Length: > 0 } serie ? serie : "sem modelo escolhido")).
+                    </p>
+                </div>
             </div>
         }
 
@@ -1859,6 +1938,71 @@
     }
 
     private void VoltarDescricao(int indice) => _proposta.Itens[indice].Descricao = "";
+
+    /// <summary>Os textos de escopo na língua da proposta.</summary>
+    private TextosDoEscopo EscopoTextos => TextosDoEscopo.Do(Idioma);
+
+    private string SerieDoItem(ItemProposta item) => _custo.SerieDe(item);
+
+    /// <summary>
+    /// Mesma regra da descrição comercial: igual ao rascunho não é edição, e
+    /// guardar vazio faz a lista continuar acompanhando a seleção.
+    /// </summary>
+    private void MudarEscopoIncluso(int indice, string texto)
+    {
+        var rascunho = EscopoDaHowden.Rascunho(_proposta.Itens[indice], _custo, _proposta.Moeda,
+            EscopoTextos);
+
+        _proposta.Itens[indice].EscopoIncluso =
+            Textos.Igual(texto.Trim(), rascunho) ? "" : texto.Trim();
+    }
+
+    private void VoltarEscopo(int indice) => _proposta.Itens[indice].EscopoIncluso = "";
+
+    private void MudarEscopoExcluido(int indice, string texto) =>
+        _proposta.Itens[indice].EscopoExcluido = texto.Trim();
+
+    /// <summary>
+    /// As linhas do catálogo que não estão na lista deste equipamento. São as
+    /// peças que nenhuma lista do cadastro escolhe — câmara anti-stall, mancal
+    /// monobloco, acoplamento elástico — e as que vocês tiraram do rascunho.
+    /// </summary>
+    private List<string> ForaDoCatalogo(ItemProposta item)
+    {
+        var textos = EscopoTextos;
+
+        var postas = EscopoDaHowden.Efetivo(item, _custo, _proposta.Moeda, textos)
+            .Select(Textos.Simples)
+            .ToHashSet();
+
+        return EscopoDaHowden.Ordem
+            .Where(c => !postas.Contains(Textos.Simples(textos.Catalogo[c])))
+            .ToList();
+    }
+
+    /// <summary>
+    /// Junta uma peça do catálogo à lista.
+    ///
+    /// Guarda a CHAVE, e não o texto, para a linha sair na língua do documento.
+    /// Se vocês já escreveram a lista à mão, aí é o texto que vale e a peça vai
+    /// no fim dele — não dá para mandar a chave para dentro de um texto livre.
+    /// </summary>
+    private void JuntarAoEscopo(int indice, string chave)
+    {
+        var item = _proposta.Itens[indice];
+
+        if (item.EscopoIncluso.Trim().Length > 0)
+        {
+            item.EscopoIncluso = item.EscopoIncluso.TrimEnd()
+                + "\n- " + EscopoTextos.Catalogo[chave];
+            return;
+        }
+
+        if (!item.EscopoExtra.Contains(chave)) item.EscopoExtra.Add(chave);
+    }
+
+    private void TirarDoEscopo(int indice, string chave) =>
+        _proposta.Itens[indice].EscopoExtra.Remove(chave);
 
     /// <summary>
     /// O que o documento vai deixar em branco. Não impede de gerar — muita

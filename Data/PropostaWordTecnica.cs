@@ -83,7 +83,106 @@ internal sealed partial class Preenchimento
             if (i > 0) Antes(fim, QuebraDePagina());
             Equipamento(fim, _p.Itens[i], i, varios, lerCurva);
         }
+
+        Alcance(fim, varios);
+        Informacoes(fim);
     }
+
+    /// <summary>
+    /// "Alcance de Suministro": o que vai, a documentação, o que não vai, e o
+    /// texto do ventilador.
+    ///
+    /// A ordem é a do modelo. A documentação fica entre o incluso e o excluído
+    /// porque ela É parte do que a Howden entrega, e os comentários ficam
+    /// depois do excluído porque são mais exclusões — as que valem para
+    /// qualquer proposta. Com mais de um equipamento, as listas do incluso
+    /// saem uma por ventilador, e as do excluído também; a documentação e os
+    /// comentários são da proposta e saem uma vez.
+    /// </summary>
+    private void Alcance(OpenXmlElement? fim, bool varios)
+    {
+        Antes(fim, QuebraDePagina());
+        Antes(fim, TituloDeSecao(_te.Secao));
+
+        for (var i = 0; i < _p.Itens.Count; i++)
+        {
+            Antes(fim, Titulo(PorVentilador(_te.Incluso, i, varios)));
+            foreach (var linha in EscopoDaHowden.Efetivo(_p.Itens[i], _custo, _moeda, _te))
+                Antes(fim, Marcador(linha));
+        }
+
+        Antes(fim, Titulo(_te.Documentacao));
+        foreach (var linha in _te.LinhasDaDocumentacao) Antes(fim, Marcador(linha));
+        Antes(fim, Paragrafo(_te.NotaDaDocumentacao));
+
+        // sem nada escrito, o título do excluído sairia com a lista vazia
+        // embaixo — e uma lista vazia num contrato é pior que seção nenhuma
+        for (var i = 0; i < _p.Itens.Count; i++)
+        {
+            var linhas = EscopoDaHowden.Linhas(_p.Itens[i].EscopoExcluido);
+            if (linhas.Count == 0) continue;
+
+            Antes(fim, Titulo(PorVentilador(_te.Excluido, i, varios)));
+            foreach (var linha in linhas) Antes(fim, Marcador(linha));
+        }
+
+        Antes(fim, Titulo(_te.Comentarios));
+        Antes(fim, Paragrafo(_te.AberturaDosComentarios));
+        foreach (var linha in _te.LinhasDosComentarios) Antes(fim, Marcador(linha));
+
+        Ventiladores(fim);
+    }
+
+    /// <summary>
+    /// O texto do ventilador, escolhido pela série do equipamento: o do VAX ou
+    /// o do Joy. Numa proposta com equipamentos das duas linhas saem os dois,
+    /// na ordem em que aparecem no escopo, e nunca o mesmo duas vezes.
+    /// </summary>
+    private void Ventiladores(OpenXmlElement? fim)
+    {
+        var jaSaiu = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var item in _p.Itens)
+        {
+            var serie = _custo.SerieDe(item).Trim();
+            if (serie.Length == 0 || !jaSaiu.Add(serie)) continue;
+
+            var vax = Textos.Simples(serie).Contains("vax");
+
+            Antes(fim, Titulo(vax ? _te.TituloVax : _te.TituloJoy));
+            foreach (var paragrafo in vax ? _te.TextoVax : _te.TextoJoy)
+                Antes(fim, Paragrafo(paragrafo));
+        }
+    }
+
+    /// <summary>
+    /// "Informaciones Adicionales": os anexos, os documentos do cliente e as
+    /// normas. É tudo da proposta, e não do equipamento, então sai uma vez, em
+    /// página própria como no modelo.
+    /// </summary>
+    private void Informacoes(OpenXmlElement? fim)
+    {
+        Antes(fim, QuebraDePagina());
+        Antes(fim, TituloDeSecao(_te.Informacoes));
+
+        Antes(fim, Titulo(_te.Anexos));
+        Antes(fim, Paragrafo(_te.AberturaDosAnexos));
+        foreach (var linha in _te.LinhasDosAnexos) Antes(fim, Marcador(linha));
+
+        Antes(fim, Paragrafo(_te.DocumentosDoCliente, negrito: true));
+        foreach (var linha in _te.LinhasDosDocumentosDoCliente) Antes(fim, Marcador(linha));
+
+        Antes(fim, Titulo(_te.Estandares));
+        Antes(fim, Paragrafo(_te.AberturaDosEstandares));
+        foreach (var linha in _te.LinhasDosEstandares) Antes(fim, Marcador(linha));
+    }
+
+    /// <summary>
+    /// O cabeçalho de um bloco que existe por equipamento. Com um só, o nome
+    /// seco; com vários, o nome e qual ventilador — igual ao bloco dos dados.
+    /// </summary>
+    private string PorVentilador(string nome, int indice, bool varios) =>
+        varios ? $"{nome} — {_t.Ventilador} {indice + 1:D2}" : nome;
 
     /// <summary>Um equipamento: os dados, os materiais, as normas e as curvas.</summary>
     private void Equipamento(OpenXmlElement? fim, ItemProposta item, int indice, bool varios,
@@ -136,6 +235,44 @@ internal sealed partial class Preenchimento
             new ParagraphStyleId { Val = "HSA-TTULO2" },
             new SpacingBetweenLines { Before = "240", After = "120" }),
         new Run(new Text(texto) { Space = SpaceProcessingModeValues.Preserve }));
+
+    /// <summary>
+    /// Um título de seção do nível de "Introducción" e "Oferta Técnica", com o
+    /// estilo do modelo. O modelo não numera os títulos, e por isso aqui
+    /// também não: um "4" escrito à mão brigaria com os vizinhos sem número.
+    /// </summary>
+    private static Paragraph TituloDeSecao(string texto) => new(
+        new ParagraphProperties(
+            new ParagraphStyleId { Val = "HSA-Ttulo1" },
+            new SpacingBetweenLines { Before = "0", After = "240" }),
+        new Run(new Text(texto) { Space = SpaceProcessingModeValues.Preserve }));
+
+    /// <summary>
+    /// Um item de lista. O marcador vai no texto, com recuo pendente, para a
+    /// segunda linha de um item longo alinhar com a primeira em vez de voltar
+    /// para baixo do marcador.
+    /// </summary>
+    private static Paragraph Marcador(string texto) => new(
+        // a ordem dentro do pPr é a do esquema do OOXML — spacing, ind e só
+        // então jc. Fora de ordem o Word abre, mas o documento é inválido
+        new ParagraphProperties(
+            new SpacingBetweenLines { Before = "0", After = "40", Line = "240",
+                LineRule = LineSpacingRuleValues.Auto },
+            new Indentation { Left = "397", Hanging = "227" },
+            new Justification { Val = JustificationValues.Left }),
+        new Run(new Text("\u2022  " + texto) { Space = SpaceProcessingModeValues.Preserve }));
+
+    /// <summary>Um parágrafo de texto corrido, com a fonte do próprio modelo.</summary>
+    private static Paragraph Paragrafo(string texto, bool negrito = false)
+    {
+        var run = new Run(new Text(texto) { Space = SpaceProcessingModeValues.Preserve });
+        if (negrito) run.PrependChild(new RunProperties(new Bold()));
+
+        return new Paragraph(
+            new ParagraphProperties(
+                new SpacingBetweenLines { Before = "120", After = "120" }),
+            run);
+    }
 
     private static Paragraph Vazio() => new();
 
@@ -222,14 +359,17 @@ internal sealed partial class Preenchimento
     /// <summary>O parágrafo de dentro da célula; "\n" vira quebra de linha.</summary>
     private static Paragraph Linha(Quadro quadro)
     {
-        var formato = new RunProperties(new RunFonts { Ascii = "Arial", HighAnsi = "Arial" },
-            new FontSize { Val = "18" });
+        // e no rPr a ordem é rFonts, b, color, sz — por isso o negrito e a cor
+        // entram ANTES do tamanho, e não no fim
+        var formato = new RunProperties(new RunFonts { Ascii = "Arial", HighAnsi = "Arial" });
 
         if (quadro.Faixa)
         {
             formato.Append(new Bold());
             formato.Append(new Color { Val = "FFFFFF" });
         }
+
+        formato.Append(new FontSize { Val = "18" });
 
         var run = new Run(formato);
         var primeiro = true;
@@ -246,8 +386,8 @@ internal sealed partial class Preenchimento
         // ("LIMPEZA:      Padrão      SA      2      ½      onde      aplicável.")
         return new Paragraph(
             new ParagraphProperties(
-                new Justification { Val = JustificationValues.Left },
-                new SpacingBetweenLines { Before = "20", After = "20" }),
+                new SpacingBetweenLines { Before = "20", After = "20" },
+                new Justification { Val = JustificationValues.Left }),
             run);
     }
 
