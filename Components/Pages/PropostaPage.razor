@@ -496,6 +496,13 @@
         <span class="subtitle" style="margin:0">manda em todos os preços</span>
     </div>
 
+    <p class="subtitle" style="margin:12px 0 0">
+        O preço de cada linha vem do cadastro e <strong>dá para trocar na própria linha</strong>:
+        serve para o que ainda não tem preço cadastrado e para quando a proposta pede um valor
+        diferente. O que você digita vale <strong>só nesta proposta</strong> — o cadastro não
+        muda — e o <strong>↺</strong> ao lado volta ao preço do cadastro.
+    </p>
+
     <div class="tabs">
         @for (var i = 0; i < _proposta.Itens.Count; i++)
         {
@@ -620,7 +627,7 @@
                             <td class="nowrap">@(modelo.FbHb.Length > 0 ? modelo.FbHb : "—")</td>
                             <td class="nowrap">@(modelo.Estagios.Length > 0 ? modelo.Estagios : "—")</td>
                             <td class="nowrap">@(modelo.Codigo.Length > 0 ? modelo.Codigo : "—")</td>
-                            <td class="nowrap right">@Dinheiro(PrecoDoModelo(atual))</td>
+                            <td class="right">@Preco(atual, "equipamento", PrecoDoModelo(atual))</td>
                         </tr>
                     </tbody>
                 </table>
@@ -671,12 +678,7 @@
                 @if (escolhida.Length > 0)
                 {
                     var linha = Resolver(atual, grupo, escolhida);
-                    <span style="flex:1"></span>
-                    <span class="subtitle" style="margin:0">
-                        @(linha.Codigo.Length > 0 ? $"código {linha.Codigo}" : "sem código")
-                        ·
-                        @(linha.Valor is null ? linha.Origem : $"{Dinheiro(linha.Valor)} — {linha.Origem}")
-                    </span>
+                    @PrecoNaLista(atual, $"lista:{grupo}", linha.Codigo, linha.Valor, linha.Origem)
                 }
             </div>
         }
@@ -733,18 +735,24 @@
                     <button class="btn-link" @onclick="() => LimparFiltro(atual)">limpar filtro</button>
                     <span style="flex:1"></span>
 
-                    @if (MotorDe(atual) is { } motor)
-                    {
-                        <strong>@(motor.Codigo.Length > 0 ? $"código {motor.Codigo}" : "sem código")</strong>
-                        <span class="val-count">@Dinheiro(DadosExcel.Numero(EscopoProposta.PrecoDoMotor(motor, _proposta.Moeda)))</span>
-                    }
-                    else
-                    {
-                        <span class="subtitle" style="margin:0">
-                            aperte o filtro até sobrar um motor — aí vêm o código, o preço e a
-                            observação
-                        </span>
-                    }
+                    <div style="display:flex; align-items:center; gap:8px; flex:0 1 auto; min-width:0">
+                        @if (MotorDe(atual) is { } motor)
+                        {
+                            <strong>@(motor.Codigo.Length > 0 ? $"código {motor.Codigo}" : "sem código")</strong>
+                            <span class="subtitle" style="margin:0; white-space:nowrap">
+                                @(EhManual(atual, "motor") ? "preço à mão" : "catálogo de motores")
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="subtitle" title="aperte o filtro até sobrar um motor — aí vêm o código e a observação"
+                                  style="margin:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis">
+                                sem motor ainda — o preço dá para pôr à mão
+                            </span>
+                        }
+
+                        @Preco(atual, "motor", PrecoDoMotor(atual))
+                    </div>
                 </div>
 
                 @if (MotorDe(atual) is { } escolhido && escolhido.Observacoes.Length > 0)
@@ -782,12 +790,7 @@
 
                 @if (LinhaDoPartidor(atual) is { } linha)
                 {
-                    <span style="flex:1"></span>
-                    <span class="subtitle" style="margin:0">
-                        @(linha.Codigo.Length > 0 ? $"código {linha.Codigo}" : "sem código")
-                        ·
-                        @(linha.Valor is null ? linha.Origem : $"{Dinheiro(linha.Valor)} — {linha.Origem}")
-                    </span>
+                    @PrecoNaLista(atual, "partidor", linha.Codigo, linha.Valor, linha.Origem)
                 }
             }
         </div>
@@ -822,11 +825,19 @@
                                    @onchange="e => MarcarInstrumentacao(atual, opcao.Valor, (bool)(e.Value ?? false))" />
                             <span>@opcao.Valor</span>
                         </label>
-                        <span class="subtitle" style="margin:0">
-                            @(linha.Codigo.Length > 0 ? $"código {linha.Codigo}" : "sem código")
-                            ·
-                            @(linha.Valor is null ? linha.Origem : Dinheiro(linha.Valor))
-                        </span>
+                        @if (marcada)
+                        {
+                            @PrecoNaLista(atual, $"instr:{opcao.Valor}", linha.Codigo, linha.Valor,
+                                linha.Origem)
+                        }
+                        else
+                        {
+                            <span class="subtitle" style="margin:0">
+                                @(linha.Codigo.Length > 0 ? $"código {linha.Codigo}" : "sem código")
+                                ·
+                                @(linha.Valor is null ? linha.Origem : Dinheiro(linha.Valor))
+                            </span>
+                        }
                     </div>
                 }
             </div>
@@ -944,8 +955,9 @@
     @if (FaltaPreco > 0)
     {
         <p class="subtitle" style="margin:10px 0 0">
-            @FaltaPreco item(ns) escolhido(s) ainda sem preço cadastrado — o custo conta só o
-            que já tem valor.
+            @FaltaPreco item(ns) escolhido(s) ainda sem preço — nem do cadastro, nem à mão. O
+            custo conta só o que já tem valor; para os outros, digite o preço na própria linha
+            do escopo.
         </p>
     }
 </div>
@@ -1707,6 +1719,33 @@
 
     private bool EhManual(ItemProposta item, string chave) =>
         item.PrecosManuais.TryGetValue(chave, out var t) && t.Trim().Length > 0;
+
+    /// <summary>
+    /// O fim de uma linha da lista de seleção: o código, de onde veio o preço e
+    /// o preço — editável.
+    ///
+    /// A tela da seleção mostrava o preço só para ler, e quem quisesse mexer
+    /// tinha de descer até o resumo. Agora é no mesmo lugar em que se escolhe:
+    /// o cadastro puxa, e quem está montando a proposta corrige ali.
+    /// </summary>
+    private RenderFragment PrecoNaLista(ItemProposta item, string chave, string codigo,
+        decimal? puxado, string origem) => @<text>
+        <span style="flex:1"></span>
+
+        @* a explicação e o campo ficam num grupo só: numa linha de escopo com
+           flex-wrap, o campo sozinho cai para a linha de baixo assim que o
+           texto da origem cresce, e some de perto da opção a que pertence *@
+        <div style="display:flex; align-items:center; gap:8px; flex:0 1 auto; min-width:0">
+            <span class="subtitle" title="@origem"
+                  style="margin:0; text-align:right; white-space:nowrap; overflow:hidden;
+                         text-overflow:ellipsis">
+                @(codigo.Length > 0 ? $"código {codigo}" : "sem código")
+                ·
+                @(EhManual(item, chave) ? "preço à mão" : origem)
+            </span>
+            @Preco(item, chave, puxado)
+        </div>
+    </text>;
 
     /// <summary>O campo de preço de uma linha: puxado, editável, e com volta.</summary>
     private RenderFragment Preco(ItemProposta item, string chave, decimal? puxado) => @<text>
