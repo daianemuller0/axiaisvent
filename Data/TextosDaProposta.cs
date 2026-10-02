@@ -107,6 +107,14 @@ public sealed class TextosDaProposta
     public required string Vertical { get; init; }
     public required string NoPiso { get; init; }
     public required string NoTeto { get; init; }
+    /// <summary>
+    /// Qual língua este conjunto é. Serve para quem tem os textos em mãos
+    /// poder buscar os outros conjuntos da mesma proposta
+    /// (<see cref="TextosDoEscopo"/>, <see cref="TextosEletricos"/>) sem ter de
+    /// receber o idioma por fora.
+    /// </summary>
+    public required IdiomaDaProposta Idioma { get; init; }
+
     public required string Inclui { get; init; }
 
     /// <summary>O rótulo do código do equipamento na proposta comercial.</summary>
@@ -267,6 +275,7 @@ public sealed class TextosDaProposta
 
         LinhaDoVentilador = "Ventilador Axial HOWDEN modelo {0} {1} instalado al {2}",
         Horizontal = "horizontal", Vertical = "vertical", NoPiso = "piso", NoTeto = "techo",
+        Idioma = IdiomaDaProposta.Espanhol,
         Inclui = "Incluye:",
         Codigo = "Código",
 
@@ -524,6 +533,7 @@ public sealed class TextosDaProposta
 
         LinhaDoVentilador = "Ventilador Axial HOWDEN modelo {0} {1} instalado no {2}",
         Horizontal = "horizontal", Vertical = "vertical", NoPiso = "piso", NoTeto = "teto",
+        Idioma = IdiomaDaProposta.Portugues,
         Inclui = "Inclui:",
         Codigo = "Código",
 
@@ -777,6 +787,7 @@ public sealed class TextosDaProposta
 
         LinhaDoVentilador = "HOWDEN Axial Fan model {0} {1} {2} mounted",
         Horizontal = "horizontal", Vertical = "vertical", NoPiso = "floor", NoTeto = "ceiling",
+        Idioma = IdiomaDaProposta.Ingles,
         Inclui = "Includes:",
         Codigo = "Code",
 

@@ -1243,9 +1243,10 @@
     {
         <p class="subtitle" style="margin:12px 0 10px">
             Sai em <strong>@_proposta.Idioma</strong> (muda no cabeçalho). Cada equipamento vira um
-            item da tabela de preço; a descrição abaixo é um rascunho montado do escopo:
-            <strong>corrija o que não interessa ao cliente</strong> — é ela que sai no documento.
-            Em branco, o sistema monta de novo.
+            item da tabela de preço. A lista abaixo do título é <strong>a mesma do escopo da
+            proposta técnica</strong> — mexeu lá, muda aqui. Dá para corrigir o texto na mão;
+            a partir daí ele para de acompanhar a técnica, e o <strong>↺ rascunho</strong>
+            volta a juntar as duas.
         </p>
 
         @for (var i = 0; i < _proposta.Itens.Count; i++)
@@ -2224,8 +2225,12 @@
             .Select(Textos.Simples)
             .ToHashSet();
 
+        // por começo de linha, e não por igualdade: a linha do motor sai com o
+        // motor escolhido grudado ("Motor elétrico — WEG 250M 150 CV"), e por
+        // igualdade ela voltaria a aparecer como peça faltando
         return EscopoDaHowden.Ordem
-            .Where(c => !postas.Contains(Textos.Simples(textos.Catalogo[c])))
+            .Where(c => !postas.Any(p => p.StartsWith(Textos.Simples(textos.Catalogo[c]),
+                StringComparison.Ordinal)))
             .ToList();
     }
 

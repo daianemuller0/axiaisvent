@@ -92,7 +92,8 @@ public static class EscopoDaHowden
             else livres.Add($"{linha.Lista.Trim()} {linha.Opcao.Trim()}".Trim());
         }
 
-        if (custo.MotorDe(item) is not null) chaves.Add("motor");
+        var motor = custo.MotorDe(item);
+        if (motor is not null) chaves.Add("motor");
 
         // as peças que vocês juntaram à mão: entram pela chave e saem na
         // ordem do catálogo, junto com as que a seleção escolheu
@@ -100,7 +101,7 @@ public static class EscopoDaHowden
             if (textos.Catalogo.ContainsKey(chave)) chaves.Add(chave);
 
         var lista = Ordem.Where(chaves.Contains)
-            .Select(c => textos.Catalogo[c])
+            .Select(c => c == "motor" ? ComOMotor(textos.Catalogo[c], motor) : textos.Catalogo[c])
             .ToList();
 
         lista.AddRange(livres);
@@ -112,6 +113,30 @@ public static class EscopoDaHowden
             lista.AddRange(item.Instrumentacao.Where(n => n.Trim().Length > 0).Select(n => n.Trim()));
 
         return lista;
+    }
+
+    /// <summary>
+    /// A linha do motor com o motor escolhido ao lado: "Motor elétrico — WEG
+    /// 250M 150 CV".
+    ///
+    /// O catálogo do modelo diz só "Motor Eléctrico", mas quem lê a proposta
+    /// quer saber QUAL motor vai. Era o que a descrição comercial trazia antes
+    /// de as duas listas virarem uma — e não havia por que perder.
+    /// </summary>
+    private static string ComOMotor(string linha, Motor? motor)
+    {
+        if (motor is null) return linha;
+
+        var partes = new[]
+        {
+            motor.Fabricante.Trim(),
+            motor.Frame.Trim(),
+            motor.PotenciaCv.Trim() is { Length: > 0 } cv ? cv + " CV" : "",
+        };
+
+        var descricao = string.Join(" ", partes.Where(p => p.Length > 0));
+
+        return descricao.Length > 0 ? $"{linha} — {descricao}" : linha;
     }
 
     /// <summary>O rascunho em texto, que é o que a tela deixa editar.</summary>
