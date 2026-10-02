@@ -651,12 +651,64 @@ internal sealed partial class Preenchimento
         Introducao();
         TabelaDePrecos();
 
-        // o bloco de aluguel e o de itens opcionais não valem para uma venda:
-        // saem inteiros, como a instrução do modelo manda
+        // o bloco de aluguel e a tabela de reposição do modelo saem inteiros,
+        // como a instrução dele manda; no lugar dela entram os opcionais DESTA
+        // proposta, quando há algum
         var aviso = Achar("BORRAR SI FUERA VENTA");
         var fimDosOpcionais = Achar("Tales ítems deberán ser incluidos");
         if (aviso is not null && fimDosOpcionais is not null) ApagarEntre(aviso, fimDosOpcionais);
         if (aviso is not null) Escrever(aviso, _t.AvisoDaDescricao);
+
+        if (aviso is not null) OpcionaisDaComercial(aviso);
+    }
+
+    /// <summary>
+    /// A tabela de itens opcionais da proposta comercial, no lugar da tabela de
+    /// reposição do modelo.
+    ///
+    /// O preço de cada um é o custo vezes o fator da proposta: eles não entram
+    /// no preço fechado, então não há pricing próprio para eles — o que há é a
+    /// mesma margem, comissão e imposto que a proposta já fechou.
+    /// </summary>
+    private void OpcionaisDaComercial(OpenXmlElement depois)
+    {
+        var linhas = new List<List<Quadro>>
+        {
+            _t.ColunasDosOpcionais.Select(c => new Quadro(c, Faixa: true)).ToList(),
+        };
+
+        var total = 0m;
+
+        for (var i = 0; i < _p.Itens.Count; i++)
+        {
+            foreach (var opcional in _custo.Opcionais(_p.Itens[i], _moeda))
+            {
+                var custo = CustoDaProposta.Efetivo(_p.Itens[i], opcional.Chave, opcional.Valor) ?? 0m;
+                var preco = PropostaWord.PrecoDoOpcional(_p, _custo, custo);
+                total += preco;
+
+                linhas.Add(new()
+                {
+                    new($"{_t.Ventilador} {i + 1:D2}"),
+                    new(opcional.Nome(_te)),
+                    new(PropostaWord.Dinheiro(preco, _moeda)),
+                });
+            }
+        }
+
+        // nenhum opcional: a seção não entra, e o documento não ganha um título
+        // com uma tabela vazia embaixo
+        if (linhas.Count == 1) return;
+
+        linhas.Add(new()
+        {
+            new(""), new(_t.TotalDaProposta, Faixa: true),
+            new(PropostaWord.Dinheiro(total, _moeda), Faixa: true),
+        });
+
+        var titulo = Titulo(_t.Opcionais);
+        _corpo.InsertAfter(titulo, depois);
+        _corpo.InsertAfter(Tabela(linhas, 3), titulo);
     }
 
     private void Introducao()

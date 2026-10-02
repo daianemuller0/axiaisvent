@@ -168,6 +168,24 @@ public sealed class ItemProposta
     public bool Especial { get; set; }
 
     /// <summary>
+    /// Os itens OPCIONAIS deste equipamento: lista do cadastro → opção
+    /// escolhida. São o que o cliente pode comprar ou não, e por isso ficam
+    /// fora do preço fechado e fora do código (ver
+    /// <see cref="CustoDaProposta.Opcionais"/>).
+    ///
+    /// Separado de <see cref="Escolhas"/> de propósito: a mesma lista pode ter
+    /// uma opção no escopo fechado e outra no opcional — é o caso do damper
+    /// que vai no escopo numa configuração e fica como opcional noutra.
+    /// </summary>
+    public Dictionary<string, string> Opcionais { get; set; } = new();
+
+    /// <summary>A instrumentação opcional — pode ser mais de uma, como a fixa.</summary>
+    public List<string> InstrumentacaoOpcional { get; set; } = new();
+
+    /// <summary>O motor opcional, quando há um. Vazio quando não há.</summary>
+    public string MotorOpcionalId { get; set; } = "";
+
+    /// <summary>
     /// A coluna da planilha de onde este item veio ("D", "E"…), quando veio de
     /// uma. Serve para a tela dizer de onde cada coisa saiu.
     /// </summary>

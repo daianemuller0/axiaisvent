@@ -68,6 +68,27 @@ public static class PropostaWord
         Ratear(p, custo, CalculoPricing.Da(p, custo.Total(p)).VendaLiquida);
 
     /// <summary>
+    /// O fator que leva o custo ao preço: a venda líquida da proposta dividida
+    /// pelo custo fechado dela.
+    ///
+    /// É o "multiplicar o custo pelo fator" da equipe. Os opcionais ficam fora
+    /// do preço fechado, então não há pricing próprio para eles — o que há é a
+    /// mesma margem, as mesmas comissões e os mesmos impostos que a proposta
+    /// já fechou, aplicados ao custo do opcional.
+    /// </summary>
+    public static decimal Fator(Proposta p, CustoDaProposta custo)
+    {
+        var total = custo.Total(p);
+        if (total <= 0m) return 0m;
+
+        return CalculoPricing.Da(p, total).VendaLiquida / total;
+    }
+
+    /// <summary>O preço de um opcional: o custo dele vezes o fator.</summary>
+    public static decimal PrecoDoOpcional(Proposta p, CustoDaProposta custo, decimal custoDele) =>
+        Math.Round(custoDele * Fator(p, custo), 2);
+
+    /// <summary>
     /// Reparte o preço de venda entre os equipamentos.
     ///
     /// O pricing dá um número só para a proposta inteira — markup, comissões e

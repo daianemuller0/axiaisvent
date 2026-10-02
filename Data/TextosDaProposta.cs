@@ -120,6 +120,12 @@ public sealed class TextosDaProposta
     /// <summary>O rótulo do código do equipamento na proposta comercial.</summary>
     public required string Codigo { get; init; }
 
+    /// <summary>O título do bloco de itens opcionais, nos dois documentos.</summary>
+    public required string Opcionais { get; init; }
+
+    /// <summary>Os cabeçalhos da tabela de opcionais da proposta comercial.</summary>
+    public required string[] ColunasDosOpcionais { get; init; }
+
     // ---------- impostos e entrega ----------
     public required string SemImpostos { get; init; }
     public required string TariffCode { get; init; }
@@ -278,6 +284,8 @@ public sealed class TextosDaProposta
         Idioma = IdiomaDaProposta.Espanhol,
         Inclui = "Incluye:",
         Codigo = "Código",
+        Opcionais = "Ítems Opcionales",
+        ColunasDosOpcionais = new[] { "ÍTEM", "DESCRIPCIÓN", "VALOR NETO" },
 
         SemImpostos = "Impuestos o retenciones no incluidos",
         TariffCode = "Tariff Code: no 84.14.59.90",
@@ -536,6 +544,8 @@ public sealed class TextosDaProposta
         Idioma = IdiomaDaProposta.Portugues,
         Inclui = "Inclui:",
         Codigo = "Código",
+        Opcionais = "Itens Opcionais",
+        ColunasDosOpcionais = new[] { "ITEM", "DESCRIÇÃO", "VALOR LÍQUIDO" },
 
         SemImpostos = "Impostos ou retenções não incluídos",
         TariffCode = "Tariff Code: no 84.14.59.90",
@@ -790,6 +800,8 @@ public sealed class TextosDaProposta
         Idioma = IdiomaDaProposta.Ingles,
         Inclui = "Includes:",
         Codigo = "Code",
+        Opcionais = "Optional Items",
+        ColunasDosOpcionais = new[] { "ITEM", "DESCRIPTION", "NET VALUE" },
 
         SemImpostos = "Taxes or withholdings not included",
         TariffCode = "Tariff Code: no 84.14.59.90",

@@ -111,6 +111,17 @@ internal sealed partial class Preenchimento
                 Antes(fim, Marcador(linha));
         }
 
+        // os opcionais vêm logo depois do que está incluso: é a pergunta que o
+        // leitor faz em seguida — "e o que mais eu posso pedir?"
+        for (var i = 0; i < _p.Itens.Count; i++)
+        {
+            var opcionais = _custo.Opcionais(_p.Itens[i], _moeda);
+            if (opcionais.Count == 0) continue;
+
+            Antes(fim, Titulo(PorVentilador(_t.Opcionais.ToUpperInvariant(), i, varios)));
+            foreach (var opcional in opcionais) Antes(fim, Marcador(opcional.Nome(_te)));
+        }
+
         Antes(fim, Titulo(_te.Documentacao));
         foreach (var linha in _te.LinhasDaDocumentacao) Antes(fim, Marcador(linha));
         Antes(fim, Paragrafo(_te.NotaDaDocumentacao));

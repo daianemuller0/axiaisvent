@@ -123,7 +123,11 @@
 
 <!-- ---------- cliente ---------- -->
 <div class="panel" style="margin-bottom:18px">
-    <h2 style="margin:0 0 14px; font-size:15px">Cliente</h2>
+    <h2 style="margin:0; font-size:15px; cursor:pointer; user-select:none"
+        title="Clique para recolher ou abrir"
+        @onclick='() => Dobrar("cliente")'><span style="display:inline-block; width:14px; color:var(--azul, #0b3d6b)">@(Aberto("cliente") ? "▾" : "▸")</span>Cliente</h2>
+    @if (Aberto("cliente"))
+    {
     <div class="form3">
         <label>@Campo("Cliente", "D6 · pricing E3")
             <input class="cell" placeholder="Empresa cliente" @bind="_proposta.Cliente" /></label>
@@ -195,11 +199,16 @@
         <label>@Campo("Prazo de entrega (dias)")
             <input class="cell num" type="number" min="0" @bind="_proposta.PrazoEntregaDias" /></label>
     </div>
+    }
 </div>
 
 <!-- ---------- cabeçalho ---------- -->
 <div class="panel" style="margin-bottom:18px">
-    <h2 style="margin:0 0 14px; font-size:15px">Cabeçalho</h2>
+    <h2 style="margin:0; font-size:15px; cursor:pointer; user-select:none"
+        title="Clique para recolher ou abrir"
+        @onclick='() => Dobrar("cabecalho")'><span style="display:inline-block; width:14px; color:var(--azul, #0b3d6b)">@(Aberto("cabecalho") ? "▾" : "▸")</span>Cabeçalho</h2>
+    @if (Aberto("cabecalho"))
+    {
     <div class="form3">
         <label>@Campo("Ano")
             <input class="cell num" @bind="_proposta.Ano" /></label>
@@ -449,11 +458,16 @@
             — já com PPR, ELG e provisões.
         </p>
     }
+    }
 </div>
 
 <!-- ---------- contatos no documento ---------- -->
 <div class="panel" style="margin-bottom:18px">
-    <h2 style="margin:0 0 4px; font-size:15px">Contatos Howden (no documento)</h2>
+    <h2 style="margin:0; font-size:15px; cursor:pointer; user-select:none"
+        title="Clique para recolher ou abrir"
+        @onclick='() => Dobrar("contatos")'><span style="display:inline-block; width:14px; color:var(--azul, #0b3d6b)">@(Aberto("contatos") ? "▾" : "▸")</span>Contatos Howden (no documento)</h2>
+    @if (Aberto("contatos"))
+    {
     <p class="subtitle" style="margin:0 0 14px">
         Até dois, do quadro da proposta. @ListasDaProposta.DiretorDeVendas.Nome
         (@ListasDaProposta.DiretorDeVendas.Cargo) sai sempre, junto com o contato
@@ -479,12 +493,15 @@
             <label>@Campo("Telefones")<input class="cell" @bind="_proposta.Contato2Telefones" /></label>
         </div>
     </div>
+    }
 </div>
 
 <!-- ---------- escopo do ventilador ---------- -->
 <div class="panel" style="margin-bottom:18px">
     <div class="toolbar" style="flex-wrap:wrap">
-        <h2 style="margin:0; font-size:15px">Escopo do ventilador</h2>
+        <h2 style="margin:0; font-size:15px; cursor:pointer; user-select:none"
+            title="Clique para recolher ou abrir"
+            @onclick='() => Dobrar("escopo")'><span style="display:inline-block; width:14px; color:var(--azul, #0b3d6b)">@(Aberto("escopo") ? "▾" : "▸")</span>Escopo do ventilador</h2>
         <span style="flex:1"></span>
         <strong>Moeda</strong>
         @foreach (var m in Moedas.Todas)
@@ -495,6 +512,8 @@
         }
         <span class="subtitle" style="margin:0">manda em todos os preços</span>
     </div>
+        @if (Aberto("escopo"))
+        {
 
     <p class="subtitle" style="margin:12px 0 0">
         O preço de cada linha vem do cadastro e <strong>dá para trocar na própria linha</strong>:
@@ -895,11 +914,173 @@
             </div>
         }
     }
+        }
+</div>
+
+<!-- ---------- itens adicionais ---------- -->
+<div class="panel" style="margin-bottom:18px">
+    <div class="toolbar" style="flex-wrap:wrap">
+        <h2 style="margin:0; font-size:15px; cursor:pointer; user-select:none"
+            title="Clique para recolher ou abrir"
+            @onclick='() => Dobrar("opcionais")'><span style="display:inline-block; width:14px; color:var(--azul, #0b3d6b)">@(Aberto("opcionais") ? "▾" : "▸")</span>Itens adicionais</h2>
+        <span class="subtitle" style="margin:0">
+            o que o cliente pode comprar ou não — fora do preço fechado
+        </span>
+        <span style="flex:1"></span>
+        @if (TotalDosOpcionais is { } totalOpc && totalOpc > 0m)
+        {
+            <span class="val-count">@Dinheiro(totalOpc) em opcionais</span>
+        }
+    </div>
+
+    @if (Aberto("opcionais"))
+    {
+        @if (_proposta.Itens.Count == 0)
+        {
+            <div class="panel empty" style="padding:16px; margin-top:14px">
+                Escolha os equipamentos no escopo — os opcionais são por equipamento.
+            </div>
+        }
+        else
+        {
+            <p class="subtitle" style="margin:12px 0 10px">
+                São as mesmas listas do escopo, menos o modelo: o equipamento sai completo e a
+                peça fica <strong>como opcional</strong>, para o cliente decidir. Eles
+                <strong>não entram no preço fechado</strong> nem no código — o preço de cada um é
+                o custo vezes o fator da proposta
+                (<strong>@FatorDaProposta.ToString("N4", new System.Globalization.CultureInfo("pt-BR"))</strong>),
+                que é a mesma margem, comissão e imposto do que já está fechado.
+            </p>
+
+            @for (var i = 0; i < _proposta.Itens.Count; i++)
+            {
+                var indice = i;
+                var item = _proposta.Itens[indice];
+                var opcionais = _custo.Opcionais(item, _proposta.Moeda);
+
+                <div class="panel" style="margin:0 0 14px; padding:14px">
+                    <div class="toolbar" style="flex-wrap:wrap; margin-bottom:10px">
+                        <strong>Item @((indice + 1).ToString("D2"))</strong>
+                        <span class="subtitle">
+                            @(ModeloDe(item) is { } m ? m.Rotulo : "sem modelo escolhido")
+                        </span>
+                        <span style="flex:1"></span>
+                        @if (opcionais.Count > 0)
+                        {
+                            <span class="val-count">@opcionais.Count opcional(is)</span>
+                        }
+                    </div>
+
+                    @foreach (var lista in ListasDeOpcionais)
+                    {
+                        var grupo = lista;
+                        var reais = OpcoesReais(grupo);
+                        if (reais.Count == 0) { continue; }
+
+                        var posta = item.Opcionais.GetValueOrDefault(grupo, "");
+
+                        <div class="toolbar" style="flex-wrap:wrap; border-top:1px solid var(--linha, #e6e8ec); padding-top:10px">
+                            <strong style="min-width:210px; font-size:12.5px">@grupo</strong>
+                            <select class="cell" style="min-width:260px" value="@posta"
+                                    @onchange="e => MudarOpcional(item, grupo, e.Value?.ToString() ?? string.Empty)">
+                                <option value="">— nenhum —</option>
+                                @foreach (var o in reais)
+                                {
+                                    <option value="@o.Valor" selected="@(o.Valor == posta)">@o.Valor</option>
+                                }
+                            </select>
+
+                            @if (posta.Length > 0)
+                            {
+                                var linha = Resolver(item, grupo, posta);
+                                @PrecoNaLista(item, $"opc:{grupo}", "", linha.Valor, linha.Origem)
+                            }
+                        </div>
+                    }
+
+                    @* ----- motor opcional ----- *@
+                    <div class="toolbar" style="flex-wrap:wrap; border-top:1px solid var(--linha, #e6e8ec); padding-top:10px">
+                        <strong style="min-width:210px; font-size:12.5px">Motor elétrico</strong>
+                        <select class="cell" style="min-width:320px" value="@item.MotorOpcionalId"
+                                @onchange="e => item.MotorOpcionalId = e.Value?.ToString() ?? string.Empty">
+                            <option value="">— nenhum —</option>
+                            @foreach (var mo in MotoresDaSerie(item))
+                            {
+                                <option value="@mo.Id" selected="@(mo.Id == item.MotorOpcionalId)">@mo.Descricao</option>
+                            }
+                        </select>
+
+                        @if (_custo.MotorOpcionalDe(item) is { } motorOpc)
+                        {
+                            @PrecoNaLista(item, "opc:motor", motorOpc.Codigo,
+                                DadosExcel.Numero(EscopoProposta.PrecoDoMotor(motorOpc, _proposta.Moeda)),
+                                "catálogo de motores")
+                        }
+                    </div>
+
+                    @* ----- instrumentação opcional ----- *@
+                    <div style="border-top:1px solid var(--linha, #e6e8ec); padding-top:10px; margin-top:10px">
+                        <strong style="font-size:12.5px">@ListaDaInstrumentacao</strong>
+                        @foreach (var o in OpcoesReais(ListaDaInstrumentacao))
+                        {
+                            var opcao = o;
+                            var marcada = item.InstrumentacaoOpcional.Contains(opcao.Valor);
+                            var linha = Resolver(item, opcao.Grupo, opcao.Valor);
+
+                            <div class="toolbar" style="flex-wrap:wrap; margin-top:6px">
+                                <label style="display:flex; align-items:center; gap:8px; min-width:380px">
+                                    <input type="checkbox" checked="@marcada"
+                                           @onchange="e => MarcarInstrumentacaoOpcional(item, opcao.Valor, (bool)(e.Value ?? false))" />
+                                    <span>@opcao.Valor</span>
+                                </label>
+                                @if (marcada)
+                                {
+                                    @PrecoNaLista(item, $"opc:instr:{opcao.Valor}", "", linha.Valor, linha.Origem)
+                                }
+                            </div>
+                        }
+                    </div>
+
+                    @if (opcionais.Count > 0)
+                    {
+                        <div class="panel" style="padding:0; overflow-x:auto; margin:12px 0 0">
+                            <table class="grid">
+                                <thead>
+                                    <tr>
+                                        <th class="nowrap">Opcional</th>
+                                        <th class="nowrap right">Custo @_proposta.Moeda.Rotulo()</th>
+                                        <th class="nowrap right">Preço @_proposta.Moeda.Rotulo()</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var linha in opcionais)
+                                    {
+                                        var custoDele = Efetivo(item, linha.Chave, linha.Valor);
+                                        <tr>
+                                            <td>@linha.Nome(EscopoTextos)</td>
+                                            <td class="nowrap right">@Dinheiro(custoDele)</td>
+                                            <td class="nowrap right">
+                                                <strong>@Dinheiro(PrecoDoOpcional(custoDele))</strong>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                </div>
+            }
+        }
+    }
 </div>
 
 <!-- ---------- resumo ---------- -->
 <div class="panel" style="margin-bottom:18px">
-    <h2 style="margin:0 0 14px; font-size:15px">Resumo da proposta</h2>
+    <h2 style="margin:0; font-size:15px; cursor:pointer; user-select:none"
+        title="Clique para recolher ou abrir"
+        @onclick='() => Dobrar("resumo")'><span style="display:inline-block; width:14px; color:var(--azul, #0b3d6b)">@(Aberto("resumo") ? "▾" : "▸")</span>Resumo da proposta</h2>
+    @if (Aberto("resumo"))
+    {
 
     @foreach (var (item, indice) in _proposta.Itens.Select((x, i) => (x, i)))
     {
@@ -1012,6 +1193,7 @@
             do escopo.
         </p>
     }
+    }
 </div>
 
 <!-- ---------- pricing ---------- -->
@@ -1024,13 +1206,17 @@
     }
 
     <div class="toolbar" style="flex-wrap:wrap">
-        <h2 style="margin:0; font-size:15px">Pricing</h2>
+        <h2 style="margin:0; font-size:15px; cursor:pointer; user-select:none"
+            title="Clique para recolher ou abrir"
+            @onclick='() => Dobrar("pricing")'><span style="display:inline-block; width:14px; color:var(--azul, #0b3d6b)">@(Aberto("pricing") ? "▾" : "▸")</span>Pricing</h2>
         <span class="subtitle" style="margin:0">
             margem, comissões e impostos — a mesma conta da aba PRICING da planilha
         </span>
         <span style="flex:1"></span>
         <button class="btn-primary" @onclick="GerarPricing">⬇ Gerar pricing</button>
     </div>
+        @if (Aberto("pricing"))
+        {
 
     <div class="form3">
         <label>@Campo("Risco adicional (%)", "pricing D36")
@@ -1220,18 +1406,23 @@
         (@string.Join(", ", PricingExcel.Mapa.Take(6).Select(m => m.Celula))…). O Excel
         refaz a conta sozinho; os números acima são a prévia.
     </p>
+        }
 </div>
 
 <!-- ---------- proposta comercial ---------- -->
 <div class="panel" style="margin-bottom:18px">
     <div class="toolbar" style="flex-wrap:wrap">
-        <h2 style="margin:0; font-size:15px">Proposta comercial</h2>
+        <h2 style="margin:0; font-size:15px; cursor:pointer; user-select:none"
+            title="Clique para recolher ou abrir"
+            @onclick='() => Dobrar("comercial")'><span style="display:inline-block; width:14px; color:var(--azul, #0b3d6b)">@(Aberto("comercial") ? "▾" : "▸")</span>Proposta comercial</h2>
         <span class="subtitle" style="margin:0">
             o modelo em Word da equipe, preenchido — com o preço de VENDA, não o custo
         </span>
         <span style="flex:1"></span>
         <button class="btn-primary" @onclick="GerarProposta">⬇ Gerar proposta</button>
     </div>
+        @if (Aberto("comercial"))
+        {
 
     @if (_proposta.Itens.Count == 0)
     {
@@ -1281,18 +1472,23 @@
             </div>
         }
     }
+        }
 </div>
 
 <!-- ---------- proposta técnica ---------- -->
 <div class="panel" style="margin-bottom:18px">
     <div class="toolbar" style="flex-wrap:wrap">
-        <h2 style="margin:0; font-size:15px">Proposta técnica</h2>
+        <h2 style="margin:0; font-size:15px; cursor:pointer; user-select:none"
+            title="Clique para recolher ou abrir"
+            @onclick='() => Dobrar("tecnica")'><span style="display:inline-block; width:14px; color:var(--azul, #0b3d6b)">@(Aberto("tecnica") ? "▾" : "▸")</span>Proposta técnica</h2>
         <span class="subtitle" style="margin:0">
             a seleção e a curva de cada equipamento
         </span>
         <span style="flex:1"></span>
         <button class="btn-primary" @onclick="GerarTecnica">⬇ Gerar proposta técnica</button>
     </div>
+        @if (Aberto("tecnica"))
+        {
 
     @if (_proposta.Itens.Count == 0)
     {
@@ -1566,9 +1762,24 @@
             </div>
         }
     }
+        }
 </div>
 
 @code {
+    /// <summary>
+    /// As caixas recolhidas. Guarda as FECHADAS, e não as abertas, para a
+    /// página nascer com tudo aberto — quem abre a proposta pela primeira vez
+    /// não deveria ter de procurar onde ficou o escopo.
+    /// </summary>
+    private readonly HashSet<string> _recolhidas = new();
+
+    private bool Aberto(string caixa) => !_recolhidas.Contains(caixa);
+
+    private void Dobrar(string caixa)
+    {
+        if (!_recolhidas.Add(caixa)) _recolhidas.Remove(caixa);
+    }
+
     private Proposta _proposta = Nascer();
     private List<Proposta> _gravadas = new();
 
@@ -2135,6 +2346,61 @@
     }
 
     private void VoltarDescricao(int indice) => _proposta.Itens[indice].Descricao = "";
+
+    // ---------- itens opcionais ----------
+
+    /// <summary>
+    /// As listas que podem virar opcional: as do escopo e a dos partidores.
+    /// Tudo o que se escolhe para o ventilador menos o MODELO — o modelo é o
+    /// equipamento, e um equipamento inteiro não é um opcional dele mesmo.
+    /// </summary>
+    private List<string> ListasDeOpcionais =>
+        _custo.ListasDoEscopo.Append(ListaDosPartidores).ToList();
+
+    /// <summary>Os motores que servem à série do equipamento, sem filtro.</summary>
+    private List<Motor> MotoresDaSerie(ItemProposta item) =>
+        EscopoProposta.MotoresPara(_motores, SerieDe(item), new());
+
+    private void MudarOpcional(ItemProposta item, string lista, string opcao)
+    {
+        if (opcao.Trim().Length == 0)
+        {
+            item.Opcionais.Remove(lista);
+            item.PrecosManuais.Remove($"opc:{lista}");
+            return;
+        }
+
+        item.Opcionais[lista] = opcao;
+    }
+
+    private void MarcarInstrumentacaoOpcional(ItemProposta item, string nome, bool marcada)
+    {
+        if (marcada)
+        {
+            if (!item.InstrumentacaoOpcional.Contains(nome)) item.InstrumentacaoOpcional.Add(nome);
+            return;
+        }
+
+        item.InstrumentacaoOpcional.Remove(nome);
+        item.PrecosManuais.Remove($"opc:instr:{nome}");
+    }
+
+    /// <summary>O fator que leva o custo de um opcional ao preço dele.</summary>
+    private decimal FatorDaProposta => PropostaWord.Fator(_proposta, _custo);
+
+    private decimal? PrecoDoOpcional(decimal? custoDele) => custoDele is { } c
+        ? PropostaWord.PrecoDoOpcional(_proposta, _custo, c)
+        : null;
+
+    /// <summary>O preço somado de todos os opcionais da proposta.</summary>
+    private decimal? TotalDosOpcionais
+    {
+        get
+        {
+            var custo = _proposta.Itens.Sum(i => _custo.CustoDosOpcionais(i, _proposta.Moeda));
+            return custo > 0m ? PropostaWord.PrecoDoOpcional(_proposta, _custo, custo) : null;
+        }
+    }
 
     /// <summary>Os textos de escopo na língua da proposta.</summary>
     private TextosDoEscopo EscopoTextos => TextosDoEscopo.Do(Idioma);

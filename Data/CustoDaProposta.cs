@@ -150,6 +150,71 @@ public sealed class CustoDaProposta
         return linhas;
     }
 
+    // ---------- itens opcionais ----------
+
+    /// <summary>
+    /// Uma linha de item opcional: o que é, quanto custa e de onde o preço
+    /// veio. A <paramref name="Chave"/> é a do preço à mão, e começa com
+    /// "opc:" para nunca colidir com a do escopo fechado.
+    /// </summary>
+    /// <param name="Lista">A lista do cadastro, ou vazio no motor e na instrumentação.</param>
+    public sealed record LinhaOpcional(string Chave, string Lista, string Opcao, decimal? Valor,
+        string Origem)
+    {
+        /// <summary>O nome como ele sai no documento, do mesmo catálogo do escopo.</summary>
+        public string Nome(TextosDoEscopo textos) => EscopoDaHowden.Nome(Lista, Opcao, textos);
+    }
+
+    /// <summary>
+    /// Os itens opcionais de um equipamento: as listas do escopo escolhidas em
+    /// <see cref="ItemProposta.Opcionais"/>, mais o motor e a instrumentação
+    /// opcionais.
+    ///
+    /// NÃO entram em <see cref="LinhasDePreco"/>: o preço fechado da proposta
+    /// é o que o cliente leva, e o opcional é o que ele pode querer depois.
+    /// </summary>
+    public List<LinhaOpcional> Opcionais(ItemProposta item, Moeda moeda)
+    {
+        var linhas = new List<LinhaOpcional>();
+
+        foreach (var lista in ListasDoEscopo.Append(ListaDosPartidores))
+        {
+            var opcao = item.Opcionais.GetValueOrDefault(lista, "").Trim();
+            if (opcao.Length == 0 || FamiliaDePreco.EhAusencia(opcao)) continue;
+
+            var resolvida = Resolver(item, lista, opcao, moeda);
+            linhas.Add(new($"opc:{lista}", lista, opcao, resolvida.Valor, resolvida.Origem));
+        }
+
+        if (MotorOpcionalDe(item) is { } motor)
+        {
+            linhas.Add(new("opc:motor", "", $"Motor elétrico — {motor.Descricao}",
+                DadosExcel.Numero(EscopoProposta.PrecoDoMotor(motor, moeda)),
+                "catálogo de motores"));
+        }
+
+        foreach (var nome in item.InstrumentacaoOpcional.Where(n => n.Trim().Length > 0))
+        {
+            var resolvida = Resolver(item, ListaDaInstrumentacao, nome, moeda);
+            linhas.Add(new($"opc:instr:{nome}", "", nome, resolvida.Valor, resolvida.Origem));
+        }
+
+        return linhas;
+    }
+
+    /// <summary>O motor opcional escolhido, se houver.</summary>
+    public Motor? MotorOpcionalDe(ItemProposta item) => item.MotorOpcionalId.Length > 0
+        ? _motores.FirstOrDefault(m => m.Id == item.MotorOpcionalId)
+        : null;
+
+    /// <summary>O custo somado dos opcionais de um equipamento.</summary>
+    public decimal CustoDosOpcionais(ItemProposta item, Moeda moeda) =>
+        Opcionais(item, moeda).Sum(l => Efetivo(item, l.Chave, l.Valor) ?? 0m);
+
+    /// <summary>Opcionais que foram escolhidos e continuam sem preço.</summary>
+    public int OpcionaisSemPreco(Proposta proposta) => proposta.Itens.Sum(item =>
+        Opcionais(item, proposta.Moeda).Count(l => Efetivo(item, l.Chave, l.Valor) is null));
+
     /// <summary>
     /// O preço que vale: o digitado à mão, quando houver; o do cadastro, quando
     /// não. É a regra geral da proposta — puxa, mas sempre dá para corrigir.

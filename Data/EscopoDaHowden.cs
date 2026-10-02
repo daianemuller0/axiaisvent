@@ -39,7 +39,7 @@ public static class EscopoDaHowden
     /// "Cone de entrada" vira cone ou conexão a manga conforme o que foi
     /// escolhido, e "Contrarrecuo" vira back stop ou freio.
     /// </summary>
-    private static string Chave(string lista, string opcao)
+    public static string Chave(string lista, string opcao)
     {
         var l = Textos.Simples(lista);
         var o = Textos.Simples(opcao);
@@ -70,6 +70,20 @@ public static class EscopoDaHowden
         if (l.Contains("damper") || l.Contains("mariposa")) return "damper";
 
         return "";
+    }
+
+    /// <summary>
+    /// O nome de catálogo de uma peça, para ela ser chamada do mesmo jeito no
+    /// escopo e nos itens opcionais. Sem lista (o motor, a instrumentação) ou
+    /// sem linha no catálogo, fica o nome que vocês deram.
+    /// </summary>
+    public static string Nome(string lista, string opcao, TextosDoEscopo textos)
+    {
+        if (lista.Trim().Length == 0) return opcao.Trim();
+
+        return Chave(lista, opcao) is { Length: > 0 } chave && textos.Catalogo.ContainsKey(chave)
+            ? textos.Catalogo[chave]
+            : $"{lista.Trim()} · {opcao.Trim()}";
     }
 
     /// <summary>
