@@ -131,6 +131,77 @@ internal sealed partial class Preenchimento
         foreach (var linha in _te.LinhasDosComentarios) Antes(fim, Marcador(linha));
 
         Ventiladores(fim);
+        Componentes(fim);
+    }
+
+    /// <summary>
+    /// As notas de componente, embaixo do texto do ventilador. Saem em toda
+    /// proposta, sem olhar o escopo — ver <see cref="NotasDosComponentes"/>.
+    /// </summary>
+    private void Componentes(OpenXmlElement? fim)
+    {
+        foreach (var nota in _notas)
+        {
+            Antes(fim, Titulo(nota.Titulo));
+            CorpoDaNota(fim, nota.Linhas);
+        }
+    }
+
+    /// <summary>
+    /// O corpo de uma nota, lendo a convenção de
+    /// <see cref="NotasDosComponentes"/>: "|" é linha de tabela, "-" é item de
+    /// lista, "--" é item de segundo nível e o resto é parágrafo.
+    ///
+    /// As linhas de tabela são juntadas até aparecer algo que não é tabela —
+    /// é assim que a nota do motor consegue ter duas tabelas separadas por
+    /// parágrafos sem precisar numerá-las.
+    /// </summary>
+    private void CorpoDaNota(OpenXmlElement? fim, string[] linhas)
+    {
+        var juntando = new List<string[]>();
+
+        void Fechar()
+        {
+            if (juntando.Count == 0) return;
+
+            Antes(fim, TabelaDaNota(juntando));
+            Antes(fim, Vazio());
+            juntando.Clear();
+        }
+
+        foreach (var linha in linhas)
+        {
+            if (linha.StartsWith('|'))
+            {
+                juntando.Add(linha[1..].Split('|').Select(c => c.Trim()).ToArray());
+                continue;
+            }
+
+            Fechar();
+
+            if (linha.StartsWith("-- ")) Antes(fim, Marcador(linha[3..].Trim(), nivel: 2));
+            else if (linha.StartsWith("- ")) Antes(fim, Marcador(linha[2..].Trim()));
+            else Antes(fim, Paragrafo(linha));
+        }
+
+        Fechar();
+    }
+
+    /// <summary>
+    /// Uma tabela de dentro de uma nota. A primeira linha é o cabeçalho — é
+    /// ela que sai na faixa azul e que diz quantas colunas a tabela tem.
+    /// </summary>
+    private static Table TabelaDaNota(List<string[]> linhas)
+    {
+        var colunas = linhas[0].Length;
+
+        var quadros = linhas
+            .Select((celulas, i) => Enumerable.Range(0, colunas)
+                .Select(c => new Quadro(c < celulas.Length ? celulas[c] : "", Faixa: i == 0))
+                .ToList())
+            .ToList();
+
+        return Tabela(quadros, colunas);
     }
 
     /// <summary>
@@ -280,15 +351,16 @@ internal sealed partial class Preenchimento
     /// segunda linha de um item longo alinhar com a primeira em vez de voltar
     /// para baixo do marcador.
     /// </summary>
-    private static Paragraph Marcador(string texto) => new(
+    private static Paragraph Marcador(string texto, int nivel = 1) => new(
         // a ordem dentro do pPr é a do esquema do OOXML — spacing, ind e só
         // então jc. Fora de ordem o Word abre, mas o documento é inválido
         new ParagraphProperties(
             new SpacingBetweenLines { Before = "0", After = "40", Line = "240",
                 LineRule = LineSpacingRuleValues.Auto },
-            new Indentation { Left = "397", Hanging = "227" },
+            new Indentation { Left = (397 * nivel).ToString(), Hanging = "227" },
             new Justification { Val = JustificationValues.Left }),
-        new Run(new Text("\u2022  " + texto) { Space = SpaceProcessingModeValues.Preserve }));
+        new Run(new Text((nivel > 1 ? "\u2013  " : "\u2022  ") + texto)
+        { Space = SpaceProcessingModeValues.Preserve }));
 
     /// <summary>Um parágrafo de texto corrido, com a fonte do próprio modelo.</summary>
     private static Paragraph Paragrafo(string texto, bool negrito = false)
@@ -339,7 +411,7 @@ internal sealed partial class Preenchimento
     /// Monta a tabela com a cara das do modelo: faixa azul no cabeçalho, letra
     /// branca, e linhas finas entre as células.
     /// </summary>
-    private static Table Tabela(List<List<Quadro>> linhas)
+    private static Table Tabela(List<List<Quadro>> linhas, int colunas = 2)
     {
         var props = new TableProperties(
             new TableWidth { Width = "5000", Type = TableWidthUnitValues.Pct },
@@ -351,37 +423,64 @@ internal sealed partial class Preenchimento
                 new InsideHorizontalBorder { Val = BorderValues.Single, Size = 4, Color = "BFBFBF" },
                 new InsideVerticalBorder { Val = BorderValues.None }));
 
-        var grade = new TableGrid(
-            new GridColumn { Width = (LarguraUtil / 2).ToString() },
-            new GridColumn { Width = (LarguraUtil / 2).ToString() });
+        var larguras = Larguras(colunas);
+
+        var grade = new TableGrid(larguras
+            .Select(l => (OpenXmlElement)new GridColumn { Width = l.ToString() })
+            .ToArray());
 
         var tabela = new Table(props, grade);
 
         foreach (var linha in linhas)
         {
             var tr = new TableRow();
+            var coluna = 0;
 
             foreach (var quadro in linha)
             {
+                // a largura da célula é a soma das colunas que ela ocupa, para
+                // uma célula que abre a faixa azul inteira não sair do tamanho
+                // da primeira
+                var ocupa = Math.Min(quadro.Colunas, colunas - coluna);
+                var largura = larguras.Skip(coluna).Take(ocupa).Sum();
+
                 var tcPr = new TableCellProperties(
                     new TableCellWidth
                     {
                         Type = TableWidthUnitValues.Pct,
-                        Width = (quadro.Colunas == 2 ? 5000 : 2500).ToString(),
+                        Width = (5000L * largura / LarguraUtil).ToString(),
                     });
 
-                if (quadro.Colunas == 2) tcPr.Append(new GridSpan { Val = 2 });
+                if (ocupa > 1) tcPr.Append(new GridSpan { Val = ocupa });
 
                 if (quadro.Faixa)
                     tcPr.Append(new Shading { Val = ShadingPatternValues.Clear, Fill = AzulDaFaixa });
 
                 tr.Append(new TableCell(tcPr, Linha(quadro)));
+                coluna += ocupa;
             }
 
             tabela.Append(tr);
         }
 
         return tabela;
+    }
+
+    /// <summary>
+    /// A largura de cada coluna. A primeira leva metade da página e o resto
+    /// divide a outra metade: é a cara das tabelas do modelo, em que o rótulo
+    /// é largo e o valor e a unidade são estreitos.
+    /// </summary>
+    private static int[] Larguras(int colunas)
+    {
+        if (colunas <= 1) return new[] { LarguraUtil };
+
+        var larguras = new int[colunas];
+        larguras[0] = LarguraUtil / 2;
+
+        for (var i = 1; i < colunas; i++) larguras[i] = LarguraUtil / 2 / (colunas - 1);
+
+        return larguras;
     }
 
     /// <summary>O parágrafo de dentro da célula; "\n" vira quebra de linha.</summary>
