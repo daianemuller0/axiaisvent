@@ -743,6 +743,9 @@
 
                 <div class="toolbar" style="margin:14px 0 0; flex-wrap:wrap">
                     <span class="val-count">@candidatos.Count motor(es) atendem</span>
+                    <span class="subtitle" style="margin:0">
+                        @MotoresComPreco(candidatos) com preço em @_proposta.Moeda.Rotulo()
+                    </span>
                     <button class="btn-link" @onclick="() => LimparFiltro(atual)">limpar filtro</button>
                     <span style="flex:1"></span>
 
@@ -750,9 +753,19 @@
                         @if (MotorDe(atual) is { } motor)
                         {
                             <strong>@(motor.Codigo.Length > 0 ? $"código {motor.Codigo}" : "sem código")</strong>
-                            <span class="subtitle" style="margin:0; white-space:nowrap">
-                                @(EhManual(atual, "motor") ? "preço à mão" : "catálogo de motores")
-                            </span>
+
+                            @if (PrecoDoMotor(motor) is null && !EhManual(atual, "motor"))
+                            {
+                                <span class="subtitle" style="margin:0; color:#c98a00; white-space:nowrap">
+                                    este motor não tem preço em @_proposta.Moeda.Rotulo() — ponha à mão ao lado
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="subtitle" style="margin:0; white-space:nowrap">
+                                    @(EhManual(atual, "motor") ? "preço à mão" : "catálogo de motores")
+                                </span>
+                            }
                         }
                         else
                         {
@@ -1926,6 +1939,21 @@
     /// <summary>O preço de um equipamento do catálogo na moeda da proposta.</summary>
     private decimal? PrecoDoEquipamento(Equipamento e) =>
         DadosExcel.Numero(EscopoProposta.PrecoDoEquipamento(e, _proposta.Moeda));
+
+    /// <summary>O preço de um motor do catálogo na moeda da proposta.</summary>
+    private decimal? PrecoDoMotor(Motor m) =>
+        DadosExcel.Numero(EscopoProposta.PrecoDoMotor(m, _proposta.Moeda));
+
+    /// <summary>
+    /// Quantos dos motores que passam no filtro têm preço cadastrado.
+    ///
+    /// O motor não se escolhe numa lista como o modelo — se escolhe apertando
+    /// filtros até sobrar um —, então a conta vai no contador dos candidatos:
+    /// é o lugar em que dá para ver, antes de fechar o filtro, se o que sobrou
+    /// tem preço.
+    /// </summary>
+    private int MotoresComPreco(List<Motor> motores) =>
+        motores.Count(m => PrecoDoMotor(m) is not null);
 
     /// <summary>
     /// O modelo como aparece na lista: o rótulo e o preço do cadastro.
