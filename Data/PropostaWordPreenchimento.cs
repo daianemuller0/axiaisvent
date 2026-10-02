@@ -666,17 +666,20 @@ internal sealed partial class Preenchimento
     /// A tabela de itens opcionais da proposta comercial, no lugar da tabela de
     /// reposição do modelo.
     ///
+    /// É desenhada com a MESMA cara da tabela de preço do modelo — faixa azul
+    /// com letra branca centrada, linhas cinzas separando todas as células,
+    /// coluna de item estreita e a de valor à direita —, porque as duas ficam
+    /// uma embaixo da outra na mesma página e qualquer diferença salta aos
+    /// olhos.
+    ///
     /// O preço de cada um é o custo vezes o fator da proposta: eles não entram
     /// no preço fechado, então não há pricing próprio para eles — o que há é a
     /// mesma margem, comissão e imposto que a proposta já fechou.
     /// </summary>
     private void OpcionaisDaComercial(OpenXmlElement depois)
     {
-        var linhas = new List<List<Quadro>>
-        {
-            _t.ColunasDosOpcionais.Select(c => new Quadro(c, Faixa: true)).ToList(),
-        };
-
+        var varios = _p.Itens.Count > 1;
+        var linhas = new List<List<CelulaDePreco>>();
         var total = 0m;
 
         for (var i = 0; i < _p.Itens.Count; i++)
@@ -687,29 +690,121 @@ internal sealed partial class Preenchimento
                 var preco = PropostaWord.PrecoDoOpcional(_p, _custo, custo);
                 total += preco;
 
+                // com um equipamento só, dizer de quem é o opcional é ruído;
+                // com vários, é o que diz em qual ventilador ele entra
+                var nome = varios
+                    ? $"{_t.Ventilador} {i + 1:D2} — {opcional.Nome(_te)}"
+                    : opcional.Nome(_te);
+
                 linhas.Add(new()
                 {
-                    new($"{_t.Ventilador} {i + 1:D2}"),
-                    new(opcional.Nome(_te)),
-                    new(PropostaWord.Dinheiro(preco, _moeda)),
+                    new((linhas.Count + 1).ToString("D2"), JustificationValues.Center),
+                    new(nome, JustificationValues.Left),
+                    // centrado como na tabela de preço, e não à direita: as duas
+                    // ficam uma embaixo da outra e a coluna é a mesma
+                    new(PropostaWord.Dinheiro(preco, _moeda), JustificationValues.Center),
                 });
             }
         }
 
         // nenhum opcional: a seção não entra, e o documento não ganha um título
         // com uma tabela vazia embaixo
-        if (linhas.Count == 1) return;
-
-        linhas.Add(new()
-        {
-            new(""), new(_t.TotalDaProposta, Faixa: true),
-            new(PropostaWord.Dinheiro(total, _moeda), Faixa: true),
-        });
+        if (linhas.Count == 0) return;
 
         var titulo = Titulo(_t.Opcionais);
         _corpo.InsertAfter(titulo, depois);
-        _corpo.InsertAfter(Tabela(linhas, 3), titulo);
+        _corpo.InsertAfter(TabelaDeOpcionais(linhas, total), titulo);
     }
+
+    /// <param name="Alinhamento">Como o texto fica na célula.</param>
+    private sealed record CelulaDePreco(string Texto, JustificationValues Alinhamento,
+        bool Faixa = false, bool Negrito = false, int Colunas = 1);
+
+    /// <summary>As colunas da tabela de opcionais, nas medidas da tabela de preço.</summary>
+    private static readonly int[] ColunasDoOpcional = { 709, 7826, 1321 };
+
+    private Table TabelaDeOpcionais(List<List<CelulaDePreco>> linhas, decimal total)
+    {
+        var tabela = new Table(
+            new TableProperties(
+                new TableWidth { Width = "5000", Type = TableWidthUnitValues.Pct }),
+            new TableGrid(ColunasDoOpcional
+                .Select(l => (OpenXmlElement)new GridColumn { Width = l.ToString() })
+                .ToArray()));
+
+        // no modelo todo cabeçalho é centrado, inclusive o da coluna larga
+        var cabecalho = _t.ColunasDosOpcionais
+            .Select(c => new CelulaDePreco(c, JustificationValues.Center, Faixa: true))
+            .ToList();
+
+        var fecho = new List<CelulaDePreco>
+        {
+            new(_t.TotalDaProposta, JustificationValues.Right, Negrito: true, Colunas: 2),
+            new(PropostaWord.Dinheiro(total, _moeda), JustificationValues.Left, Negrito: true),
+        };
+
+        foreach (var linha in new[] { cabecalho }.Concat(linhas).Append(fecho))
+            tabela.Append(LinhaDeOpcional(linha));
+
+        return tabela;
+    }
+
+    private static TableRow LinhaDeOpcional(List<CelulaDePreco> celulas)
+    {
+        var tr = new TableRow();
+        var coluna = 0;
+
+        foreach (var celula in celulas)
+        {
+            var ocupa = Math.Min(celula.Colunas, ColunasDoOpcional.Length - coluna);
+            var largura = ColunasDoOpcional.Skip(coluna).Take(ocupa).Sum();
+
+            // a ordem dentro do tcPr é a do esquema: tcW, gridSpan, tcBorders,
+            // shd, vAlign
+            var tcPr = new TableCellProperties(new TableCellWidth
+            {
+                Type = TableWidthUnitValues.Pct,
+                Width = (5000L * largura / ColunasDoOpcional.Sum()).ToString(),
+            });
+
+            if (ocupa > 1) tcPr.Append(new GridSpan { Val = ocupa });
+
+            // bordas por célula, e não da tabela: é como o modelo desenha a
+            // tabela de preço, e é o que dá as linhas verticais entre colunas
+            tcPr.Append(new TableCellBorders(
+                Borda<TopBorder>(), Borda<LeftBorder>(), Borda<BottomBorder>(), Borda<RightBorder>()));
+
+            if (celula.Faixa)
+                tcPr.Append(new Shading { Val = ShadingPatternValues.Clear, Fill = AzulDaFaixa });
+
+            tcPr.Append(new TableCellVerticalAlignment { Val = TableVerticalAlignmentValues.Center });
+
+            var formato = new RunProperties(
+                new RunFonts { Ascii = "Arial", HighAnsi = "Arial" });
+
+            // a ordem do rPr é rFonts, b, color, sz
+            if (celula.Faixa || celula.Negrito) formato.Append(new Bold());
+            if (celula.Faixa) formato.Append(new Color { Val = "FFFFFF" });
+
+            formato.Append(new FontSize { Val = "18" });
+
+            var paragrafo = new Paragraph(
+                new ParagraphProperties(
+                    new SpacingBetweenLines { Line = "220", LineRule = LineSpacingRuleValues.AtLeast },
+                    new Justification { Val = celula.Alinhamento }),
+                new Run(formato,
+                    new Text(celula.Texto) { Space = SpaceProcessingModeValues.Preserve }));
+
+            tr.Append(new TableCell(tcPr, paragrafo));
+            coluna += ocupa;
+        }
+
+        return tr;
+    }
+
+    /// <summary>A linha cinza fina que o modelo usa entre as células.</summary>
+    private static T Borda<T>() where T : BorderType, new() =>
+        new() { Val = BorderValues.Single, Size = 4, Color = "808080" };
 
     private void Introducao()
     {
