@@ -1048,19 +1048,21 @@
                                 <thead>
                                     <tr>
                                         <th class="nowrap">Opcional</th>
-                                        <th class="nowrap right">Custo @_proposta.Moeda.Rotulo()</th>
+                                        <th class="nowrap right">Qtd.</th>
+                                        <th class="nowrap right">Custo unit. @_proposta.Moeda.Rotulo()</th>
                                         <th class="nowrap right">Preço @_proposta.Moeda.Rotulo()</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     @foreach (var linha in opcionais)
                                     {
-                                        var custoDele = Efetivo(item, linha.Chave, linha.Valor);
+                                        var unitario = _custo.CustoDoOpcional(item, linha);
                                         <tr>
                                             <td>@linha.Nome(EscopoTextos)</td>
-                                            <td class="nowrap right">@Dinheiro(custoDele)</td>
+                                            <td class="nowrap right">@item.Quantos</td>
+                                            <td class="nowrap right">@Dinheiro(unitario)</td>
                                             <td class="nowrap right">
-                                                <strong>@Dinheiro(PrecoDoOpcional(custoDele))</strong>
+                                                <strong>@Dinheiro(PrecoDoOpcional(unitario * item.Quantos))</strong>
                                             </td>
                                         </tr>
                                     }

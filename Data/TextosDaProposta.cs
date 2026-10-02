@@ -285,7 +285,7 @@ public sealed class TextosDaProposta
         Inclui = "Incluye:",
         Codigo = "Código",
         Opcionais = "Ítems Opcionales",
-        ColunasDosOpcionais = new[] { "ÍTEM", "DESCRIPCIÓN", "VALOR NETO" },
+        ColunasDosOpcionais = new[] { "ÍTEM", "CTD.", "DESCRIPCIÓN", "VALOR NETO" },
 
         SemImpostos = "Impuestos o retenciones no incluidos",
         TariffCode = "Tariff Code: no 84.14.59.90",
@@ -545,7 +545,7 @@ public sealed class TextosDaProposta
         Inclui = "Inclui:",
         Codigo = "Código",
         Opcionais = "Itens Opcionais",
-        ColunasDosOpcionais = new[] { "ITEM", "DESCRIÇÃO", "VALOR LÍQUIDO" },
+        ColunasDosOpcionais = new[] { "ITEM", "QTD.", "DESCRIÇÃO", "VALOR LÍQUIDO" },
 
         SemImpostos = "Impostos ou retenções não incluídos",
         TariffCode = "Tariff Code: no 84.14.59.90",
@@ -801,7 +801,7 @@ public sealed class TextosDaProposta
         Inclui = "Includes:",
         Codigo = "Code",
         Opcionais = "Optional Items",
-        ColunasDosOpcionais = new[] { "ITEM", "DESCRIPTION", "NET VALUE" },
+        ColunasDosOpcionais = new[] { "ITEM", "QTY.", "DESCRIPTION", "NET VALUE" },
 
         SemImpostos = "Taxes or withholdings not included",
         TariffCode = "Tariff Code: no 84.14.59.90",

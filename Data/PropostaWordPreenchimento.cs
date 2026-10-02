@@ -686,7 +686,9 @@ internal sealed partial class Preenchimento
         {
             foreach (var opcional in _custo.Opcionais(_p.Itens[i], _moeda))
             {
-                var custo = CustoDaProposta.Efetivo(_p.Itens[i], opcional.Chave, opcional.Valor) ?? 0m;
+                // vezes a quantidade do equipamento, como no escopo fechado:
+                // dois ventiladores levam dois dampers
+                var custo = _custo.CustoDoOpcional(_p.Itens[i], opcional) * _p.Itens[i].Quantos;
                 var preco = PropostaWord.PrecoDoOpcional(_p, _custo, custo);
                 total += preco;
 
@@ -699,6 +701,7 @@ internal sealed partial class Preenchimento
                 linhas.Add(new()
                 {
                     new((linhas.Count + 1).ToString("D2"), JustificationValues.Center),
+                    new(_p.Itens[i].Quantos.ToString(), JustificationValues.Center),
                     new(nome, JustificationValues.Left),
                     // centrado como na tabela de preço, e não à direita: as duas
                     // ficam uma embaixo da outra e a coluna é a mesma
@@ -721,7 +724,7 @@ internal sealed partial class Preenchimento
         bool Faixa = false, bool Negrito = false, int Colunas = 1);
 
     /// <summary>As colunas da tabela de opcionais, nas medidas da tabela de preço.</summary>
-    private static readonly int[] ColunasDoOpcional = { 709, 7826, 1321 };
+    private static readonly int[] ColunasDoOpcional = { 709, 735, 7091, 1321 };
 
     private Table TabelaDeOpcionais(List<List<CelulaDePreco>> linhas, decimal total)
     {
@@ -739,7 +742,7 @@ internal sealed partial class Preenchimento
 
         var fecho = new List<CelulaDePreco>
         {
-            new(_t.TotalDaProposta, JustificationValues.Right, Negrito: true, Colunas: 2),
+            new(_t.TotalDaProposta, JustificationValues.Right, Negrito: true, Colunas: 3),
             new(PropostaWord.Dinheiro(total, _moeda), JustificationValues.Left, Negrito: true),
         };
 

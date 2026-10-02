@@ -105,13 +105,22 @@ public sealed class CustoDaProposta
         ? DadosExcel.Numero(EscopoProposta.PrecoDoMotor(motor, moeda))
         : null;
 
-    public ItemDoEscopo Resolver(ItemProposta item, string grupo, string valor, Moeda moeda)
+    /// <param name="potencia">
+    /// A potência que manda no preço de quem se precifica por ela — o partidor.
+    /// Vazia, vale a do motor do escopo fechado. Serve aos OPCIONAIS: um
+    /// partidor opcional de um equipamento cujo motor também é opcional não
+    /// tem potência no escopo fechado para consultar, e sem isto ficaria sem
+    /// preço.
+    /// </param>
+    public ItemDoEscopo Resolver(ItemProposta item, string grupo, string valor, Moeda moeda,
+        string potencia = "")
     {
         var opcao = Opcoes(grupo).FirstOrDefault(o => o.Valor == valor)
             ?? new Caracteristica { Grupo = grupo, Valor = valor };
 
-        return EscopoProposta.Resolver(opcao, Modelo(item), moeda, _precos,
-            MotorDe(item)?.PotenciaCv ?? "");
+        var cv = potencia.Trim().Length > 0 ? potencia.Trim() : MotorDe(item)?.PotenciaCv ?? "";
+
+        return EscopoProposta.Resolver(opcao, Modelo(item), moeda, _precos, cv);
     }
 
     /// <summary>As linhas do escopo de um equipamento, na ordem das listas.</summary>
@@ -170,19 +179,27 @@ public sealed class CustoDaProposta
     /// <see cref="ItemProposta.Opcionais"/>, mais o motor e a instrumentação
     /// opcionais.
     ///
-    /// NÃO entram em <see cref="LinhasDePreco"/>: o preço fechado da proposta
-    /// é o que o cliente leva, e o opcional é o que ele pode querer depois.
+    /// O CUSTO sai exatamente das mesmas regras do escopo fechado — o mesmo
+    /// <see cref="Resolver"/>, logo a mesma tabela por Fan Diameter, o mesmo
+    /// preço solto da opção, o mesmo catálogo de motores. O que muda é só o
+    /// destino: eles NÃO entram em <see cref="LinhasDePreco"/>, e por isso não
+    /// entram no pricing. O preço de venda deles é o custo vezes o fator da
+    /// proposta (ver <see cref="PropostaWord.PrecoDoOpcional"/>).
     /// </summary>
     public List<LinhaOpcional> Opcionais(ItemProposta item, Moeda moeda)
     {
         var linhas = new List<LinhaOpcional>();
+
+        // o motor que manda no preço do partidor opcional: o opcional, quando
+        // há um — eles vão juntos —, e o do escopo fechado quando não há
+        var potencia = (MotorOpcionalDe(item) ?? MotorDe(item))?.PotenciaCv ?? "";
 
         foreach (var lista in ListasDoEscopo.Append(ListaDosPartidores))
         {
             var opcao = item.Opcionais.GetValueOrDefault(lista, "").Trim();
             if (opcao.Length == 0 || FamiliaDePreco.EhAusencia(opcao)) continue;
 
-            var resolvida = Resolver(item, lista, opcao, moeda);
+            var resolvida = Resolver(item, lista, opcao, moeda, potencia);
             linhas.Add(new($"opc:{lista}", lista, opcao, resolvida.Valor, resolvida.Origem));
         }
 
@@ -195,7 +212,7 @@ public sealed class CustoDaProposta
 
         foreach (var nome in item.InstrumentacaoOpcional.Where(n => n.Trim().Length > 0))
         {
-            var resolvida = Resolver(item, ListaDaInstrumentacao, nome, moeda);
+            var resolvida = Resolver(item, ListaDaInstrumentacao, nome, moeda, potencia);
             linhas.Add(new($"opc:instr:{nome}", "", nome, resolvida.Valor, resolvida.Origem));
         }
 
@@ -207,9 +224,19 @@ public sealed class CustoDaProposta
         ? _motores.FirstOrDefault(m => m.Id == item.MotorOpcionalId)
         : null;
 
-    /// <summary>O custo somado dos opcionais de um equipamento.</summary>
+    /// <summary>O custo UNITÁRIO de um opcional: o do cadastro, ou o da mão.</summary>
+    public decimal CustoDoOpcional(ItemProposta item, LinhaOpcional linha) =>
+        Efetivo(item, linha.Chave, linha.Valor) ?? 0m;
+
+    /// <summary>
+    /// O custo somado dos opcionais de um equipamento, já vezes a quantidade —
+    /// mesma conta do <see cref="Subtotal"/> do escopo fechado.
+    ///
+    /// São dois ventiladores, são dois dampers: o opcional acompanha a
+    /// quantidade do equipamento a que pertence, como qualquer peça dele.
+    /// </summary>
     public decimal CustoDosOpcionais(ItemProposta item, Moeda moeda) =>
-        Opcionais(item, moeda).Sum(l => Efetivo(item, l.Chave, l.Valor) ?? 0m);
+        Opcionais(item, moeda).Sum(l => CustoDoOpcional(item, l)) * item.Quantos;
 
     /// <summary>Opcionais que foram escolhidos e continuam sem preço.</summary>
     public int OpcionaisSemPreco(Proposta proposta) => proposta.Itens.Sum(item =>
