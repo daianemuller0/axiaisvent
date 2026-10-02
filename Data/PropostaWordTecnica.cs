@@ -209,15 +209,43 @@ internal sealed partial class Preenchimento
         Antes(fim, Tabela(UmaColuna(_t.Normas, _t.LinhasDasNormas)));
 
         // as curvas ficam na página seguinte à dos dados, como a equipe pediu
-        if (item.Curvas.Count == 0) return;
+        if (item.Curvas.Count > 0)
+        {
+            Antes(fim, QuebraDePagina());
+            Antes(fim, Titulo(_t.CurvaDePerformance));
+
+            foreach (var curva in item.Curvas)
+            {
+                if (lerCurva(curva) is not { } arquivo) continue;
+                Antes(fim, Imagem(arquivo));
+            }
+        }
+
+        Eletrica(fim, item, indice, varios);
+    }
+
+    /// <summary>
+    /// A parte elétrica: a tabela do motor e, embaixo dela, a do quadro do
+    /// partidor. Vai em página própria, depois da curva.
+    ///
+    /// Quem decide se ela existe é o escopo, não esta função: sem motor,
+    /// <see cref="DadosEletricos.De"/> devolve vazio e a página não é criada —
+    /// nem a quebra que a abriria, que é o que faria sobrar uma folha em
+    /// branco no fim do bloco do equipamento.
+    /// </summary>
+    private void Eletrica(OpenXmlElement? fim, ItemProposta item, int indice, bool varios)
+    {
+        var quadros = DadosEletricos.De(item, _custo, _moeda, _tel);
+        if (quadros.Count == 0) return;
 
         Antes(fim, QuebraDePagina());
-        Antes(fim, Titulo(_t.CurvaDePerformance));
+        Antes(fim, Titulo(PorVentilador(_tel.Secao, indice, varios)));
 
-        foreach (var curva in item.Curvas)
+        for (var i = 0; i < quadros.Count; i++)
         {
-            if (lerCurva(curva) is not { } arquivo) continue;
-            Antes(fim, Imagem(arquivo));
+            // a faixa azul já é o nome da tabela, como no modelo
+            if (i > 0) Antes(fim, Vazio());
+            Antes(fim, Tabela(UmaColuna(quadros[i].Titulo, quadros[i].Linhas)));
         }
     }
 

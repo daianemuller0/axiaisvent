@@ -1331,6 +1331,42 @@
                     </div>
                 </div>
 
+                @* ----- parte elétrica ----- *@
+                <div style="margin-top:14px; padding-top:12px;
+                            border-top:1px solid var(--linha, #e6e8ec)">
+                    <div class="subtitle" style="margin-bottom:8px">
+                        <strong>@EletricaTextos.Secao.ToUpperInvariant()</strong>
+                        — sai depois da curva, em página própria
+                    </div>
+
+                    @if (DadosEletricos.De(item, _custo, _proposta.Moeda, EletricaTextos)
+                         is { Count: > 0 } eletrica)
+                    {
+                        @foreach (var quadro in eletrica)
+                        {
+                            <div class="panel" style="padding:0; overflow-x:auto; margin:0 0 10px">
+                                <table class="grid">
+                                    <thead><tr><th>@quadro.Titulo</th></tr></thead>
+                                    <tbody>
+                                        @foreach (var linha in quadro.Linhas)
+                                        {
+                                            <tr><td>@linha</td></tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <p class="subtitle" style="margin:0">
+                            Sem motor no escopo — a parte elétrica não entra no documento.
+                            Com motor e sem partidor, sai só a tabela do motor, sem a linha do
+                            método de partida.
+                        </p>
+                    }
+                </div>
+
                 @* ----- curvas ----- *@
                 <div class="toolbar" style="flex-wrap:wrap; margin-top:14px; padding-top:12px;
                                             border-top:1px solid var(--linha, #e6e8ec)">
@@ -1941,6 +1977,9 @@
 
     /// <summary>Os textos de escopo na língua da proposta.</summary>
     private TextosDoEscopo EscopoTextos => TextosDoEscopo.Do(Idioma);
+
+    /// <summary>Os textos da parte elétrica na língua da proposta.</summary>
+    private TextosEletricos EletricaTextos => TextosEletricos.Do(Idioma);
 
     private string SerieDoItem(ItemProposta item) => _custo.SerieDe(item);
 
