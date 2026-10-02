@@ -10,11 +10,14 @@ public sealed record QuadroEletrico(string Titulo, List<string> Linhas);
 /// Sai do ESCOPO, e não de um preenchimento à parte:
 ///
 /// <list type="bullet">
-/// <item>sem motor no escopo, a parte elétrica inteira não aparece;</item>
-/// <item>sem partidor, aparece só a tabela do motor, e sem a linha do método
-/// de partida — não há partida a descrever;</item>
-/// <item>com partidor, o método de partida é o que vocês escolheram, e embaixo
-/// vem a tabela daquele tipo de quadro.</item>
+/// <item>a tabela do motor segue o MOTOR: sem motor no escopo, ela não sai;</item>
+/// <item>a tabela do quadro segue o PARTIDOR, e sai mesmo sem motor — quem
+/// compra só o partidor, para usar com o motor que já tem, precisa do quadro
+/// descrito na proposta;</item>
+/// <item>com os dois, a linha do método de partida fecha a tabela do motor e o
+/// quadro vem embaixo;</item>
+/// <item>a partida direta não leva quadro próprio, como no modelo da equipe:
+/// com ela, só a linha do método de partida.</item>
 /// </list>
 ///
 /// A tensão, a frequência e o grau de proteção vêm do motor e da opção do
@@ -37,22 +40,26 @@ public static class DadosEletricos
     public static List<QuadroEletrico> De(ItemProposta item, CustoDaProposta custo, Moeda moeda,
         TextosEletricos textos)
     {
-        if (!item.ComMotor) return new();
-
         var motor = custo.MotorDe(item);
-        var partidor = custo.LinhaDoPartidor(item, moeda) is { Ausencia: false } linha
-            ? linha.Opcao.Trim()
-            : "";
+        var partidor = Partidor(item, custo, moeda);
 
         var tensao = TensaoEFrequencia(motor);
         var tipo = Tipo(partidor);
 
-        var doMotor = textos.LinhasDoMotor.Select(l => Preencher(l, tensao, "")).ToList();
+        var quadros = new List<QuadroEletrico>();
 
-        if (partidor.Length > 0)
-            doMotor.Add(string.Format(textos.MetodoDeArranque, Metodo(tipo, partidor, textos)));
+        // a tabela do motor segue o MOTOR, e a do quadro segue o PARTIDOR. São
+        // duas vendas separadas: o cliente que compra só o partidor, com o
+        // motor dele, tem direito ao quadro descrito na proposta
+        if (item.ComMotor)
+        {
+            var doMotor = textos.LinhasDoMotor.Select(l => Preencher(l, tensao, "")).ToList();
 
-        var quadros = new List<QuadroEletrico> { new(textos.Motores, doMotor) };
+            if (partidor.Length > 0)
+                doMotor.Add(string.Format(textos.MetodoDeArranque, Metodo(tipo, partidor, textos)));
+
+            quadros.Add(new(textos.Motores, doMotor));
+        }
 
         if (Tabela(tipo, textos) is { } tabela)
         {
@@ -62,6 +69,10 @@ public static class DadosEletricos
 
         return quadros;
     }
+
+    /// <summary>O partidor escolhido, ou vazio quando não há.</summary>
+    public static string Partidor(ItemProposta item, CustoDaProposta custo, Moeda moeda) =>
+        custo.LinhaDoPartidor(item, moeda) is { Ausencia: false } linha ? linha.Opcao.Trim() : "";
 
     /// <summary>
     /// "380 V / 50 Hz" — do motor escolhido, quando há um. A tensão vem como a

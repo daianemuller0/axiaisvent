@@ -1395,11 +1395,12 @@
                     }
                     else
                     {
-                        <p class="subtitle" style="margin:0">
-                            Sem motor no escopo — a parte elétrica não entra no documento.
-                            Com motor e sem partidor, sai só a tabela do motor, sem a linha do
-                            método de partida.
-                        </p>
+                        <p class="subtitle" style="margin:0">@SemParteEletrica(item)</p>
+                    }
+
+                    @if (SoOMetodoDePartida(item) is { Length: > 0 } semQuadro)
+                    {
+                        <p class="subtitle" style="margin:8px 0 0; color:#c98a00">@semQuadro</p>
                     }
                 </div>
 
@@ -2111,6 +2112,56 @@
 
     /// <summary>Os textos da parte elétrica na língua da proposta.</summary>
     private TextosEletricos EletricaTextos => TextosEletricos.Do(Idioma);
+
+    /// <summary>
+    /// Por que a parte elétrica deste equipamento não vai sair.
+    ///
+    /// Em vez de um "não entra no documento" seco: a tabela do motor segue o
+    /// motor e a do quadro segue o partidor, então o motivo é sempre um dos
+    /// dois — e saber qual é a diferença entre marcar uma caixa e procurar um
+    /// defeito no gerador.
+    /// </summary>
+    private string SemParteEletrica(ItemProposta item)
+    {
+        var partidor = DadosEletricos.Partidor(item, _custo, _proposta.Moeda);
+
+        if (partidor.Length == 0)
+            return "Sem motor e sem partidor no escopo — não há parte elétrica a descrever.";
+
+        var porque = DadosEletricos.Tipo(partidor) == DadosEletricos.TipoDePartidor.Dol
+            ? " é partida direta, que não leva quadro próprio"
+            : " não é um dos quadros do modelo (SS, estrela-triângulo ou VDF)";
+
+        return partidor + porque + ", e o motor não está no escopo. "
+            + "Marque o motor para a tabela dele sair com o método de partida.";
+    }
+
+    /// <summary>
+    /// O aviso de quando o partidor escolhido entra só como método de partida,
+    /// sem quadro próprio — a partida direta, que o modelo da equipe não
+    /// descreve, e um partidor com nome que não casa com nenhum dos três.
+    /// </summary>
+    private string SoOMetodoDePartida(ItemProposta item)
+    {
+        if (!item.ComMotor) return "";
+
+        var partidor = DadosEletricos.Partidor(item, _custo, _proposta.Moeda);
+        if (partidor.Length == 0) return "";
+
+        return DadosEletricos.Tipo(partidor) switch
+        {
+            DadosEletricos.TipoDePartidor.Dol => partidor
+                + " é partida direta: entra como método de partida na tabela do motor, e não leva "
+                + "quadro próprio — é assim no modelo de vocês.",
+
+            DadosEletricos.TipoDePartidor.Ss or DadosEletricos.TipoDePartidor.Yd
+                or DadosEletricos.TipoDePartidor.Vdf => "",
+
+            _ => partidor
+                + " não casa com nenhum dos quadros do modelo (SS, estrela-triângulo ou VDF): "
+                + "entra como método de partida, com esse nome, mas sem tabela de quadro.",
+        };
+    }
 
     private string SerieDoItem(ItemProposta item) => _custo.SerieDe(item);
 
