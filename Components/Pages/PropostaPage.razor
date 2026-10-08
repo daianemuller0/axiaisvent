@@ -18,7 +18,7 @@
     <div>
         <h1>Proposta</h1>
         <p class="subtitle">
-            O cabeçalho do documento, o cliente e o escopo do ventilador. O preço e o código
+            O cabeçalho do documento, o cliente e o escopo do ventilador. O custo e o código
             de cada item saem do cadastro da guia <strong>Dados</strong> — a proposta guarda a
             escolha, e o valor é lido na hora.
         </p>
@@ -510,16 +510,16 @@
             <button class="@(_proposta.Moeda == moeda ? "btn-primary" : "btn-ghost")"
                     @onclick="() => _proposta.MoedaCodigo = moeda.Codigo()">@moeda.Rotulo()</button>
         }
-        <span class="subtitle" style="margin:0">manda em todos os preços</span>
+        <span class="subtitle" style="margin:0">manda em todos os custos</span>
     </div>
         @if (Aberto("escopo"))
         {
 
     <p class="subtitle" style="margin:12px 0 0">
-        O preço de cada linha vem do cadastro e <strong>dá para trocar na própria linha</strong>:
-        serve para o que ainda não tem preço cadastrado e para quando a proposta pede um valor
+        O custo de cada linha vem do cadastro e <strong>dá para trocar na própria linha</strong>:
+        serve para o que ainda não tem custo cadastrado e para quando a proposta pede um valor
         diferente. O que você digita vale <strong>só nesta proposta</strong> — o cadastro não
-        muda — e o <strong>↺</strong> ao lado volta ao preço do cadastro.
+        muda — e o <strong>↺</strong> ao lado volta ao custo do cadastro.
     </p>
 
     <div class="tabs">
@@ -578,7 +578,7 @@
                  && !EhManual(atual, "equipamento"))
             {
                 <span class="subtitle" style="margin:0; color:#c98a00">
-                    este modelo não tem preço em @_proposta.Moeda.Rotulo() — ponha à mão abaixo
+                    este modelo não tem custo em @_proposta.Moeda.Rotulo() — ponha à mão abaixo
                 </span>
             }
             else
@@ -653,7 +653,7 @@
                             <th class="nowrap">FB/HB</th>
                             <th class="nowrap">Nº de estágios</th>
                             <th class="nowrap">Código</th>
-                            <th class="nowrap right">Preço @_proposta.Moeda.Rotulo()</th>
+                            <th class="nowrap right">Custo @_proposta.Moeda.Rotulo()</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -791,7 +791,7 @@
                 <div class="toolbar" style="margin:14px 0 0; flex-wrap:wrap">
                     <span class="val-count">@candidatos.Count motor(es) atendem</span>
                     <span class="subtitle" style="margin:0">
-                        @MotoresComPreco(candidatos) com preço em @_proposta.Moeda.Rotulo()
+                        @MotoresComPreco(candidatos) com custo em @_proposta.Moeda.Rotulo()
                     </span>
                     <button class="btn-link" @onclick="() => LimparFiltro(atual)">limpar filtro</button>
                     <span style="flex:1"></span>
@@ -804,13 +804,13 @@
                             @if (PrecoDoMotor(motor) is null && !EhManual(atual, "motor"))
                             {
                                 <span class="subtitle" style="margin:0; color:#c98a00; white-space:nowrap">
-                                    este motor não tem preço em @_proposta.Moeda.Rotulo() — ponha à mão ao lado
+                                    este motor não tem custo em @_proposta.Moeda.Rotulo() — ponha à mão ao lado
                                 </span>
                             }
                             else
                             {
                                 <span class="subtitle" style="margin:0; white-space:nowrap">
-                                    @(EhManual(atual, "motor") ? "preço à mão" : "catálogo de motores")
+                                    @(EhManual(atual, "motor") ? "custo à mão" : "catálogo de motores")
                                 </span>
                             }
                         }
@@ -1050,7 +1050,7 @@
                                         <th class="nowrap">Opcional</th>
                                         <th class="nowrap right">Qtd.</th>
                                         <th class="nowrap right">Custo unit. @_proposta.Moeda.Rotulo()</th>
-                                        <th class="nowrap right">Preço @_proposta.Moeda.Rotulo()</th>
+                                        <th class="nowrap right">Custo @_proposta.Moeda.Rotulo()</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1190,8 +1190,8 @@
     @if (FaltaPreco > 0)
     {
         <p class="subtitle" style="margin:10px 0 0">
-            @FaltaPreco item(ns) escolhido(s) ainda sem preço — nem do cadastro, nem à mão. O
-            custo conta só o que já tem valor; para os outros, digite o preço na própria linha
+            @FaltaPreco item(ns) escolhido(s) ainda sem custo — nem do cadastro, nem à mão. O
+            custo conta só o que já tem valor; para os outros, digite o custo na própria linha
             do escopo.
         </p>
     }
@@ -2008,7 +2008,7 @@
                          text-overflow:ellipsis">
                 @(codigo.Length > 0 ? $"código {codigo}" : "sem código")
                 ·
-                @(EhManual(item, chave) ? "preço à mão" : origem)
+                @(EhManual(item, chave) ? "custo à mão" : origem)
             </span>
             @Preco(item, chave, puxado)
         </div>
@@ -2022,7 +2022,7 @@
                    @onchange="e => DefinirPrecoManual(item, chave, e.Value?.ToString() ?? string.Empty, puxado)" />
             @if (EhManual(item, chave))
             {
-                <button class="btn-link" title="Voltar ao preço do cadastro"
+                <button class="btn-link" title="Voltar ao custo do cadastro"
                         @onclick="() => item.PrecosManuais.Remove(chave)">↺</button>
             }
         </div>
@@ -2208,7 +2208,7 @@
     /// </summary>
     private string RotuloDoModelo(Equipamento e) => PrecoDoEquipamento(e) is { } preco
         ? $"{e.Rotulo} · {preco.ToString("N2", new System.Globalization.CultureInfo("pt-BR"))}"
-        : $"{e.Rotulo} · sem preço";
+        : $"{e.Rotulo} · sem custo";
 
     /// <summary>
     /// A série com a conta de quantos modelos dela têm preço — para dar a
@@ -2219,7 +2219,7 @@
         var todos = modelos.ToList();
         var comPreco = todos.Count(e => PrecoDoEquipamento(e) is not null);
 
-        return $"{serie} — {comPreco} de {todos.Count} com preço em {_proposta.Moeda.Rotulo()}";
+        return $"{serie} — {comPreco} de {todos.Count} com custo em {_proposta.Moeda.Rotulo()}";
     }
 
     private string Dinheiro(decimal? valor) => valor is null
