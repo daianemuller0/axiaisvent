@@ -1,0 +1,154 @@
+@page "/axiais/marca"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject BrandingRepository Branding
+
+<div class="page-head">
+    <div>
+        <h1>Identidade Visual</h1>
+        <p class="subtitle">
+            Dois logos, trocáveis a qualquer momento: o da <strong>página inicial</strong> (a tela
+            de entrada, com o login) e o do <strong>sistema</strong> (a barra lateral, em todas as
+            telas). Envie PNG ou JPG de até 1&nbsp;MB — de preferência PNG com fundo transparente.
+        </p>
+    </div>
+</div>
+
+<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:18px; align-items:start">
+    <div class="panel">
+        <h3 class="dash-title">Logo da página inicial</h3>
+        <InputFile OnChange="e => Enviar(e, paginaInicial: true)" accept="image/png,image/jpeg" />
+        <div class="logo-preview" style="margin-top:14px; background:#0d3b66">
+            @if (_logoPaginaInicial is not null)
+            {
+                <div class="login2-logo" style="color:#fff"><img src="@_logoPaginaInicial" alt="Logo da página inicial" /></div>
+            }
+            else
+            {
+                <div style="color:#fff; text-align:center">
+                    <div style="font-weight:bold;font-size:26px;letter-spacing:.5px;line-height:1">Howden</div>
+                    <div style="font-style:italic;font-size:11px;opacity:.8;margin-top:2px">A Chart Industries Company</div>
+                    <div style="font-size:12px;opacity:.7;margin-top:12px">Wordmark padrão (nenhum logo enviado).</div>
+                </div>
+            }
+        </div>
+        @if (_logoPaginaInicial is not null)
+        {
+            <button class="btn-ghost" style="margin-top:12px" @onclick="() => Remover(paginaInicial: true)">
+                Remover logo da página inicial
+            </button>
+        }
+    </div>
+
+    <div class="panel">
+        <h3 class="dash-title">Logo do sistema (barra lateral)</h3>
+        <InputFile OnChange="e => Enviar(e, paginaInicial: false)" accept="image/png,image/jpeg" />
+        <div class="logo-preview" style="margin-top:14px; background:#14315c">
+            @if (_logoSistema is not null)
+            {
+                <span class="brand-img"><img src="@_logoSistema" alt="Logo do sistema" /></span>
+            }
+            else
+            {
+                <div style="color:#fff; text-align:center">
+                    <div style="font-weight:bold;font-size:26px;letter-spacing:.5px;line-height:1">Howden</div>
+                    <div style="font-style:italic;font-size:11px;opacity:.8;margin-top:2px">Ventiladores Axiais</div>
+                    <div style="font-size:12px;opacity:.7;margin-top:12px">Padrão (nenhum logo enviado).</div>
+                </div>
+            }
+        </div>
+        @if (_logoSistema is not null)
+        {
+            <button class="btn-ghost" style="margin-top:12px" @onclick="() => Remover(paginaInicial: false)">
+                Remover logo do sistema
+            </button>
+        }
+    </div>
+</div>
+
+@if (_msg is not null)
+{
+    <div class="@(_erro ? "aviso aviso-erro" : "aviso aviso-ok")" style="margin-top:14px; max-width:760px">@_msg</div>
+}
+
+@code {
+    private const long TamanhoMaximo = 1L * 1024 * 1024;
+
+    private string? _logoPaginaInicial;
+    private string? _logoSistema;
+    private string? _msg;
+    private bool _erro;
+
+    protected override void OnInitialized()
+    {
+        _logoPaginaInicial = Branding.GetLogoPaginaInicial();
+        _logoSistema = Branding.GetLogoSistema();
+    }
+
+    private async Task Enviar(InputFileChangeEventArgs e, bool paginaInicial)
+    {
+        _msg = null;
+        _erro = false;
+
+        try
+        {
+            var arquivo = e.File;
+
+            var tipo = arquivo.ContentType;
+            if (tipo is not ("image/png" or "image/jpeg"))
+            {
+                Aviso($"\"{arquivo.Name}\" não é PNG nem JPG.", erro: true);
+                return;
+            }
+
+            if (arquivo.Size > TamanhoMaximo)
+            {
+                Aviso("Arquivo muito grande (máximo 1 MB).", erro: true);
+                return;
+            }
+
+            using var memoria = new MemoryStream();
+            await arquivo.OpenReadStream(TamanhoMaximo).CopyToAsync(memoria);
+            var dataUri = $"data:{tipo};base64,{Convert.ToBase64String(memoria.ToArray())}";
+
+            if (paginaInicial)
+            {
+                Branding.SaveLogoPaginaInicial(dataUri);
+                _logoPaginaInicial = dataUri;
+                Aviso("Logo da página inicial salvo — já aparece na tela de entrada.");
+            }
+            else
+            {
+                Branding.SaveLogoSistema(dataUri);
+                _logoSistema = dataUri;
+                Aviso("Logo do sistema salvo — já aparece na barra lateral.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Aviso("Não consegui enviar o arquivo: " + ex.Message, erro: true);
+        }
+    }
+
+    private void Remover(bool paginaInicial)
+    {
+        if (paginaInicial)
+        {
+            Branding.ClearLogoPaginaInicial();
+            _logoPaginaInicial = null;
+            Aviso("Logo da página inicial removido — volta o wordmark padrão.");
+        }
+        else
+        {
+            Branding.ClearLogoSistema();
+            _logoSistema = null;
+            Aviso("Logo do sistema removido — volta o padrão.");
+        }
+    }
+
+    private void Aviso(string texto, bool erro = false)
+    {
+        _msg = texto;
+        _erro = erro;
+    }
+}

@@ -124,6 +124,16 @@ Item sem CLP não é tocado. A opção *só preencher o que está vazio* preserv
 digitados à mão. As taxas ficam gravadas (`taxas_conversao`) com a data da última gravação;
 o código está em `Data/ConversaoRepository.cs`.
 
+## Identidade Visual
+
+Item **Identidade Visual** no menu (`/axiais/marca`): troca os dois logos do sistema, sem mexer
+em código. O **logo da página inicial** aparece na tela de entrada (login) e o **logo do
+sistema** na barra lateral, em todas as telas. Aceita PNG ou JPG de até 1 MB (de preferência
+PNG com fundo transparente); a troca vale na hora, inclusive na barra lateral de quem já está
+com o sistema aberto. Sem logo enviado, cada lugar volta ao padrão da Howden. Os logos ficam
+gravados na pasta de dados (entidade `branding`, `Data/BrandingRepository.cs`). O logo do
+documento das propostas não passa por aqui: ele é o do modelo em Word da equipe.
+
 ## A aba Base
 
 Hoje o sistema tem uma aba, **Base**, com a planilha da equipe:

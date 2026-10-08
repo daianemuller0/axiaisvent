@@ -1,14 +1,24 @@
 @implements IDisposable
 @inject NavigationManager Nav
+@inject BrandingRepository Branding
 
 <aside class="sidebar no-print">
-    <div class="brand">
-        <div class="brand-mark">H</div>
-        <div>
-            <div class="brand-name">Howden</div>
-            <div class="brand-sub">Ventiladores Axiais</div>
+    @if (_logo is not null)
+    {
+        <div class="brand logo">
+            <span class="brand-img"><img src="@_logo" alt="Logo" /></span>
         </div>
-    </div>
+    }
+    else
+    {
+        <div class="brand">
+            <div class="brand-mark">H</div>
+            <div>
+                <div class="brand-name">Howden</div>
+                <div class="brand-sub">Ventiladores Axiais</div>
+            </div>
+        </div>
+    }
 
     <nav class="nav">
         <div class="nav-section">Comercial</div>
@@ -30,6 +40,10 @@
             <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/></svg>
             <span>Dados</span>
         </NavLink>
+        <NavLink class="nav-item" href="/axiais/marca">
+            <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+            <span>Identidade Visual</span>
+        </NavLink>
     </nav>
 
     <div class="sidebar-footer">
@@ -38,7 +52,27 @@
 </aside>
 
 @code {
-    protected override void OnInitialized() => Nav.LocationChanged += OnChanged;
+    private string? _logo;
+
+    protected override void OnInitialized()
+    {
+        _logo = Branding.GetLogoSistema();
+        Nav.LocationChanged += OnChanged;
+        BrandingRepository.Mudou += OnLogoMudou;
+    }
+
     private void OnChanged(object? s, LocationChangedEventArgs e) => StateHasChanged();
-    public void Dispose() => Nav.LocationChanged -= OnChanged;
+
+    // outra pessoa (ou esta, na tela Identidade Visual) trocou o logo
+    private void OnLogoMudou() => _ = InvokeAsync(() =>
+    {
+        _logo = Branding.GetLogoSistema();
+        StateHasChanged();
+    });
+
+    public void Dispose()
+    {
+        Nav.LocationChanged -= OnChanged;
+        BrandingRepository.Mudou -= OnLogoMudou;
+    }
 }
