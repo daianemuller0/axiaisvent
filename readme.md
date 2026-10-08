@@ -113,6 +113,17 @@ duas escadas independentes.
 Onde a rotação está vazia, o campo sugere em cinza a rotação síncrona de polos +
 frequência; é só dica, o valor gravado é o que você digitar.
 
+## A seção Conversão
+
+Quarta seção da guia Dados (`/axiais/conversao`): converte o preço em **CLP** para **USD** e
+para **R$**. A equipe digita as duas taxas do jeito que se fala — `1 USD = X CLP` e
+`1 R$ = X CLP` — e o **Ver o que muda** mostra quantos preços serão recalculados em modelos,
+motores, características e tabelas por referência. Confirmado, o USD e o R$ de **todo item
+que tem CLP** são gravados (CLP ÷ taxa, duas casas) e as propostas já usam os valores novos.
+Item sem CLP não é tocado. A opção *só preencher o que está vazio* preserva o USD e o R$
+digitados à mão. As taxas ficam gravadas (`taxas_conversao`) com a data da última gravação;
+o código está em `Data/ConversaoRepository.cs`.
+
 ## A aba Base
 
 Hoje o sistema tem uma aba, **Base**, com a planilha da equipe:

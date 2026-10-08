@@ -1,6 +1,7 @@
 @page "/axiais/dados"
 @page "/axiais/motores"
 @page "/axiais/caracteristicas"
+@page "/axiais/conversao"
 @attribute [Authorize]
 @rendermode InteractiveServer
 @inject EquipamentoRepository Equipamentos
@@ -16,7 +17,7 @@
     <div>
         <h1>Dados</h1>
         <p class="subtitle">
-            Modelos, motores e características — tudo numa guia só. O Excel leva e traz de
+            Modelos, motores, características e a conversão de moeda — tudo numa guia só. O Excel leva e traz de
             volta o conteúdo inteiro desta página.
         </p>
     </div>
@@ -127,6 +128,10 @@ else if (_secao == "motores")
 {
     <VistaMotores @key="@("motores-" + _versao)" />
 }
+else if (_secao == "conversao")
+{
+    <VistaConversao @key="@("conversao-" + _versao)" />
+}
 else
 {
     <VistaCaracteristicas @key="@("caract-" + _versao)" />
@@ -145,6 +150,7 @@ else
     private static readonly (string Chave, string Titulo)[] Secoes =
     {
         ("modelos", "Modelos"), ("motores", "Motores"), ("caracteristicas", "Características"),
+        ("conversao", "Conversão"),
     };
 
     /// <summary>A seção à vista. Começa pela que a rota pediu.</summary>
@@ -187,6 +193,7 @@ else
         var rota = Navegacao.ToBaseRelativePath(Navegacao.Uri).ToLowerInvariant();
         if (rota.Contains("motores")) _secao = "motores";
         else if (rota.Contains("caracteristicas")) _secao = "caracteristicas";
+        else if (rota.Contains("conversao")) _secao = "conversao";
 
         Contar();
     }
