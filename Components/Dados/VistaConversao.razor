@@ -5,11 +5,11 @@
 @inject PrecoReferenciaRepository Referencias
 
 <p class="subtitle">
-    Converte o preço em <strong>peso chileno (CLP)</strong> para <strong>dólar</strong> e para
-    <strong>real</strong>. Digite as taxas do dia e aplique: o USD e o R$ de cada item de
-    <em>Modelos</em>, <em>Motores</em>, <em>Características</em> e das tabelas de preço por
+    Converte o custo em <strong>peso chileno (CLP)</strong> para <strong>dólar</strong>
+    (o real está fora de uso por enquanto). Digite a taxa do dia e aplique: o USD de cada item de
+    <em>Modelos</em>, <em>Motores</em>, <em>Características</em> e das tabelas de custo por
     referência são recalculados a partir do CLP, e as propostas já passam a usar os valores novos.
-    Item sem preço em CLP não é tocado.
+    Item sem custo em CLP não é tocado.
 </p>
 
 <div class="panel" style="margin-bottom:16px">
@@ -23,12 +23,15 @@
             <span>CLP</span>
         </label>
 
+        @if (Moedas.UsaReal)
+        {
         <label style="display:flex; align-items:center; gap:6px">
             <span>1 R$ =</span>
             <input class="cell" style="width:110px" inputmode="decimal" placeholder="ex.: 180"
                    value="@_clpPorBrl" @oninput="DigitouBrl" />
             <span>CLP</span>
         </label>
+        }
 
         <button class="btn-ghost" @onclick="SalvarTaxas">Salvar taxas</button>
 
@@ -39,21 +42,21 @@
     </div>
 
     <p class="subtitle" style="margin:10px 0 0">
-        @if (ExemploUsd is not null || ExemploBrl is not null)
+        @if (ExemploUsd is not null || (Moedas.UsaReal && ExemploBrl is not null))
         {
             <span>Conferência: 1.000.000 CLP =</span>
             @if (ExemploUsd is not null)
             {
                 <strong> USD @ExemploUsd</strong>
             }
-            @if (ExemploBrl is not null)
+            @if (Moedas.UsaReal && ExemploBrl is not null)
             {
                 <strong> · R$ @ExemploBrl</strong>
             }
         }
         else
         {
-            <span>Informe ao menos uma das taxas. Pode usar vírgula ou ponto (950,5 ou 950.5).</span>
+            <span>Informe a taxa. Pode usar vírgula ou ponto (950,5 ou 950.5).</span>
         }
     </p>
 </div>
@@ -79,7 +82,7 @@
     </div>
 
     <p class="subtitle" style="margin:10px 0 0">
-        Por padrão o USD e o R$ já preenchidos são <strong>substituídos</strong> pelo valor
+        Por padrão o USD já preenchido é <strong>substituído</strong> pelo valor
         convertido — é o que faz a taxa nova subir para tudo. Marque a opção acima para
         preservar o que já foi digitado à mão.
     </p>
@@ -89,16 +92,16 @@
         @if (_previa.Total == 0)
         {
             <div class="aviso aviso-alerta" style="margin-top:12px">
-                Nada a atualizar: @(_previa.ComClp == 0 ? "nenhum item tem preço em CLP." : "os valores já estão de acordo com as taxas.")
+                Nada a atualizar: @(_previa.ComClp == 0 ? "nenhum item tem custo em CLP." : "os valores já estão de acordo com as taxas.")
             </div>
         }
         else
         {
             <div class="aviso aviso-alerta" style="margin-top:12px">
-                ⚠ Vão ser atualizados <strong>@_previa.Total</strong> preço(s):
+                ⚠ Vão ser atualizados <strong>@_previa.Total</strong> custo(s):
                 @_previa.Modelos modelo(s), @_previa.Motores motor(es),
                 @_previa.Caracteristicas subitem(ns) de características e
-                @_previa.Referencias linha(s) de preço por referência.
+                @_previa.Referencias linha(s) de custo por referência.
                 <strong>Não dá para desfazer</strong> — mas basta digitar a taxa certa e aplicar de novo.
             </div>
             <div class="toolbar" style="margin:12px 0 0">
@@ -136,7 +139,7 @@
 
     private bool TemTaxa =>
         ConversaoRepository.Taxa(_clpPorUsd) is not null ||
-        ConversaoRepository.Taxa(_clpPorBrl) is not null;
+        (Moedas.UsaReal && ConversaoRepository.Taxa(_clpPorBrl) is not null);
 
     private string? ExemploUsd => ConversaoRepository.Taxa(_clpPorUsd) is { } t
         ? Math.Round(1_000_000m / t, 2).ToString("N2", Pt)
@@ -188,7 +191,7 @@
             Aviso("A taxa do dólar não é um número maior que zero.", erro: true);
             return false;
         }
-        if (_clpPorBrl.Trim().Length > 0 && ConversaoRepository.Taxa(_clpPorBrl) is null)
+        if (Moedas.UsaReal && _clpPorBrl.Trim().Length > 0 && ConversaoRepository.Taxa(_clpPorBrl) is null)
         {
             Aviso("A taxa do real não é um número maior que zero.", erro: true);
             return false;
@@ -203,7 +206,7 @@
         var t = Taxas();
         Repo.Salvar(t);
         _atualizadaEm = Formatar(t.AtualizadaEm);
-        Aviso("Taxas gravadas. Para atualizar os preços, use “Ver o que muda”.");
+        Aviso("Taxas gravadas. Para atualizar os custos, use “Ver o que muda”.");
     }
 
     private void Prever()
@@ -229,7 +232,7 @@
             Equipamentos, Motores, Caracteristicas, Referencias);
 
         _previa = null;
-        Aviso($"Taxas aplicadas: {feito.Total} preço(s) atualizado(s) — " +
+        Aviso($"Taxas aplicadas: {feito.Total} custo(s) atualizado(s) — " +
               $"{feito.Modelos} modelo(s), {feito.Motores} motor(es), " +
               $"{feito.Caracteristicas} subitem(ns) e {feito.Referencias} linha(s) por referência.");
     }

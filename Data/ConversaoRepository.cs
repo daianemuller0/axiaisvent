@@ -95,7 +95,8 @@ public sealed class ConversaoRepository
         CaracteristicaRepository caracteristicas, PrecoReferenciaRepository referencias)
     {
         var usd = Taxa(taxas.ClpPorUsd);
-        var brl = Taxa(taxas.ClpPorBrl);
+        // o real está fora de uso: enquanto estiver, só o dólar é recalculado
+        var brl = Moedas.UsaReal ? Taxa(taxas.ClpPorBrl) : null;
         var resumo = new ResumoConversao();
 
         if (usd is null && brl is null) return resumo;

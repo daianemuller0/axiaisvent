@@ -115,14 +115,18 @@ frequência; é só dica, o valor gravado é o que você digitar.
 
 ## A seção Conversão
 
-Quarta seção da guia Dados (`/axiais/conversao`): converte o preço em **CLP** para **USD** e
-para **R$**. A equipe digita as duas taxas do jeito que se fala — `1 USD = X CLP` e
-`1 R$ = X CLP` — e o **Ver o que muda** mostra quantos preços serão recalculados em modelos,
-motores, características e tabelas por referência. Confirmado, o USD e o R$ de **todo item
-que tem CLP** são gravados (CLP ÷ taxa, duas casas) e as propostas já usam os valores novos.
-Item sem CLP não é tocado. A opção *só preencher o que está vazio* preserva o USD e o R$
-digitados à mão. As taxas ficam gravadas (`taxas_conversao`) com a data da última gravação;
-o código está em `Data/ConversaoRepository.cs`.
+Quarta seção da guia Dados (`/axiais/conversao`): converte o custo em **CLP** para **USD**. A
+equipe digita a taxa do jeito que se fala — `1 USD = X CLP` — e o **Ver o que muda** mostra
+quantos valores serão recalculados em modelos, motores, características e tabelas por
+referência. Confirmado, o USD de **todo item que tem CLP** é gravado (CLP ÷ taxa, duas casas) e
+as propostas já usam os valores novos. Item sem CLP não é tocado. A opção *só preencher o que
+está vazio* preserva o USD digitado à mão. A taxa fica gravada (`taxas_conversao`) com a data da
+última gravação; o código está em `Data/ConversaoRepository.cs`.
+
+**O real está fora de uso por enquanto.** O interruptor é `Moedas.UsaReal` (`Data/Moeda.cs`):
+desligado, a coluna R$ some das telas e das planilhas de Dados, a moeda R$ some da proposta e a
+conversão só trata o dólar. Os valores em R$ já gravados continuam no banco; para religar, basta
+trocar o valor para `true`. Na guia Dados, o que se chamava *preço* agora é *custo*.
 
 ## Identidade Visual
 

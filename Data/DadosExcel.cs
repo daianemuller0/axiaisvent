@@ -10,14 +10,14 @@ namespace HowdenAxiais.Poc.Data;
 ///
 /// Cada tabela é uma ABA da planilha, com o mesmo nome nos dois sentidos — o que
 /// sai é exatamente o que entra. É o caminho para a equipe trabalhar no Excel
-/// (preços, códigos) e devolver ao sistema.
+/// (custos, códigos) e devolver ao sistema.
 /// </summary>
 public static class DadosExcel
 {
     public const string AbaModelos = "Modelos";
     public const string AbaVentiladores = "Ventiladores";
     public const string AbaCubos = "Cubos";
-    public const string AbaPrecos = "Preços por referência";
+    public const string AbaPrecos = "Custos por referência";
     public const string AbaLimites = "Limites de motor";
     public const string AbaMotores = "Motores";
     public const string AbaCaracteristicas = "Características";
@@ -45,7 +45,7 @@ public static class DadosExcel
 
         // A aba Modelos é a LISTA CRUZADA: uma linha por combinação
         // ventilador × cubo, que é o equipamento — e é nela que estão o código
-        // e o preço. A ordem é a do cadastro de ventiladores e, dentro dele, a
+        // e o custo. A ordem é a do cadastro de ventiladores e, dentro dele, a
         // do cadastro de cubos: a mesma da tela.
         var posicao = itensModelo.ToDictionary(i => (i.Serie, i.Tipo, i.Rotulo), i => i.Ordem);
         int Pos(string serie, string tipo, string rotulo) =>
@@ -57,7 +57,7 @@ public static class DadosExcel
             {
                 "Série", "Ventilador", "Cubo", "FB/HB", "Nº de estágios",
                 "Rotação máx (rpm)", "Frame máx IEC", "Frame máx NEMA", "Código",
-                "Preço USD", "Preço CLP", "Preço R$",
+                "Custo USD", "Custo CLP",
             },
             equipamentos
                 .OrderBy(e => Pos(e.Serie, ItemModelo.TipoVentilador, e.Diametro))
@@ -66,11 +66,11 @@ public static class DadosExcel
                 {
                     e.Serie, e.Diametro, e.Cubo, e.FbHb, Numero(e.Estagios),
                     e.RpmMax, e.FrameMaxIec, e.FrameMaxNema, e.Codigo,
-                    Numero(e.PrecoUsd), Numero(e.PrecoClp), Numero(e.Preco),
+                    Numero(e.PrecoUsd), Numero(e.PrecoClp),
                 }));
 
         // O cadastro de ventiladores e de cubos — é ele que forma as linhas e as
-        // colunas da matriz. Aqui vai só o rótulo e a posição: código e preço
+        // colunas da matriz. Aqui vai só o rótulo e a posição: código e custo
         // estão na aba Modelos, na combinação.
         foreach (var (aba, tipo, titulo) in new[]
                  {
@@ -104,13 +104,13 @@ public static class DadosExcel
             {
                 "Ordem", "Série", "Fabricante", "Potência CV", "Frequência", "Tensão",
                 "Rotação", "Nº Polos", "Tipo de Flange", "IEC/NEMA", "Frame", "Código",
-                "Preço USD", "Preço CLP", "Preço R$", "Observações", "Id (não mexer)",
+                "Custo USD", "Custo CLP", "Observações", "Id (não mexer)",
             },
             motores.Select(m => new object?[]
             {
                 m.Ordem, m.Serie, m.Fabricante, Numero(m.PotenciaCv), Numero(m.Frequencia),
                 m.Tensao, Numero(m.Rotacao), Numero(m.Polos), m.Flange, m.Padrao, m.Frame,
-                m.Codigo, Numero(m.PrecoUsd), Numero(m.PrecoClp), Numero(m.Preco),
+                m.Codigo, Numero(m.PrecoUsd), Numero(m.PrecoClp),
                 m.Observacoes, m.Id,
             }));
 
@@ -131,11 +131,11 @@ public static class DadosExcel
                 linhas.Add(new object?[]
             {
                 g.Nome, c.Ordem, c.Valor, c.Codigo,
-                Numero(c.PrecoUsd), Numero(c.PrecoClp), Numero(c.Preco),
+                Numero(c.PrecoUsd), Numero(c.PrecoClp),
             });
         }
         Montar(wb, AbaCaracteristicas,
-            new[] { "Item", "Ordem", "Subitem", "Código", "Preço USD", "Preço CLP", "Preço R$" },
+            new[] { "Item", "Ordem", "Subitem", "Código", "Custo USD", "Custo CLP" },
             linhas);
 
         return Bytes(wb);
@@ -167,7 +167,7 @@ public static class DadosExcel
         Exportar(new(), new(), new(), motores, new(), new(), AbaMotores);
 
     /// <summary>
-    /// A planilha de preço de uma opção: uma linha por valor de referência (Fan
+    /// A planilha de custo de uma opção: uma linha por valor de referência (Fan
     /// Diameter ou potência do motor, conforme a família), com o que já está
     /// gravado.
     ///
@@ -182,7 +182,7 @@ public static class DadosExcel
         var usaMedida = familia.UsaMedida;
         var colunas = new List<string> { "Item", "Subitem", familia.RotuloDoEixo };
         if (usaMedida) colunas.Add("Diâmetro (mm)");
-        colunas.AddRange(new[] { "Preço USD", "Preço CLP", "Preço R$" });
+        colunas.AddRange(new[] { "Custo USD", "Custo CLP" });
 
         using var wb = new XLWorkbook();
         Montar(wb, AbaPrecos, colunas.ToArray(),
@@ -193,7 +193,7 @@ public static class DadosExcel
                 if (usaMedida) linha.Add(Numero(p?.Medida ?? ""));
                 linha.AddRange(new object?[]
                 {
-                    Numero(p?.PrecoUsd ?? ""), Numero(p?.PrecoClp ?? ""), Numero(p?.Preco ?? ""),
+                    Numero(p?.PrecoUsd ?? ""), Numero(p?.PrecoClp ?? ""),
                 });
                 return linha.ToArray();
             }));
@@ -201,8 +201,8 @@ public static class DadosExcel
     }
 
     /// <summary>
-    /// A volta da planilha. Linha em branco apaga o preço daquela referência —
-    /// em branco quer dizer "usa o preço da opção", na tela e aqui.
+    /// A volta da planilha. Linha em branco apaga o custo daquela referência —
+    /// em branco quer dizer "usa o custo da opção", na tela e aqui.
     /// </summary>
     public static (int Linhas, List<string> Avisos) ImportarPrecosPorReferencia(
         Stream arquivo, PrecoReferenciaRepository repo, List<string> referenciasValidas)
@@ -210,7 +210,7 @@ public static class DadosExcel
         using var wb = new XLWorkbook(arquivo);
         var avisos = new List<string>();
 
-        if (!Achar(wb, AbaPrecos, out var ws))
+        if (!Achar(wb, AbaPrecos, out var ws) && !Achar(wb, "Preços por referência", out ws))
         {
             avisos.Add($"O arquivo não tem a aba \"{AbaPrecos}\". " +
                        "Exporte esta tabela primeiro para ver o formato esperado.");
@@ -223,9 +223,9 @@ public static class DadosExcel
         var iDiam = Coluna(cab, "fan diameter", "potência (cv)", "potencia (cv)",
             "potência", "potencia", "cv", "ventilador", "diâmetro", "diametro");
         var iMedida = Coluna(cab, "diâmetro (mm)", "diametro (mm)", "mm");
-        var iPreco = Coluna(cab, "preço r$", "preco r$", "preço", "preco");
-        var iUsd = Coluna(cab, "preço usd", "preco usd", "usd");
-        var iClp = Coluna(cab, "preço clp", "preco clp", "clp");
+        var iPreco = Coluna(cab, "custo r$", "preço r$", "preco r$", "preço", "preco");
+        var iUsd = Coluna(cab, "custo usd", "preço usd", "preco usd", "usd");
+        var iClp = Coluna(cab, "custo clp", "preço clp", "preco clp", "clp");
 
         if (iItem < 0 || iSub < 0 || iDiam < 0)
         {
@@ -288,14 +288,14 @@ public static class DadosExcel
         }
 
         if (apagadas > 0)
-            avisos.Add($"{apagadas} linha(s) vinham em branco e voltaram a usar o preço da opção.");
+            avisos.Add($"{apagadas} linha(s) vinham em branco e voltaram a usar o custo da opção.");
 
         if (desconhecidos.Count > 0)
             avisos.Add($"{desconhecidos.Count} linha(s) com referência que não está no cadastro " +
                        $"({string.Join("; ", desconhecidos.Distinct().Take(3))}) — ignoradas.");
 
         if (semFamilia.Count > 0)
-            avisos.Add($"{semFamilia.Distinct().Count()} opção(ões) de preço único " +
+            avisos.Add($"{semFamilia.Distinct().Count()} opção(ões) de custo único " +
                        $"({string.Join("; ", semFamilia.Distinct().Take(2))}) — ignoradas.");
 
         return (gravadas, avisos);
@@ -457,7 +457,7 @@ public static class DadosExcel
     }
 
     /// <summary>
-    /// A lista de ventiladores e cubos: rótulo, ordem, código e preço. Rótulo
+    /// A lista de ventiladores e cubos: rótulo, ordem, código e custo. Rótulo
     /// que ainda não existe é CRIADO — é como se acrescenta uma linha ou uma
     /// coluna à matriz pela planilha.
     /// </summary>
@@ -526,9 +526,9 @@ public static class DadosExcel
         var iCubo = Coluna(cab, "cubo", "fan hub diameter");
         var iRpm = Coluna(cab, "rotação máx (rpm)", "rotação", "rotacao", "rpm");
         var iCodigo = Coluna(cab, "código", "codigo", "cod");
-        var iPreco = Coluna(cab, "preço r$", "preco r$", "preço", "preco");
-        var iPrecoUsd = Coluna(cab, "preço usd", "preco usd", "usd");
-        var iPrecoClp = Coluna(cab, "preço clp", "preco clp", "clp");
+        var iPreco = Coluna(cab, "custo r$", "preço r$", "preco r$", "preço", "preco");
+        var iPrecoUsd = Coluna(cab, "custo usd", "preço usd", "preco usd", "usd");
+        var iPrecoClp = Coluna(cab, "custo clp", "preço clp", "preco clp", "clp");
         var iFrameIec = Coluna(cab, "frame máx iec", "frame max iec", "frame máximo iec");
         var iFrameNema = Coluna(cab, "frame máx nema", "frame max nema", "frame máximo nema");
         var iFbHb = Coluna(cab, "fb/hb", "fbhb", "fb / hb");
@@ -628,9 +628,9 @@ public static class DadosExcel
         var iTensao = Coluna(cab, "tensão", "tensao", "volt", "volts", "v");
         var iObs = Coluna(cab, "observações", "observacoes", "observação", "observacao", "obs");
         var iCodigo = Coluna(cab, "código", "codigo", "cod");
-        var iPreco = Coluna(cab, "preço r$", "preco r$", "preço", "preco", "valor");
-        var iPrecoUsd = Coluna(cab, "preço usd", "preco usd", "usd");
-        var iPrecoClp = Coluna(cab, "preço clp", "preco clp", "clp");
+        var iPreco = Coluna(cab, "custo r$", "preço r$", "preco r$", "preço", "preco", "valor");
+        var iPrecoUsd = Coluna(cab, "custo usd", "preço usd", "preco usd", "usd");
+        var iPrecoClp = Coluna(cab, "custo clp", "preço clp", "preco clp", "clp");
 
         if (iPadrao < 0 && iFrame < 0 && iFabricante < 0)
         {
@@ -725,9 +725,9 @@ public static class DadosExcel
         var iSub = Coluna(cab, "subitem", "valor", "descrição", "descricao");
         var iOrdem = Coluna(cab, "ordem");
         var iCodigo = Coluna(cab, "código", "codigo", "cod");
-        var iPreco = Coluna(cab, "preço r$", "preco r$", "preço", "preco");
-        var iPrecoUsd = Coluna(cab, "preço usd", "preco usd", "usd");
-        var iPrecoClp = Coluna(cab, "preço clp", "preco clp", "clp");
+        var iPreco = Coluna(cab, "custo r$", "preço r$", "preco r$", "preço", "preco");
+        var iPrecoUsd = Coluna(cab, "custo usd", "preço usd", "preco usd", "usd");
+        var iPrecoClp = Coluna(cab, "custo clp", "preço clp", "preco clp", "clp");
 
         if (iItem < 0 || iSub < 0)
         {
@@ -835,7 +835,7 @@ public static class DadosExcel
     }
 
     /// <summary>
-    /// Texto canônico do preço, no formato brasileiro: 12500,90.
+    /// Texto canônico do custo, no formato brasileiro: 12500,90.
     ///
     /// A importação normaliza por aqui porque o Excel devolve o número já
     /// formatado pela cultura da máquina — sem isso, exportar e importar de
@@ -846,7 +846,7 @@ public static class DadosExcel
     /// Uma medida (potência, frequência, rotação, polos) de volta em texto
     /// enxuto: sem as casas decimais que o Excel inventa.
     ///
-    /// O preço sai sempre com duas casas — é dinheiro. Estes campos não: exportar
+    /// O custo sai sempre com duas casas — é dinheiro. Estes campos não: exportar
     /// 7,5 CV como número e reimportar devolvia "7.50", e 4 polos viravam "4.00".
     /// Aqui as casas inúteis caem e o separador volta a ser o brasileiro, então
     /// exportar e importar de volta não mexe no que a equipe digitou.
@@ -867,7 +867,7 @@ public static class DadosExcel
     }
 
     /// <summary>
-    /// Preço como número quando dá para ler — aí o Excel soma e filtra.
+    /// Custo como número quando dá para ler — aí o Excel soma e filtra.
     ///
     /// Não dá para escolher uma cultura e pronto: o mesmo campo recebe o que a
     /// pessoa digita (12500,90) e o que o Excel devolve formatado pela cultura
@@ -933,7 +933,7 @@ public static class DadosExcel
     /// <summary>
     /// O caractere escolhido como decimal só pode aparecer UMA vez — o mesmo
     /// símbolo servindo de decimal e de milhar é entrada malformada ("12,5,7"),
-    /// e num campo de preço é melhor recusar do que adivinhar.
+    /// e num campo de custo é melhor recusar do que adivinhar.
     /// </summary>
     private static bool DecimalUnico(string texto, char separador) =>
         texto.Count(c => c == separador) == 1;
