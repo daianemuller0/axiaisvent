@@ -1,16 +1,17 @@
 namespace HowdenAxiais.Poc.Data;
 
 /// <summary>Uma nota de componente: o título e o corpo dela.</summary>
-public sealed record NotaDeComponente(string Titulo, string[] Linhas);
+public sealed record NotaDeComponente(string Titulo, string[] Linhas, string Chave = "");
 
 /// <summary>
 /// As notas descritivas dos componentes do ventilador, que entram embaixo do
 /// texto do VAX ou do Joy no escopo de fornecimento.
 ///
 /// <para>
-/// Saem em TODA proposta técnica, sem olhar o escopo — foi o que a equipe
-/// pediu ("adiciona essas notas também como padrão"). Elas descrevem como a
-/// Howden constrói cada peça, e não o que foi vendido nesta proposta; quem diz
+/// Cinco delas são o padrão e saem sempre (cone de entrada, conjunto rotativo,
+/// paletas guia, carcaça e placas de identificação). As outras cinco estão
+/// ligadas ao escopo: saem só quando a peça foi escolhida "Com" — ver
+/// <see cref="Sai"/>. Elas descrevem como a Howden constrói cada peça; quem diz
 /// o que foi vendido é a lista do <see cref="EscopoDaHowden"/>, logo acima.
 /// </para>
 ///
@@ -23,6 +24,7 @@ public sealed record NotaDeComponente(string Titulo, string[] Linhas);
 /// <list type="bullet">
 /// <item><c>- </c> na frente: item de lista;</item>
 /// <item><c>-- </c> na frente: item de lista de segundo nível;</item>
+/// <item><c># </c> na frente: parágrafo em negrito (subtítulo dentro da nota);</item>
 /// <item><c>| a | b | c</c>: linha de tabela — a primeira de uma sequência é o
 /// cabeçalho, e é ela que define quantas colunas a tabela tem;</item>
 /// <item>qualquer outra coisa: parágrafo.</item>
@@ -33,12 +35,64 @@ public sealed record NotaDeComponente(string Titulo, string[] Linhas);
 /// </summary>
 public static class NotasDosComponentes
 {
-    public static NotaDeComponente[] Do(IdiomaDaProposta idioma) => idioma switch
+    /// <summary>
+    /// A identidade de cada nota, na ordem em que elas aparecem nos três
+    /// idiomas — as três listas têm as mesmas dez notas, na mesma ordem. É a
+    /// chave que diz quando a nota sai (<see cref="Sai"/>), sem depender do
+    /// título, que muda de língua para língua.
+    /// </summary>
+    private static readonly string[] Chaves =
+    {
+        "cone", "rvc", "rotor", "guias", "carcasa", "difusor", "motor", "manga",
+        "atenuadores", "placas",
+    };
+
+    public static NotaDeComponente[] Do(IdiomaDaProposta idioma) => PorIdioma(idioma)
+        .Select((n, i) => n with { Chave = i < Chaves.Length ? Chaves[i] : "" })
+        .ToArray();
+
+    private static NotaDeComponente[] PorIdioma(IdiomaDaProposta idioma) => idioma switch
     {
         IdiomaDaProposta.Portugues => Pt,
         IdiomaDaProposta.Ingles => En,
         _ => Es,
     };
+
+    /// <summary>
+    /// Se a nota entra nesta proposta. Cone de entrada, conjunto rotativo,
+    /// paletas guia, carcaça e placas são o padrão e saem sempre; as demais
+    /// estão ligadas a uma escolha do escopo e saem só quando a peça foi
+    /// escolhida ("Com") em algum equipamento da proposta — marcada "Sem", a
+    /// nota some junto:
+    ///
+    /// <list type="bullet">
+    /// <item>damper de controle radial (RVC): damper mariposa;</item>
+    /// <item>difusor: difusor;</item>
+    /// <item>motor elétrico: motor elétrico;</item>
+    /// <item>acoplamento ao duto: conexão a manga na descarga;</item>
+    /// <item>atenuadores de ruído: silenciador de entrada ou de descarga.</item>
+    /// </list>
+    ///
+    /// As listas são achadas pelas mesmas palavras do código do equipamento
+    /// (<see cref="CodigoDoEquipamento.Posicoes"/>), porque o nome é de quem
+    /// monta o cadastro.
+    /// </summary>
+    public static bool Sai(string chave, Proposta proposta, CustoDaProposta custo)
+    {
+        bool Algum(params string[] posicoes) => proposta.Itens.Any(item => posicoes.Any(nome =>
+            CodigoDoEquipamento.Vai(item, custo, proposta.Moeda,
+                CodigoDoEquipamento.Posicoes.First(x => x.Nome == nome).Casa)));
+
+        return chave switch
+        {
+            "rvc" => Algum("Damper"),
+            "difusor" => Algum("Difusor"),
+            "motor" => proposta.Itens.Any(i => i.ComMotor),
+            "manga" => Algum("Conexão a manga na descarga"),
+            "atenuadores" => Algum("Silenciador de entrada", "Silenciador de descarga"),
+            _ => true,
+        };
+    }
 
     // ================= ESPANHOL (o documento da equipe) =================
 
@@ -61,27 +115,14 @@ public static class NotasDosComponentes
 
         new("DAMPER DE CONTROL RADIAL (RADIAL VANE CONTROL - RVC)", new[]
         {
-            "Las paletas guía de entrada (Radial Vane Control - RVC) constituyen un sistema de " +
-            "control aerodinámico instalado en la succión del ventilador, inmediatamente aguas " +
-            "arriba del rotor, destinado a la regulación continua del caudal y de la presión " +
-            "desarrollados por el equipo. El conjunto está compuesto por paletas aerodinámicas " +
-            "móviles distribuidas radialmente alrededor del eje del ventilador e interconectadas " +
-            "mediante un mecanismo de sincronización que garantiza el movimiento simultáneo de " +
-            "todos los elementos, permitiendo la modificación controlada del ángulo de admisión " +
-            "del flujo de aire. Al modificar la orientación de las paletas, el sistema genera una " +
-            "prerrotación del flujo antes de su ingreso al rotor, ajustando las condiciones " +
-            "aerodinámicas de operación y permitiendo un control preciso del desempeño del " +
-            "ventilador sin necesidad de restringir directamente el paso del flujo.",
-
-            "A diferencia de los sistemas convencionales de estrangulamiento, que controlan la " +
-            "capacidad del ventilador mediante la generación de pérdidas adicionales en el " +
-            "sistema, las paletas guía de entrada actúan de forma más eficiente acondicionando el " +
-            "flujo admitido por el rotor, reduciendo la potencia absorbida en condiciones de " +
-            "carga parcial y proporcionando un mejor aprovechamiento de la energía disponible. " +
-            "Esta característica genera un ahorro significativo de energía, especialmente en " +
-            "aplicaciones con demandas variables de caudal y presión. El conjunto puede " +
-            "accionarse mediante actuadores eléctricos, neumáticos o hidráulicos, integrándose " +
-            "fácilmente a los sistemas de control de planta.",
+            "# Damper Mariposa (Butterfly Damper)",
+            "El damper mariposa es un dispositivo mecánico de control de flujo utilizado en sistemas de ventilación industrial, minería, túneles y procesos de manejo de aire. Su función principal es regular, limitar o aislar el paso del flujo de aire mediante la rotación de una compuerta circular montada sobre un eje central.",
+            "# Principio de Funcionamiento",
+            "El damper está compuesto por un disco circular (mariposa) instalado en el interior del conducto. Mediante un actuador eléctrico, neumático o accionamiento manual, el disco gira entre las posiciones:",
+            "- 0° (abierto): mínima restricción al flujo.",
+            "- 90° (cerrado): bloqueo prácticamente total del paso de aire.",
+            "- Posiciones intermedias: regulación progresiva del caudal y de la pérdida de carga del sistema.",
+            "La simplicidad de este mecanismo permite una operación rápida y confiable incluso en aplicaciones de gran diámetro.",
         }),
 
         new("CONJUNTO ROTATIVO (ROTOR / CUBO Y PALAS)", new[]
@@ -372,25 +413,14 @@ public static class NotasDosComponentes
 
         new("DAMPER DE CONTROLE RADIAL (RADIAL VANE CONTROL - RVC)", new[]
         {
-            "As pás-guia de entrada (Radial Vane Control - RVC) constituem um sistema de controle " +
-            "aerodinâmico instalado na sucção do ventilador, imediatamente a montante do rotor, " +
-            "destinado à regulagem contínua da vazão e da pressão desenvolvidas pelo equipamento. " +
-            "O conjunto é composto por pás aerodinâmicas móveis distribuídas radialmente ao redor " +
-            "do eixo do ventilador e interligadas por um mecanismo de sincronização que garante o " +
-            "movimento simultâneo de todos os elementos, permitindo a modificação controlada do " +
-            "ângulo de admissão do fluxo de ar. Ao modificar a orientação das pás, o sistema gera " +
-            "uma pré-rotação do fluxo antes da sua entrada no rotor, ajustando as condições " +
-            "aerodinâmicas de operação e permitindo um controle preciso do desempenho do " +
-            "ventilador sem necessidade de restringir diretamente a passagem do fluxo.",
-
-            "Diferentemente dos sistemas convencionais de estrangulamento, que controlam a " +
-            "capacidade do ventilador gerando perdas adicionais no sistema, as pás-guia de " +
-            "entrada atuam de forma mais eficiente condicionando o fluxo admitido pelo rotor, " +
-            "reduzindo a potência absorvida em condições de carga parcial e proporcionando um " +
-            "melhor aproveitamento da energia disponível. Essa característica gera uma economia " +
-            "significativa de energia, especialmente em aplicações com demandas variáveis de " +
-            "vazão e pressão. O conjunto pode ser acionado por atuadores elétricos, pneumáticos " +
-            "ou hidráulicos, integrando-se facilmente aos sistemas de controle da planta.",
+            "# Damper Borboleta (Butterfly Damper)",
+            "O damper borboleta é um dispositivo mecânico de controle de fluxo utilizado em sistemas de ventilação industrial, mineração, túneis e processos de movimentação de ar. Sua função principal é regular, limitar ou isolar a passagem do fluxo de ar por meio da rotação de uma comporta circular montada sobre um eixo central.",
+            "# Princípio de Funcionamento",
+            "O damper é composto por um disco circular (borboleta) instalado no interior do duto. Por meio de um atuador elétrico, pneumático ou de acionamento manual, o disco gira entre as posições:",
+            "- 0° (aberto): mínima restrição ao fluxo.",
+            "- 90° (fechado): bloqueio praticamente total da passagem de ar.",
+            "- Posições intermediárias: regulagem progressiva da vazão e da perda de carga do sistema.",
+            "A simplicidade desse mecanismo permite uma operação rápida e confiável, mesmo em aplicações de grande diâmetro.",
         }),
 
         new("CONJUNTO ROTATIVO (ROTOR / CUBO E PÁS)", new[]
@@ -668,24 +698,14 @@ public static class NotasDosComponentes
 
         new("RADIAL VANE CONTROL DAMPER (RVC)", new[]
         {
-            "The inlet guide vanes (Radial Vane Control - RVC) form an aerodynamic control " +
-            "system installed at the fan suction, immediately upstream of the impeller, intended " +
-            "for continuous regulation of the flow rate and pressure developed by the equipment. " +
-            "The assembly comprises movable aerodynamic vanes distributed radially around the fan " +
-            "axis and interconnected by a synchronising mechanism that ensures the simultaneous " +
-            "movement of all elements, allowing controlled modification of the air flow admission " +
-            "angle. By changing the vane orientation, the system creates a pre-rotation of the " +
-            "flow before it enters the impeller, adjusting the aerodynamic operating conditions " +
-            "and allowing precise control of fan performance without directly restricting the " +
-            "flow passage.",
-
-            "Unlike conventional throttling systems, which control fan capacity by generating " +
-            "additional losses in the system, inlet guide vanes act more efficiently by " +
-            "conditioning the flow admitted by the impeller, reducing absorbed power at part load " +
-            "and providing better use of the available energy. This feature produces significant " +
-            "energy savings, especially in applications with variable flow and pressure demands. " +
-            "The assembly can be driven by electric, pneumatic or hydraulic actuators, and " +
-            "integrates easily into plant control systems.",
+            "# Butterfly Damper",
+            "The butterfly damper is a mechanical flow control device used in industrial ventilation, mining, tunnel and air-handling systems. Its main function is to regulate, limit or isolate the passage of airflow by rotating a circular gate mounted on a central shaft.",
+            "# Operating Principle",
+            "The damper consists of a circular disc (butterfly) installed inside the duct. By means of an electric or pneumatic actuator, or manual operation, the disc rotates between the positions:",
+            "- 0° (open): minimum flow restriction.",
+            "- 90° (closed): practically complete blockage of the air passage.",
+            "- Intermediate positions: progressive regulation of the flow rate and of the system pressure loss.",
+            "The simplicity of this mechanism allows fast and reliable operation even in large-diameter applications.",
         }),
 
         new("ROTATING ASSEMBLY (IMPELLER / HUB AND BLADES)", new[]
