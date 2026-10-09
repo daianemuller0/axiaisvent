@@ -142,10 +142,10 @@ public static class EscopoProposta
         var origem = FamiliaDePreco.EhAusencia(opcao.Valor)
             ? "sem custo"
             : familia is null
-                ? "preço único da opção"
+                ? "custo único da opção"
                 : familia.Eixo == EixoDePreco.PotenciaMotor && potenciaMotor.Length == 0
-                    ? "escolha o motor: o preço vem da potência dele"
-                    : $"a tabela de {familia.Rotulo} ainda não tem preço para este {familia.RotuloDoEixo}";
+                    ? "escolha o motor: o custo vem da potência dele"
+                    : $"a tabela de {familia.Rotulo} ainda não tem custo para este {familia.RotuloDoEixo}";
 
         return new ItemDoEscopo(opcao.Grupo, opcao.Valor, opcao.Codigo, doCadastro,
             DadosExcel.Numero(doCadastro), origem);

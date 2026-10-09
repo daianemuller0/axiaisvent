@@ -113,6 +113,31 @@ duas escadas independentes.
 Onde a rotação está vazia, o campo sugere em cinza a rotação síncrona de polos +
 frequência; é só dica, o valor gravado é o que você digitar.
 
+## A seção Conversão
+
+Quarta seção da guia Dados (`/axiais/conversao`): converte o custo em **CLP** para **USD**. A
+equipe digita a taxa do jeito que se fala — `1 USD = X CLP` — e o **Ver o que muda** mostra
+quantos valores serão recalculados em modelos, motores, características e tabelas por
+referência. Confirmado, o USD de **todo item que tem CLP** é gravado (CLP ÷ taxa, duas casas) e
+as propostas já usam os valores novos. Item sem CLP não é tocado. A opção *só preencher o que
+está vazio* preserva o USD digitado à mão. A taxa fica gravada (`taxas_conversao`) com a data da
+última gravação; o código está em `Data/ConversaoRepository.cs`.
+
+**O real está fora de uso por enquanto.** O interruptor é `Moedas.UsaReal` (`Data/Moeda.cs`):
+desligado, a coluna R$ some das telas e das planilhas de Dados, a moeda R$ some da proposta e a
+conversão só trata o dólar. Os valores em R$ já gravados continuam no banco; para religar, basta
+trocar o valor para `true`. Na guia Dados, o que se chamava *preço* agora é *custo*.
+
+## Identidade Visual
+
+Item **Identidade Visual** no menu (`/axiais/marca`): troca os dois logos do sistema, sem mexer
+em código. O **logo da página inicial** aparece na tela de entrada (login) e o **logo do
+sistema** na barra lateral, em todas as telas. Aceita PNG ou JPG de até 1 MB (de preferência
+PNG com fundo transparente); a troca vale na hora, inclusive na barra lateral de quem já está
+com o sistema aberto. Sem logo enviado, cada lugar volta ao padrão da Howden. Os logos ficam
+gravados na pasta de dados (entidade `branding`, `Data/BrandingRepository.cs`). O logo do
+documento das propostas não passa por aqui: ele é o do modelo em Word da equipe.
+
 ## A aba Base
 
 Hoje o sistema tem uma aba, **Base**, com a planilha da equipe:

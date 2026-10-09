@@ -9,7 +9,16 @@ public enum Moeda { Usd, Clp, Brl }
 
 public static class Moedas
 {
-    public static readonly Moeda[] Todas = { Moeda.Usd, Moeda.Clp, Moeda.Brl };
+    /// <summary>
+    /// O real está fora de uso por enquanto: a equipe trabalha o custo em USD e
+    /// em CLP. Ligar de volta é trocar este valor — os dados em R$ continuam
+    /// gravados e as telas, planilhas e a conversão voltam a mostrar a coluna.
+    /// </summary>
+    public const bool UsaReal = false;
+
+    public static readonly Moeda[] Todas = UsaReal
+        ? new[] { Moeda.Usd, Moeda.Clp, Moeda.Brl }
+        : new[] { Moeda.Usd, Moeda.Clp };
 
     public static string Rotulo(this Moeda m) => m switch
     {
