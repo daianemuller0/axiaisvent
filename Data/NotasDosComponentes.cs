@@ -162,9 +162,8 @@ public static class NotasDosComponentes
             "del ventilador.",
         }),
 
-        new("DAMPER DE CONTROL RADIAL (RADIAL VANE CONTROL - RVC)", new[]
+        new("Damper Mariposa (Butterfly Damper)", new[]
         {
-            "# Damper Mariposa (Butterfly Damper)",
             "El damper mariposa es un dispositivo mecánico de control de flujo utilizado en sistemas de ventilación industrial, minería, túneles y procesos de manejo de aire. Su función principal es regular, limitar o aislar el paso del flujo de aire mediante la rotación de una compuerta circular montada sobre un eje central.",
             "# Principio de Funcionamiento",
             "El damper está compuesto por un disco circular (mariposa) instalado en el interior del conducto. Mediante un actuador eléctrico, neumático o accionamiento manual, el disco gira entre las posiciones:",
@@ -460,9 +459,8 @@ public static class NotasDosComponentes
             "ótimas de fluxo na sucção do ventilador.",
         }),
 
-        new("DAMPER DE CONTROLE RADIAL (RADIAL VANE CONTROL - RVC)", new[]
+        new("Damper Borboleta (Butterfly Damper)", new[]
         {
-            "# Damper Borboleta (Butterfly Damper)",
             "O damper borboleta é um dispositivo mecânico de controle de fluxo utilizado em sistemas de ventilação industrial, mineração, túneis e processos de movimentação de ar. Sua função principal é regular, limitar ou isolar a passagem do fluxo de ar por meio da rotação de uma comporta circular montada sobre um eixo central.",
             "# Princípio de Funcionamento",
             "O damper é composto por um disco circular (borboleta) instalado no interior do duto. Por meio de um atuador elétrico, pneumático ou de acionamento manual, o disco gira entre as posições:",
@@ -745,9 +743,8 @@ public static class NotasDosComponentes
             "optimum flow conditions at the fan suction.",
         }),
 
-        new("RADIAL VANE CONTROL DAMPER (RVC)", new[]
+        new("Butterfly Damper", new[]
         {
-            "# Butterfly Damper",
             "The butterfly damper is a mechanical flow control device used in industrial ventilation, mining, tunnel and air-handling systems. Its main function is to regulate, limit or isolate the passage of airflow by rotating a circular gate mounted on a central shaft.",
             "# Operating Principle",
             "The damper consists of a circular disc (butterfly) installed inside the duct. By means of an electric or pneumatic actuator, or manual operation, the disc rotates between the positions:",

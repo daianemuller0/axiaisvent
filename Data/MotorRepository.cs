@@ -85,6 +85,17 @@ public sealed class Motor
         return minha.Contains(pedida) || pedida.Contains(minha);
     }
 
+    /// <summary>
+    /// Como o motor sai nos documentos do cliente: o frame e a potência, SEM o
+    /// fabricante — a Howden não informa quem fabrica o motor. Vazio quando o
+    /// cadastro não tem nenhum dos dois.
+    /// </summary>
+    public string NoDocumento => string.Join(" ", new[]
+        {
+            Frame.Trim(),
+            PotenciaCv.Trim() is { Length: > 0 } cv ? cv + " CV" : "",
+        }.Where(p => p.Length > 0));
+
     /// <summary>Como o motor aparece numa mensagem: o frame, ou o que houver.</summary>
     public string Descricao
     {

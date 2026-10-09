@@ -148,25 +148,18 @@ public static class EscopoDaHowden
     private static bool EhDesign(string lista) => Textos.Simples(lista).Contains("design");
 
     /// <summary>
-    /// A linha do motor com o motor escolhido ao lado: "Motor elétrico — WEG
-    /// 250M 150 CV".
+    /// A linha do motor com o motor escolhido ao lado: "Motor elétrico — 250M
+    /// 150 CV".
     ///
     /// O catálogo do modelo diz só "Motor Eléctrico", mas quem lê a proposta
-    /// quer saber QUAL motor vai. Era o que a descrição comercial trazia antes
-    /// de as duas listas virarem uma — e não havia por que perder.
+    /// quer saber QUAL motor vai — o frame e a potência. O FABRICANTE não sai:
+    /// a Howden não informa quem fabrica o motor.
     /// </summary>
     private static string ComOMotor(string linha, Motor? motor)
     {
         if (motor is null) return linha;
 
-        var partes = new[]
-        {
-            motor.Fabricante.Trim(),
-            motor.Frame.Trim(),
-            motor.PotenciaCv.Trim() is { Length: > 0 } cv ? cv + " CV" : "",
-        };
-
-        var descricao = string.Join(" ", partes.Where(p => p.Length > 0));
+        var descricao = motor.NoDocumento;
 
         return descricao.Length > 0 ? $"{linha} — {descricao}" : linha;
     }

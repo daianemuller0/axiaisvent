@@ -205,7 +205,7 @@ public sealed class CustoDaProposta
 
         if (MotorOpcionalDe(item) is { } motor)
         {
-            linhas.Add(new("opc:motor", "", $"Motor elétrico — {motor.Descricao}",
+            linhas.Add(new("opc:motor", "", motor.NoDocumento is { Length: > 0 } d ? $"Motor elétrico — {d}" : "Motor elétrico",
                 DadosExcel.Numero(EscopoProposta.PrecoDoMotor(motor, moeda)),
                 "catálogo de motores"));
         }
