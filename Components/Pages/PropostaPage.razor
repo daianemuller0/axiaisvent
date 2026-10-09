@@ -1198,6 +1198,42 @@
     }
 </div>
 
+<!-- ---------- custo previsto ---------- -->
+<div class="panel" style="margin-bottom:18px">
+    <div class="toolbar" style="flex-wrap:wrap; margin-bottom:0">
+        <h2 style="margin:0; font-size:15px">Custo previsto</h2>
+        <span class="subtitle" style="margin:0">
+            a planilha que o suprimentos usa para comprar as peças — uma linha por item de cada equipamento
+        </span>
+        <span style="flex:1"></span>
+        @if (!_pedindoCustoPrevisto)
+        {
+            <button class="btn-primary" @onclick="PedirCustoPrevisto">⬇ Gerar custo previsto</button>
+        }
+    </div>
+
+    @if (_pedindoCustoPrevisto)
+    {
+        <div class="toolbar" style="flex-wrap:wrap; margin:14px 0 0">
+            <strong>Número do projeto</strong>
+            <input class="cell" style="width:150px" placeholder="ex.: NB0982" value="@_cpProjeto"
+                   @oninput="e => _cpProjeto = e.Value?.ToString() ?? string.Empty" />
+            <strong>Número do pedido</strong>
+            <input class="cell" style="width:150px" value="@_cpPedido"
+                   @oninput="e => _cpPedido = e.Value?.ToString() ?? string.Empty" />
+            <button class="btn-primary" @onclick="GerarCustoPrevisto">⬇ Gerar</button>
+            <button class="btn-ghost" @onclick="@(() => _pedindoCustoPrevisto = false)">Cancelar</button>
+        </div>
+        <p class="subtitle" style="margin:10px 0 0">
+            O arquivo sai como <strong>@(CustoPrevistoExcel.NomeDoArquivo(_cpProjeto.Trim().Length > 0 ? _cpProjeto : "PROJETO"))</strong>.
+            Cada equipamento leva o número do projeto com o dele atrás
+            (@CustoPrevistoExcel.CodigoDaLinha(_cpProjeto.Trim().Length > 0 ? _cpProjeto : "PROJETO", 0),
+            @CustoPrevistoExcel.CodigoDaLinha(_cpProjeto.Trim().Length > 0 ? _cpProjeto : "PROJETO", 1)…).
+            Os valores saem na moeda da proposta (@_proposta.Moeda.Rotulo()).
+        </p>
+    }
+</div>
+
 <!-- ---------- pricing ---------- -->
 <div class="panel" style="margin-bottom:18px">
     @{
@@ -2622,6 +2658,55 @@
         if (caminho is null) return null;
 
         return new ImagemDaCurva(File.ReadAllBytes(caminho), Path.GetExtension(caminho));
+    }
+
+    private bool _pedindoCustoPrevisto;
+    private string _cpProjeto = "";
+    private string _cpPedido = "";
+
+    private void PedirCustoPrevisto()
+    {
+        _msg = null;
+        _pedindoCustoPrevisto = true;
+    }
+
+    /// <summary>
+    /// A planilha de custo previsto, depois de pedir o projeto e o pedido —
+    /// os dois entram em todas as linhas. Ver <see cref="CustoPrevistoExcel"/>.
+    /// </summary>
+    private async Task GerarCustoPrevisto()
+    {
+        var projeto = _cpProjeto.Trim();
+        var pedido = _cpPedido.Trim();
+
+        if (projeto.Length == 0 || pedido.Length == 0)
+        {
+            Aviso("Informe o número do projeto e o número do pedido.", erro: true);
+            return;
+        }
+
+        if (_proposta.Itens.Count == 0)
+        {
+            Aviso("A proposta não tem equipamento para gerar o custo previsto.", erro: true);
+            return;
+        }
+
+        try
+        {
+            var bytes = CustoPrevistoExcel.Gerar(_proposta, _custo, projeto, pedido, DateTime.Now);
+            var nome = CustoPrevistoExcel.NomeDoArquivo(projeto);
+
+            await JS.InvokeVoidAsync("appDownload", nome,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                Convert.ToBase64String(bytes));
+
+            _pedindoCustoPrevisto = false;
+            Aviso($"Custo previsto gerado: {nome}.");
+        }
+        catch (Exception ex)
+        {
+            Aviso($"Não consegui gerar o custo previsto: {ex.Message}", erro: true);
+        }
     }
 
     private async Task GerarPricing()
