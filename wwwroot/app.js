@@ -33,3 +33,9 @@ window.appDownload = (fileName, mime, base64) => {
     }
     iniciar();
 })();
+
+// Rola a página até um elemento (atalhos no alto de telas compridas).
+window.appRolarPara = (id) => {
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+};

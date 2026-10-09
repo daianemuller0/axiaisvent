@@ -41,6 +41,8 @@
                   @onclick="DesmarcarEnviada">enviada em @DataCurta(_proposta.EnviadaEm)</span>
         }
 
+        <button class="btn-ghost" @onclick="IrParaCustoPrevisto"
+                title="Gerar a planilha de custo previsto para o suprimentos">⬇ Custo previsto</button>
         <button class="btn-primary" @onclick="Salvar">💾 Salvar</button>
     </div>
 </div>
@@ -1199,7 +1201,7 @@
 </div>
 
 <!-- ---------- custo previsto ---------- -->
-<div class="panel" style="margin-bottom:18px">
+<div class="panel" id="custo-previsto" style="margin-bottom:18px">
     <div class="toolbar" style="flex-wrap:wrap; margin-bottom:0">
         <h2 style="margin:0; font-size:15px">Custo previsto</h2>
         <span class="subtitle" style="margin:0">
@@ -2663,6 +2665,17 @@
     private bool _pedindoCustoPrevisto;
     private string _cpProjeto = "";
     private string _cpPedido = "";
+
+    /// <summary>
+    /// O atalho do alto da tela: o painel do custo previsto fica no meio da
+    /// proposta, e a tela é comprida. Abre o pedido do projeto e do pedido e
+    /// rola até lá.
+    /// </summary>
+    private async Task IrParaCustoPrevisto()
+    {
+        PedirCustoPrevisto();
+        await JS.InvokeVoidAsync("appRolarPara", "custo-previsto");
+    }
 
     private void PedirCustoPrevisto()
     {
