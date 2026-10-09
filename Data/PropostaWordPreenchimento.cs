@@ -48,7 +48,12 @@ internal sealed partial class Preenchimento
         _t = TextosDaProposta.Do(idioma);
         _te = TextosDoEscopo.Do(idioma);
         _tel = TextosEletricos.Do(idioma);
-        _notas = NotasDosComponentes.Do(idioma);
+        // a placa de identificação do motor sai com os dados do motor escolhido
+        _notas = NotasDosComponentes.Do(idioma, p.Itens
+            .Where(i => i.ComMotor)
+            .Select(custo.MotorDe)
+            .OfType<Motor>()
+            .ToList());
         _espanhol = idioma == IdiomaDaProposta.Espanhol;
 
         _corpo = doc.MainDocumentPart!.Document.Body!;

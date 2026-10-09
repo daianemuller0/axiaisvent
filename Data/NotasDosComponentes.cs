@@ -47,9 +47,58 @@ public static class NotasDosComponentes
         "atenuadores", "placas",
     };
 
-    public static NotaDeComponente[] Do(IdiomaDaProposta idioma) => PorIdioma(idioma)
-        .Select((n, i) => n with { Chave = i < Chaves.Length ? Chaves[i] : "" })
-        .ToArray();
+    public static NotaDeComponente[] Do(IdiomaDaProposta idioma, IReadOnlyList<Motor> motores) =>
+        PorIdioma(idioma)
+            .Select((n, i) =>
+            {
+                var nota = n with { Chave = i < Chaves.Length ? Chaves[i] : "" };
+
+                return nota.Chave == "motor"
+                    ? nota with
+                    {
+                        Linhas = nota.Linhas.Select(l => DoMotor(l, motores, idioma)).ToArray(),
+                    }
+                    : nota;
+            })
+            .ToArray();
+
+    /// <summary>
+    /// Os campos da placa de identificação que vêm do motor escolhido no
+    /// escopo — tipo (IEC ou NEMA), polos, frequência e rotação — entram no
+    /// lugar de <c>{tipo}</c>, <c>{polos}</c>, <c>{frecuencia}</c> e
+    /// <c>{rotacao}</c>. O resto da placa é texto fixo do modelo.
+    ///
+    /// Com mais de um motor na proposta o valor sai com todos, sem repetir
+    /// ("6 / 4 polos"); sem dado no cadastro, sai um travessão — um campo
+    /// visivelmente vazio é melhor que um valor inventado.
+    /// </summary>
+    private static string DoMotor(string linha, IReadOnlyList<Motor> motores, IdiomaDaProposta idioma)
+    {
+        if (!linha.Contains('{')) return linha;
+
+        var cultura = idioma == IdiomaDaProposta.Ingles
+            ? new System.Globalization.CultureInfo("en-US")
+            : new System.Globalization.CultureInfo("pt-BR");
+
+        string Juntar(Func<Motor, string> campo, string unidade = "", bool numero = false)
+        {
+            var valores = motores
+                .Select(campo)
+                .Select(v => v.Trim())
+                .Where(v => v.Length > 0)
+                .Select(v => numero && DadosExcel.Numero(v) is { } n ? n.ToString("#,##0.##", cultura) : v)
+                .Distinct()
+                .ToList();
+
+            return valores.Count == 0 ? "—" : string.Join(" / ", valores) + unidade;
+        }
+
+        return linha
+            .Replace("{tipo}", Juntar(m => m.Padrao))
+            .Replace("{polos}", Juntar(m => m.Polos, numero: true))
+            .Replace("{frecuencia}", Juntar(m => m.Frequencia, " Hz", numero: true))
+            .Replace("{rotacao}", Juntar(m => m.Rotacao, " rpm", numero: true));
+    }
 
     private static NotaDeComponente[] PorIdioma(IdiomaDaProposta idioma) => idioma switch
     {
@@ -255,7 +304,7 @@ public static class NotasDosComponentes
 
             "El motor dispone de clase de aislamiento F, dimensionada para soportar la corriente " +
             "nominal a plena carga sin que el incremento de temperatura exceda los límites " +
-            "establecidos por la normativa aplicable. El grado de protección mínimo será IP55, " +
+            "establecidos por la normativa aplicable. El grado de protección mínimo será IP65, " +
             "garantizando protección contra la entrada de polvo y chorros de agua provenientes de " +
             "cualquier dirección. El fabricante deberá suministrar toda la información referente " +
             "a los intervalos de relubricación, tipos de grasa recomendados y procedimientos " +
@@ -282,7 +331,7 @@ public static class NotasDosComponentes
             "| Parámetro | Unidad | Valor",
             "| Temperatura ambiente de referencia | °C | 35",
             "| Temperatura mínima | °C | -20",
-            "| Altitud sobre el nivel del mar | m s.n.m. | 3.500",
+            "| Altitud sobre el nivel del mar | m s.n.m. | ≤ 2000",
             "| Humedad relativa media | % | 85",
 
             "El motor estará provisto de un ojo de izaje para facilitar las operaciones de " +
@@ -301,13 +350,13 @@ public static class NotasDosComponentes
             "La placa de identificación del ventilador deberá contener, como mínimo, la siguiente " +
             "información:",
             "| Característica | Especificación",
-            "| Tipo y familia | NEMA",
-            "| Número de polos | 6",
-            "| Frecuencia | 50 / 60 Hz",
-            "| Eficiencia | IE2 / IE3",
-            "| Grado de protección | IP55 / IP65",
-            "| Tensión de trabajo | 4.160 V",
-            "| Velocidad nominal | 1.200 rpm",
+            "| Tipo y familia | {tipo}",
+            "| Número de polos | {polos}",
+            "| Frecuencia | {frecuencia}",
+            "| Eficiencia | IE3",
+            "| Grado de protección | IP65",
+            "| Tensión de trabajo | 380/400 V",
+            "| Velocidad nominal | {rotacao}",
             "| Clase de aislamiento | F",
             "| Sensores de temperatura en los devanados del motor | 2 por fase (PT100 RTD)",
             "| Sensores de vibración para los rodamientos | 1 por rodamiento, señal 4-20 mA",
@@ -546,7 +595,7 @@ public static class NotasDosComponentes
 
             "O motor dispõe de classe de isolamento F, dimensionada para suportar a corrente " +
             "nominal a plena carga sem que a elevação de temperatura exceda os limites " +
-            "estabelecidos pela norma aplicável. O grau de proteção mínimo será IP55, garantindo " +
+            "estabelecidos pela norma aplicável. O grau de proteção mínimo será IP65, garantindo " +
             "proteção contra a entrada de poeira e jatos de água provenientes de qualquer " +
             "direção. O fabricante deverá fornecer todas as informações referentes aos intervalos " +
             "de relubrificação, tipos de graxa recomendados e procedimentos adequados para sua " +
@@ -573,7 +622,7 @@ public static class NotasDosComponentes
             "| Parâmetro | Unidade | Valor",
             "| Temperatura ambiente de referência | °C | 35",
             "| Temperatura mínima | °C | -20",
-            "| Altitude acima do nível do mar | m s.n.m. | 3.500",
+            "| Altitude acima do nível do mar | m s.n.m. | ≤ 2000",
             "| Umidade relativa média | % | 85",
 
             "O motor será provido de olhal de içamento para facilitar as operações de instalação " +
@@ -592,13 +641,13 @@ public static class NotasDosComponentes
             "A placa de identificação do ventilador deverá conter, no mínimo, as seguintes " +
             "informações:",
             "| Característica | Especificação",
-            "| Tipo e família | NEMA",
-            "| Número de polos | 6",
-            "| Frequência | 50 / 60 Hz",
-            "| Eficiência | IE2 / IE3",
-            "| Grau de proteção | IP55 / IP65",
-            "| Tensão de trabalho | 4.160 V",
-            "| Velocidade nominal | 1.200 rpm",
+            "| Tipo e família | {tipo}",
+            "| Número de polos | {polos}",
+            "| Frequência | {frecuencia}",
+            "| Eficiência | IE3",
+            "| Grau de proteção | IP65",
+            "| Tensão de trabalho | 380/400 V",
+            "| Velocidade nominal | {rotacao}",
             "| Classe de isolamento | F",
             "| Sensores de temperatura nos enrolamentos do motor | 2 por fase (PT100 RTD)",
             "| Sensores de vibração para os rolamentos | 1 por rolamento, sinal 4-20 mA",
@@ -826,7 +875,7 @@ public static class NotasDosComponentes
 
             "The motor has insulation class F, sized to withstand the rated full-load current " +
             "without the temperature rise exceeding the limits set by the applicable standard. " +
-            "The minimum degree of protection shall be IP55, ensuring protection against the " +
+            "The minimum degree of protection shall be IP65, ensuring protection against the " +
             "ingress of dust and water jets from any direction. The manufacturer shall supply all " +
             "information regarding relubrication intervals, recommended grease types and suitable " +
             "application procedures, ensuring correct bearing maintenance and the operational " +
@@ -849,7 +898,7 @@ public static class NotasDosComponentes
             "| Parameter | Unit | Value",
             "| Reference ambient temperature | °C | 35",
             "| Minimum temperature | °C | -20",
-            "| Altitude above sea level | m a.s.l. | 3,500",
+            "| Altitude above sea level | m a.s.l. | ≤ 2000",
             "| Average relative humidity | % | 85",
 
             "The motor shall be provided with a lifting eye to make installation and removal " +
@@ -866,13 +915,13 @@ public static class NotasDosComponentes
 
             "The fan nameplate shall contain at least the following information:",
             "| Characteristic | Specification",
-            "| Type and family | NEMA",
-            "| Number of poles | 6",
-            "| Frequency | 50 / 60 Hz",
-            "| Efficiency | IE2 / IE3",
-            "| Degree of protection | IP55 / IP65",
-            "| Working voltage | 4,160 V",
-            "| Rated speed | 1,200 rpm",
+            "| Type and family | {tipo}",
+            "| Number of poles | {polos}",
+            "| Frequency | {frecuencia}",
+            "| Efficiency | IE3",
+            "| Degree of protection | IP65",
+            "| Working voltage | 380/400 V",
+            "| Rated speed | {rotacao}",
             "| Insulation class | F",
             "| Temperature sensors in the motor windings | 2 per phase (PT100 RTD)",
             "| Vibration sensors for the bearings | 1 per bearing, 4-20 mA signal",
