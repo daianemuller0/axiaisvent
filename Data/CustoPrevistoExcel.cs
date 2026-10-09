@@ -19,8 +19,9 @@ namespace HowdenAxiais.Poc.Data;
 /// <item>NOME_PRODUTO: o nome do item na seleção do programa; MATERIAL fica em
 /// branco por enquanto;</item>
 /// <item>QUANTIDADE: a do equipamento na proposta; CUSTO TOTAL: o custo da
-/// peça (o do cadastro ou o digitado à mão) vezes essa quantidade, na moeda da
-/// proposta — em branco quando a peça ainda não tem custo;</item>
+/// peça (o do cadastro ou o digitado à mão) vezes essa quantidade, na moeda do
+/// custo (a da proposta, que é a de onde o cadastro puxa o custo), indicada no
+/// formato da célula — em branco quando a peça ainda não tem custo;</item>
 /// <item>os seis meses: o mês em que a planilha foi gerada e os cinco
 /// seguintes, em branco, para o controle do projeto;</item>
 /// <item>PEDIDO: o número do pedido pedido na hora de gerar.</item>
@@ -146,10 +147,14 @@ public static class CustoPrevistoExcel
         cab.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
         cab.Style.Alignment.WrapText = true;
 
+        // a moeda do custo vai no formato da célula ("USD" 1.234,00): o valor
+        // continua número, e quem compra vê em que moeda o custo foi cadastrado
+        var formato = $"\"{p.Moeda.Codigo()}\" #,##0.00";
+
         if (linha > 2)
         {
-            ws.Range(2, colCustoTotal, linha - 1, colCustoTotal).Style.NumberFormat.Format = "#,##0.00";
-            ws.Range(2, primeiroMes, linha - 1, colTotal).Style.NumberFormat.Format = "#,##0.00";
+            ws.Range(2, colCustoTotal, linha - 1, colCustoTotal).Style.NumberFormat.Format = formato;
+            ws.Range(2, primeiroMes, linha - 1, colTotal).Style.NumberFormat.Format = formato;
         }
 
         var tabela = ws.Range(1, 1, Math.Max(linha - 1, 1), cabecalhos.Count);
