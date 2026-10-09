@@ -102,6 +102,9 @@ public static class EscopoDaHowden
         {
             if (FamiliaDePreco.EhAusencia(linha.Opcao)) continue;
 
+            // o design (padrão ou especial) não é peça: não entra no escopo
+            if (EhDesign(linha.Lista)) continue;
+
             if (Chave(linha.Lista, linha.Opcao) is { Length: > 0 } chave) chaves.Add(chave);
             else livres.Add($"{linha.Lista.Trim()} {linha.Opcao.Trim()}".Trim());
         }
@@ -126,8 +129,23 @@ public static class EscopoDaHowden
         if (item.ComInstrumentacao)
             lista.AddRange(item.Instrumentacao.Where(n => n.Trim().Length > 0).Select(n => n.Trim()));
 
+        // pintura e embalagem vão em todo equipamento
+        lista.AddRange(textos.Padrao);
+
         return lista;
     }
+
+    /// <summary>
+    /// "DESIGN Padrão" / "DESIGN Especial", como a lista do design saía no
+    /// rascunho antigo. Só essas: uma linha digitada à mão que comece com
+    /// "design" (um desenho, por exemplo) é da equipe e fica.
+    /// </summary>
+    private static bool LinhaDoDesign(string linha) =>
+        Textos.Simples(linha) is "design padrao" or "design especial"
+            or "design standard" or "design special";
+
+    /// <summary>A lista do design, que a equipe não quer no escopo.</summary>
+    private static bool EhDesign(string lista) => Textos.Simples(lista).Contains("design");
 
     /// <summary>
     /// A linha do motor com o motor escolhido ao lado: "Motor elétrico — WEG
@@ -160,13 +178,25 @@ public static class EscopoDaHowden
 
     /// <summary>
     /// A lista que vale: a de vocês, quando escreveram; o rascunho, quando não.
-    /// Mesma regra do preço e da descrição comercial.
+    /// Mesma regra do preço e da descrição comercial. Pintura e embalagem entram
+    /// sempre, mesmo na lista escrita à mão.
     /// </summary>
     public static List<string> Efetivo(ItemProposta item, CustoDaProposta custo, Moeda moeda,
-        TextosDoEscopo textos) =>
-        item.EscopoIncluso.Trim().Length > 0
-            ? Linhas(item.EscopoIncluso)
-            : De(item, custo, moeda, textos);
+        TextosDoEscopo textos)
+    {
+        if (item.EscopoIncluso.Trim().Length == 0) return De(item, custo, moeda, textos);
+
+        // o texto da equipe pode ser de antes destas regras: tira o design que
+        // ele ainda carregue e garante o que é padrão em todo escopo
+        var linhas = Linhas(item.EscopoIncluso)
+            .Where(l => !LinhaDoDesign(l))
+            .ToList();
+
+        foreach (var padrao in textos.Padrao)
+            if (!linhas.Any(l => Textos.Igual(l, padrao))) linhas.Add(padrao);
+
+        return linhas;
+    }
 
     /// <summary>
     /// Um texto de tela virando lista de marcadores. Aceita com e sem o traço
