@@ -60,8 +60,28 @@ public static class BackendHost
         }
 
         // --- Blazor Server (componentes interativos no servidor) ---
+        //
+        // A tela fica "parada" quando o navegador suspende a aba (computador em
+        // repouso, VPN que oscila, aba em segundo plano): a conexão com o
+        // servidor cai. O que está preenchido vive na memória do servidor, num
+        // "circuito" — e o padrão do Blazor o descarta 3 minutos depois de a
+        // conexão cair, o que obrigava a recarregar e perder a proposta. Aqui o
+        // circuito é guardado por horas, e o navegador reconecta sozinho
+        // (ver wwwroot/app.js) assim que a pessoa volta.
         builder.Services.AddRazorComponents()
-            .AddInteractiveServerComponents();
+            .AddInteractiveServerComponents(opcoes =>
+            {
+                opcoes.DisconnectedCircuitRetentionPeriod = TimeSpan.FromHours(12);
+                opcoes.DisconnectedCircuitMaxRetained = 200;
+            });
+
+        // um navegador em segundo plano atrasa os "ping" do SignalR: com o
+        // limite padrão (30 s) o servidor o dava por perdido cedo demais
+        builder.Services.Configure<Microsoft.AspNetCore.SignalR.HubOptions>(opcoes =>
+        {
+            opcoes.KeepAliveInterval = TimeSpan.FromSeconds(15);
+            opcoes.ClientTimeoutInterval = TimeSpan.FromMinutes(5);
+        });
 
         // --- Autenticação por cookie (sessão fica no navegador do usuário) ---
         builder.Services.AddCascadingAuthenticationState();
