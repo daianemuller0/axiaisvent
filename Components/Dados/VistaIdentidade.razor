@@ -1,18 +1,10 @@
-@page "/axiais/marca"
-@attribute [Authorize(Roles = "adm,admin")]
-@rendermode InteractiveServer
 @inject BrandingRepository Branding
 
-<div class="page-head">
-    <div>
-        <h1>Identidade Visual</h1>
-        <p class="subtitle">
+<p class="subtitle">
             Dois logos, trocáveis a qualquer momento: o da <strong>página inicial</strong> (a tela
             de entrada, com o login) e o do <strong>sistema</strong> (a barra lateral, em todas as
             telas). Envie PNG ou JPG de até 1&nbsp;MB — de preferência PNG com fundo transparente.
         </p>
-    </div>
-</div>
 
 <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:18px; align-items:start">
     <div class="panel">

@@ -130,7 +130,7 @@ trocar o valor para `true`. Na guia Dados, o que se chamava *preço* agora é *c
 
 ## Identidade Visual
 
-Item **Identidade Visual** no menu (`/axiais/marca`): troca os dois logos do sistema, sem mexer
+Seção **Identidade Visual** dentro de **Configurações** (`/axiais/configuracoes`, ou `/axiais/marca`): troca os dois logos do sistema, sem mexer
 em código. O **logo da página inicial** aparece na tela de entrada (login) e o **logo do
 sistema** na barra lateral, em todas as telas. Aceita PNG ou JPG de até 1 MB (de preferência
 PNG com fundo transparente); a troca vale na hora, inclusive na barra lateral de quem já está

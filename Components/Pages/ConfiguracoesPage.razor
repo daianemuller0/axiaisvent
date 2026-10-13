@@ -1,19 +1,35 @@
 @page "/axiais/configuracoes"
+@page "/axiais/marca"
 @attribute [Authorize(Roles = "adm,admin")]
 @rendermode InteractiveServer
 @inject UsuarioRepository Usuarios
+@inject NavigationManager Navegacao
 
 <div class="page-head">
     <div>
         <h1>Configurações</h1>
         <p class="subtitle">
-            Os usuários do sistema e o que cada um pode fazer. Quem for cadastrado aqui entra
-            pela tela de login com o usuário e a senha definidos, e o <strong>papel</strong>
-            decide o que aparece no menu.
+            Os usuários do sistema e o que cada um pode fazer, e a identidade visual (os
+            logos). Quem for cadastrado aqui entra pela tela de login com o usuário e a senha
+            definidos, e o <strong>papel</strong> decide o que cada um pode fazer.
         </p>
     </div>
 </div>
 
+<div class="tabs" style="margin-top:6px">
+    @foreach (var (chave, titulo) in Abas)
+    {
+        var a = chave;
+        <button class="tab @(_aba == a ? "active" : "")" @onclick="() => _aba = a">@titulo</button>
+    }
+</div>
+
+@if (_aba == "identidade")
+{
+    <VistaIdentidade />
+}
+else
+{
 <div class="panel" style="margin-bottom:18px">
     <h3 class="dash-title">Novo usuário</h3>
 
@@ -111,7 +127,17 @@
     ele que abre o sistema na primeira vez.
 </p>
 
+}
+
 @code {
+    private static readonly (string Chave, string Titulo)[] Abas =
+    {
+        ("usuarios", "Usuários"), ("identidade", "Identidade Visual"),
+    };
+
+    /// <summary>A seção à vista. /axiais/marca (o endereço antigo) abre na identidade visual.</summary>
+    private string _aba = "usuarios";
+
     private List<Usuario> _todos = new();
 
     private string _nome = "";
@@ -124,7 +150,13 @@
     private string? _msg;
     private bool _erro;
 
-    protected override void OnInitialized() => _todos = Usuarios.Todos();
+    protected override void OnInitialized()
+    {
+        _todos = Usuarios.Todos();
+
+        if (Navegacao.ToBaseRelativePath(Navegacao.Uri).Contains("marca", StringComparison.OrdinalIgnoreCase))
+            _aba = "identidade";
+    }
 
     private string NovaSenha(Usuario u) => _novasSenhas.GetValueOrDefault(u.Id, "");
 
