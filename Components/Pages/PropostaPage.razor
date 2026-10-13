@@ -1316,12 +1316,10 @@
         <div class="aviso aviso-alerta" style="margin-top:8px">@aviso</div>
     }
 
-    @{
-        var converte = Cambio.Converte(_proposta);
-        var moedaCusto = _proposta.Moeda;
-        var moedaVenda = _proposta.MoedaVenda;
-        var pt = new System.Globalization.CultureInfo("pt-BR");
-    }
+    var converte = Cambio.Converte(_proposta);
+    var moedaCusto = _proposta.Moeda;
+    var moedaVenda = _proposta.MoedaVenda;
+    var pt = new System.Globalization.CultureInfo("pt-BR");
 
     <div class="toolbar" style="flex-wrap:wrap; margin-top:14px">
         <strong>Preço ao cliente em</strong>
