@@ -68,18 +68,20 @@
 
         @if (_proposta.Id.Length > 0)
         {
-            @if (_apagando)
-            {
-                <span class="aviso aviso-alerta" style="margin:0; padding:5px 9px">
-                    Apagar a proposta @_proposta.Numero?
-                </span>
-                <button class="btn-link" @onclick="Apagar">Sim, apagar</button>
-                <button class="btn-link" @onclick="@(() => _apagando = false)">Cancelar</button>
-            }
-            else
-            {
-                <button class="btn-link" @onclick="@(() => _apagando = true)">✕ apagar</button>
-            }
+            <AuthorizeView Roles="adm">
+                @if (_apagando)
+                {
+                    <span class="aviso aviso-alerta" style="margin:0; padding:5px 9px">
+                        Apagar a proposta @_proposta.Numero (rev @_proposta.Revisao)?
+                    </span>
+                    <button class="btn-link" @onclick="Apagar">Sim, apagar</button>
+                    <button class="btn-link" @onclick="@(() => _apagando = false)">Cancelar</button>
+                }
+                else
+                {
+                    <button class="btn-link" @onclick="@(() => _apagando = true)">✕ apagar</button>
+                }
+            </AuthorizeView>
         }
     </div>
 </div>
@@ -1921,6 +1923,13 @@
     private Proposta _proposta = Nascer();
     private List<Proposta> _gravadas = new();
 
+    /// <summary>
+    /// A revisão que a proposta tinha quando foi aberta (ou gravada pela última
+    /// vez). Se a pessoa muda o número da revisão e grava, não é a mesma proposta
+    /// que se atualiza: é uma NOVA revisão, e a anterior fica como estava.
+    /// </summary>
+    private string _revisaoAberta = "";
+
     private List<Equipamento> _equipamentos = new();
     private List<Motor> _motores = new();
     private List<LimiteMotor> _limites = new();
@@ -2001,6 +2010,7 @@
         if (Repo.Achar(Id) is { } achada)
         {
             _proposta = achada;
+            _revisaoAberta = achada.Revisao;
             AjustarEscolhasLivres();
             _aberto = 0;
             Aviso($"Proposta {achada.Numero} aberta.");
@@ -3227,16 +3237,51 @@
 
     // ---------- gravar / abrir ----------
 
+    /// <summary>
+    /// Mudou o número da revisão de uma proposta que já estava gravada? Aí o que
+    /// se grava é outra proposta.
+    /// </summary>
+    private bool NovaRevisaoPendente =>
+        _proposta.Id.Length > 0 && _proposta.Revisao.Trim() != _revisaoAberta.Trim();
+
     private void Salvar()
     {
+        var novaRevisao = NovaRevisaoPendente;
+
+        if (novaRevisao)
+        {
+            var revisao = _proposta.Revisao.Trim();
+
+            // a revisão que já existe não se sobrescreve nem por este caminho
+            if (Repo.Todas().Any(x => x.Id != _proposta.Id && x.Numero == _proposta.Numero
+                                      && x.Revisao.Trim() == revisao))
+            {
+                Aviso($"A revisão {revisao} da proposta {_proposta.Numero} já existe. " +
+                      "Abra-a pela Base de Dados ou use outro número de revisão.", erro: true);
+                return;
+            }
+
+            // a anterior fica intacta no banco: o que se grava daqui é uma
+            // proposta nova, com o mesmo número e a revisão atualizada — e ainda
+            // não enviada, porque ninguém mandou esta revisão ao cliente
+            _proposta.Id = "";
+            _proposta.CriadaEm = "";
+            _proposta.EnviadaEm = "";
+        }
+
         Repo.Salvar(_proposta);
+        _revisaoAberta = _proposta.Revisao;
         Recarregar();
-        Aviso($"Proposta {_proposta.Numero} gravada.");
+
+        Aviso(novaRevisao
+            ? $"Revisão {_proposta.Revisao.Trim()} gravada como uma proposta nova — a revisão anterior continua como estava."
+            : $"Proposta {_proposta.Numero} gravada.");
     }
 
     private void Nova()
     {
         _proposta = Nascer();
+        _revisaoAberta = "";
         AjustarEscolhasLivres();
         _aberto = 0;
         _apagando = false;
@@ -3265,6 +3310,7 @@
         }
 
         _proposta = achada;
+        _revisaoAberta = achada.Revisao;
         AjustarEscolhasLivres();
         _aberto = 0;
         Aviso($"Proposta {achada.Numero} aberta.");
@@ -3276,6 +3322,12 @@
     /// </summary>
     private void MarcarEnviada()
     {
+        if (NovaRevisaoPendente)
+        {
+            Aviso("A revisão mudou: grave a nova revisão (💾 Salvar) antes de marcar como enviada.", erro: true);
+            return;
+        }
+
         _proposta.EnviadaEm = DateTime.Now.ToString("yyyy-MM-dd");
         Repo.Salvar(_proposta);
 
@@ -3285,6 +3337,12 @@
 
     private void DesmarcarEnviada()
     {
+        if (NovaRevisaoPendente)
+        {
+            Aviso("A revisão mudou: grave a nova revisão (💾 Salvar) antes.", erro: true);
+            return;
+        }
+
         _proposta.EnviadaEm = "";
         Repo.Salvar(_proposta);
 

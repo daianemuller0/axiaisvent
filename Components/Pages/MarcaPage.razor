@@ -1,5 +1,5 @@
 @page "/axiais/marca"
-@attribute [Authorize]
+@attribute [Authorize(Roles = "adm")]
 @rendermode InteractiveServer
 @inject BrandingRepository Branding
 

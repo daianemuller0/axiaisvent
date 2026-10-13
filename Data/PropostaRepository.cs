@@ -500,6 +500,7 @@ public sealed class Proposta
     /// <summary>Como a proposta aparece numa lista.</summary>
     public string Titulo =>
         (Numero.Length > 0 ? Numero : "(sem número)") +
+        (Revisao.Trim().Length > 0 ? $" rev {Revisao.Trim()}" : "") +
         (Cliente.Length > 0 ? $" · {Cliente}" : "") +
         (Projeto.Length > 0 ? $" · {Projeto}" : "");
 }

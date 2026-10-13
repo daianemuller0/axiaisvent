@@ -2,7 +2,7 @@
 @page "/axiais/motores"
 @page "/axiais/caracteristicas"
 @page "/axiais/conversao"
-@attribute [Authorize]
+@attribute [Authorize(Roles = "adm,cadastro")]
 @rendermode InteractiveServer
 @inject EquipamentoRepository Equipamentos
 @inject ItemModeloRepository ItensModelo
@@ -102,7 +102,7 @@
     <p class="subtitle" style="margin:10px 0 0">
         Esvazia as tabelas marcadas para a equipe subir as dela — pela planilha ou digitando.
         A tabela de fábrica <strong>não volta</strong> na próxima abertura: a limpeza fica
-        gravada. A aba <a href="/axiais/base">Base</a> não é tocada.
+        gravada.
     </p>
 </div>
 

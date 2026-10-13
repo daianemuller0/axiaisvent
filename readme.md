@@ -158,6 +158,23 @@ aparece a caixa **Conversão da moeda**:
 O código está em `Data/Cambio.cs`; a moeda do preço, a taxa, o sentido e a segurança ficam gravados
 na proposta. A planilha **Gerar pricing** continua recebendo os valores na moeda do custo.
 
+## Configurações, papéis e revisões
+
+**Configurações** (`/axiais/configuracoes`, só ADM): cria usuários com **papel de acesso** — ADM
+(tudo: Configurações, Identidade Visual, Dados e excluir propostas), Cadastro (Proposta, Base de
+Dados e Dados) e Comercial (Proposta e Base de Dados). A senha é guardada só como resumo (PBKDF2).
+Usuário inativo não entra. O acesso de `appsettings.json` (Auth:Usuario / Auth:Senha) continua
+valendo como ADM, para abrir o sistema na primeira vez. O menu mostra só o que o papel permite.
+
+**Base de Dados** (antiga lista de propostas): para o ADM, ganha a coluna **Rev.** e o botão
+**Excluir** (com confirmação; cada revisão é uma proposta à parte).
+
+**Revisões:** abrir uma proposta gravada, mudar o número da revisão e **Salvar** não sobrescreve a
+anterior — grava uma proposta nova, com o mesmo número e a revisão atualizada (ainda não enviada). Se
+a revisão já existir, o sistema recusa e avisa.
+
+A guia **Base** (planilha solta) foi retirada; o sistema abre na **Proposta**.
+
 ## A aba Base
 
 Hoje o sistema tem uma aba, **Base**, com a planilha da equipe:

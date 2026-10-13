@@ -98,7 +98,7 @@ public static class BackendHost
         // --- Dados: DuckDB (motor) sobre Parquet numa pasta de rede ---
         var dataFolder = builder.Configuration["Data:Folder"] ?? "data";
         builder.Services.AddSingleton(new ParquetStore(dataFolder));
-        builder.Services.AddScoped<BaseRepository>();
+        builder.Services.AddScoped<UsuarioRepository>();
         builder.Services.AddScoped<EquipamentoRepository>();
         builder.Services.AddScoped<ItemModeloRepository>();
         builder.Services.AddScoped<MotorRepository>();
@@ -181,24 +181,42 @@ public static class BackendHost
         app.UseAuthorization();
 
         // --- Login/logout (precisam do HttpContext para gravar o cookie) ---
-        app.MapPost("/auth/login", async (HttpContext http, IConfiguration cfg) =>
+        app.MapPost("/auth/login", async (HttpContext http, IConfiguration cfg, UsuarioRepository usuarios) =>
         {
             var form = await http.Request.ReadFormAsync();
             var usuario = form["usuario"].ToString().Trim();
             var senha = form["senha"].ToString();
 
-            var cfgUsuario = cfg["Auth:Usuario"] ?? "howden";
-            var cfgSenha = cfg["Auth:Senha"] ?? "howden2026";
+            // quem foi cadastrado em Configurações entra com o papel dele; o
+            // acesso do appsettings.json continua valendo, como ADM — é o que
+            // abre o sistema na primeira vez e nunca deixa ninguém de fora
+            List<Claim> claims;
 
-            if (!usuario.Equals(cfgUsuario, StringComparison.OrdinalIgnoreCase) || senha != cfgSenha)
-                return Results.Redirect("/login?error=1");
-
-            var claims = new List<Claim>
+            if (usuarios.Autenticar(usuario, senha) is { } cadastrado)
             {
-                new(ClaimTypes.NameIdentifier, "equipe"),
-                new(ClaimTypes.Name, "Equipe Howden"),
-                new(ClaimTypes.Role, "admin"),
-            };
+                claims = new List<Claim>
+                {
+                    new(ClaimTypes.NameIdentifier, cadastrado.Id),
+                    new(ClaimTypes.Name, cadastrado.Nome),
+                    new(ClaimTypes.Role, cadastrado.Papel),
+                };
+            }
+            else
+            {
+                var cfgUsuario = cfg["Auth:Usuario"] ?? "howden";
+                var cfgSenha = cfg["Auth:Senha"] ?? "howden2026";
+
+                if (!usuario.Equals(cfgUsuario, StringComparison.OrdinalIgnoreCase) || senha != cfgSenha)
+                    return Results.Redirect("/login?error=1");
+
+                claims = new List<Claim>
+                {
+                    new(ClaimTypes.NameIdentifier, "equipe"),
+                    new(ClaimTypes.Name, "Equipe Howden"),
+                    new(ClaimTypes.Role, Papeis.Adm),
+                };
+            }
+
             var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
             await http.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity));
             return Results.Redirect("/");

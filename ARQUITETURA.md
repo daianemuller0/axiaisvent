@@ -52,7 +52,7 @@ axiaisvent/
 │   ├── RedirectToLogin.razor
 │   ├── Layout/                    # MainLayout, NavMenu, EmptyLayout
 │   └── Pages/
-│       ├── Home.razor             # "/" → /axiais/base
+│       ├── Home.razor             # "/" → /axiais/proposta
 │       ├── Login.razor
 │       ├── BasePage.razor         # ★ a aba Base (subir, ajustar linhas, exportar)
 │       └── Error.razor
@@ -166,7 +166,7 @@ A pasta vem de `Data:Folder` no `appsettings.json`
 
 | Rota | Página | O que faz |
 |---|---|---|
-| `/` | Home | Redireciona para `/axiais/base` |
+| `/` | Home | Redireciona para `/axiais/proposta` |
 | `/login` | Login | Formulário que posta em `/auth/login` |
 | `/axiais/base` | Base | A planilha da base: subir, ajustar linhas, procurar e exportar |
 | `/axiais/dados` | Dados | Três vistas na mesma aba: Modelos, Motores e Características |
