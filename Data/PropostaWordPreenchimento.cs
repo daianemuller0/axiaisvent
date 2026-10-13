@@ -120,7 +120,7 @@ internal sealed partial class Preenchimento
     private void Propriedades()
     {
         var props = _doc.PackageProperties;
-        props.Title = PropostaWord.Referencia(_p);
+        props.Title = _tecnica ? PropostaWord.ReferenciaTecnica(_p) : PropostaWord.Referencia(_p);
         props.Category = _p.Projeto;
         props.Description = _p.AosCuidados;
         props.Keywords = _p.ReferenciaCliente;
@@ -187,7 +187,7 @@ internal sealed partial class Preenchimento
             ["Empresa"] = _p.Cliente,
             ["Categoria"] = _p.Projeto,
             ["Comentários"] = _p.AosCuidados,
-            ["Título"] = PropostaWord.Referencia(_p),
+            ["Título"] = _tecnica ? PropostaWord.ReferenciaTecnica(_p) : PropostaWord.Referencia(_p),
             ["Endereço da Empresa"] = _p.Cidade,
             ["Palavras-chave"] = _p.ReferenciaCliente,
             ["Data de Publicação"] = Hoje(),

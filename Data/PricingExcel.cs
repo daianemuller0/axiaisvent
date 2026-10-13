@@ -103,11 +103,9 @@ public static class PricingExcel
         return saida.ToArray();
     }
 
-    /// <summary>O nome do arquivo que a equipe baixa.</summary>
-    public static string NomeDoArquivo(Proposta p)
-    {
-        var numero = p.Numero.Length > 0 ? p.Numero : "proposta";
-        var revisao = p.Revisao.Length > 0 ? $"-rev{p.Revisao}" : "";
-        return $"pricing-{numero}{revisao}.xlsm";
-    }
+    /// <summary>
+    /// O nome do arquivo que a equipe baixa: P_PRP-2026-001-C00.xlsm — o mesmo
+    /// da proposta comercial a que o pricing pertence (a extensão é que muda).
+    /// </summary>
+    public static string NomeDoArquivo(Proposta p) => $"{PropostaWord.Referencia(p)}.xlsm";
 }
