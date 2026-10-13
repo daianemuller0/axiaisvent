@@ -138,6 +138,26 @@ com o sistema aberto. Sem logo enviado, cada lugar volta ao padrão da Howden. O
 gravados na pasta de dados (entidade `branding`, `Data/BrandingRepository.cs`). O logo do
 documento das propostas não passa por aqui: ele é o do modelo em Word da equipe.
 
+## Conversão de moeda da proposta
+
+O custo pode estar numa moeda e o preço ao cliente em outra — o mesmo funcionamento do sistema
+de Serviços. Na tela **Proposta**: a **moeda do custo** é a do escopo (de onde o cadastro puxa o
+custo) e, na seção **Pricing**, **Preço ao cliente em** escolhe a moeda do preço. Sendo diferentes,
+aparece a caixa **Conversão da moeda**:
+
+- **Taxa de conversão**, nos dois sentidos: `1 <moeda do preço> em <moeda do custo>` ou o inverso
+  (internamente guardada sempre no primeiro). Ex.: custo em CLP, preço em USD, `1 USD = 950 CLP`.
+- **Segurança da moeda**: % tirado da taxa. Com 5% a conversão usa 902,5 em vez de 950 — o preço em
+  USD sobe, e se o dólar cair até 5% o valor em pesos não perde.
+- Preço = custo ÷ taxa efetiva, com duas casas. O custo e todo o pricing continuam na moeda do
+  custo; só o valor final é convertido (venda líquida e preço com impostos, o preço de cada
+  equipamento, os opcionais e o valor do histórico).
+- Sem taxa informada a tela avisa e o preço sai sem conversão. Custo e preço na mesma moeda nunca
+  convertem. O Word da proposta comercial sai na moeda do preço; o Custo Previsto, na do custo.
+
+O código está em `Data/Cambio.cs`; a moeda do preço, a taxa, o sentido e a segurança ficam gravados
+na proposta. A planilha **Gerar pricing** continua recebendo os valores na moeda do custo.
+
 ## A aba Base
 
 Hoje o sistema tem uma aba, **Base**, com a planilha da equipe:

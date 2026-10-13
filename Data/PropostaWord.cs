@@ -65,7 +65,7 @@ public static class PropostaWord
     /// a tela não mostrar um número e o Word sair com outro.
     /// </summary>
     public static List<decimal> PrecosDeVenda(Proposta p, CustoDaProposta custo) =>
-        Ratear(p, custo, CalculoPricing.Da(p, custo.Total(p)).VendaLiquida);
+        Ratear(p, custo, Cambio.ParaVenda(p, CalculoPricing.Da(p, custo.Total(p)).VendaLiquida));
 
     /// <summary>
     /// O fator que leva o custo ao preço: a venda líquida da proposta dividida
@@ -84,9 +84,13 @@ public static class PropostaWord
         return CalculoPricing.Da(p, total).VendaLiquida / total;
     }
 
-    /// <summary>O preço de um opcional: o custo dele vezes o fator.</summary>
+    /// <summary>
+    /// O preço de um opcional: o custo dele vezes o fator, já na moeda do preço
+    /// ao cliente (o fator leva o custo ao preço, e a conversão leva o preço à
+    /// moeda do cliente).
+    /// </summary>
     public static decimal PrecoDoOpcional(Proposta p, CustoDaProposta custo, decimal custoDele) =>
-        Math.Round(custoDele * Fator(p, custo), 2);
+        Math.Round(Cambio.ParaVenda(p, custoDele * Fator(p, custo)), 2);
 
     /// <summary>
     /// Reparte o preço de venda entre os equipamentos.

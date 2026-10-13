@@ -164,7 +164,7 @@ else
 
         var pricing = CalculoPricing.Da(p, custo);
 
-        return $"{p.Moeda.Rotulo()} {pricing.VendaLiquida.ToString("N2", Br)}";
+        return $"{p.MoedaVenda.Rotulo()} {Cambio.ParaVenda(p, pricing.VendaLiquida).ToString("N2", Br)}";
     }
 
     private static string Data(Proposta p)
