@@ -68,7 +68,7 @@
 
         @if (_proposta.Id.Length > 0)
         {
-            <AuthorizeView Roles="adm">
+            <AuthorizeView Roles="adm,admin">
                 @if (_apagando)
                 {
                     <span class="aviso aviso-alerta" style="margin:0; padding:5px 9px">

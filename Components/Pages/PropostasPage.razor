@@ -61,7 +61,7 @@ else
             <thead>
                 <tr>
                     <th class="nowrap">Número</th>
-                    <AuthorizeView Roles="adm">
+                    <AuthorizeView Roles="adm,admin">
                         <th class="nowrap" style="width:80px">Rev.</th>
                     </AuthorizeView>
                     <th class="nowrap">Cliente</th>
@@ -71,7 +71,7 @@ else
                     <th class="nowrap">Quem fez</th>
                     <th class="nowrap" style="width:130px">Data</th>
                     <th class="nowrap" style="width:120px">Situação</th>
-                    <AuthorizeView Roles="adm">
+                    <AuthorizeView Roles="adm,admin">
                         <th class="nowrap" style="width:150px"></th>
                     </AuthorizeView>
                 </tr>
@@ -82,7 +82,7 @@ else
                     var proposta = p;
                     <tr @key="proposta.Id" style="cursor:pointer" @onclick="() => Abrir(proposta)">
                         <td class="nowrap"><strong>@(proposta.Numero.Length > 0 ? proposta.Numero : "—")</strong></td>
-                        <AuthorizeView Roles="adm">
+                        <AuthorizeView Roles="adm,admin">
                             <td class="nowrap">@(proposta.Revisao.Length > 0 ? proposta.Revisao : "—")</td>
                         </AuthorizeView>
                         <td class="nowrap">@(proposta.Cliente.Length > 0 ? proposta.Cliente : "(sem cliente)")</td>
@@ -101,7 +101,7 @@ else
                                 <span class="subtitle">em elaboração</span>
                             }
                         </td>
-                        <AuthorizeView Roles="adm">
+                        <AuthorizeView Roles="adm,admin">
                             <td class="nowrap">
                                 @if (_apagando == proposta.Id)
                                 {

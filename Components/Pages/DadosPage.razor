@@ -2,7 +2,7 @@
 @page "/axiais/motores"
 @page "/axiais/caracteristicas"
 @page "/axiais/conversao"
-@attribute [Authorize(Roles = "adm,cadastro")]
+@attribute [Authorize(Roles = "adm,admin,cadastro")]
 @rendermode InteractiveServer
 @inject EquipamentoRepository Equipamentos
 @inject ItemModeloRepository ItensModelo
