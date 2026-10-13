@@ -1182,6 +1182,7 @@ internal sealed partial class Preenchimento
     {
         Moeda.Clp => (1_800_000m, 3_600_000m),
         Moeda.Brl => (6_000m, 12_000m),
+        Moeda.Eur => (1_725m, 3_450m),
         _ => (2_015m, 4_030m),
     };
 

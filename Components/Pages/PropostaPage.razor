@@ -1323,7 +1323,7 @@
 
     <div class="toolbar" style="flex-wrap:wrap; margin-top:14px">
         <strong>Preço ao cliente em</strong>
-        @foreach (var m in Moedas.Todas)
+        @foreach (var m in Moedas.DePreco)
         {
             var moeda = m;
             <button class="@(moedaVenda == moeda ? "btn-primary" : "btn-ghost")"
