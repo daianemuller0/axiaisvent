@@ -124,6 +124,11 @@ public static class PricingExcel
 
             if (wb.TryGetWorksheet("BD_pricing", out var bd)) bd.Cell("A1").Value = linha;
 
+            // o bloco convertido (K13/Q13) só aparece em venda de exportação:
+            // preço em outra moeda é, para a planilha, exatamente isso
+            if (proposta.MoedaVenda != proposta.Moeda)
+                ws.Cell("J5").Value = "Exportação";
+
             // o valor convertido (Q13) saía com nove casas: fecha em uma
             var convertido = ws.Cell("Q13");
             if (convertido.HasFormula)
