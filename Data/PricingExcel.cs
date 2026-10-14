@@ -103,27 +103,37 @@ public static class PricingExcel
         // modelo trazia (25%). Sem isto, mudar a margem aqui não mudava o arquivo
         ws.Cell("P25").Value = (double)pricing.Margem;
 
-        // ---------- moeda: a caixa "Moedas" da planilha (G36:J50) ----------
-        // A planilha calcula na moeda do custo e converte para a moeda do preço
-        // com Q14 = venda ÷ taxa da moeda escolhida. A escolha vem de
-        // BD_pricing!A1 (1 = USD, 2 = EUR, 3 = GBP, 4 = CLP) e as taxas são as
-        // células I36..I39. Aqui vai a taxa EFETIVA do sistema (já com a
-        // segurança da moeda) na linha da moeda do preço — a planilha converte
+        // ---------- moeda: a caixa "Moedas" da planilha ----------
+        // A planilha calcula na moeda do custo e converte o preço para a moeda
+        // escolhida com Q13 = venda (Q12) ÷ taxa da moeda. A escolha é o número
+        // em BD_pricing!A1 (1 = USD, 2 = EUR, 3 = GBP, 4 = CLP — é a ligação dos
+        // botões de opção) e as taxas são as células I35 (USD), I36 (EUR), I37
+        // (GBP) e I38 (CLP). Aqui vai a taxa EFETIVA do sistema (já com a
+        // segurança da moeda) na linha da moeda do preço: a planilha converte
         // exatamente como a tela.
+        var codigoDoCusto = proposta.Moeda.Codigo();
+        var codigoDoPreco = proposta.MoedaVenda.Codigo();
+
         var (indice, taxa) = MoedaDaPlanilha(proposta);
         if (indice is int linha)
         {
-            ws.Cell(linha switch { 1 => "I36", 2 => "I37", 3 => "I38", _ => "I39" }).Value =
-                (double)Math.Round(taxa, 6);
+            var celulaDaTaxa = ws.Cell(linha switch { 1 => "I35", 2 => "I36", 3 => "I37", _ => "I38" });
+            celulaDaTaxa.Value = (double)Math.Round(taxa, 6);
+            // a planilha rotula tudo como BRL; a taxa é "moeda do custo por 1 moeda do preço"
+            celulaDaTaxa.Style.NumberFormat.Format = $"\"{codigoDoCusto}\" #,##0.0000";
 
             if (wb.TryGetWorksheet("BD_pricing", out var bd)) bd.Cell("A1").Value = linha;
 
-            // o valor convertido fecha em duas casas (saía com nove)
-            var convertido = ws.Cell("Q14");
+            // o valor convertido (Q13) saía com nove casas: fecha em uma
+            var convertido = ws.Cell("Q13");
             if (convertido.HasFormula)
-                convertido.FormulaA1 = $"ROUND({convertido.FormulaA1},2)";
-            convertido.Style.NumberFormat.Format = "#,##0.00";
+                convertido.FormulaA1 = $"ROUND({convertido.FormulaA1},1)";
+            convertido.Style.NumberFormat.Format = $"\"{codigoDoPreco}\" #,##0.0";
         }
+
+        // a venda líquida está na moeda do custo; o modelo a rotulava R$
+        ws.Cell("Q12").Style.NumberFormat.Format = $"\"{codigoDoCusto}\" #,##0.0";
+        ws.Cell("E51").Style.NumberFormat.Format = $"\"{codigoDoCusto}\" #,##0.0";
 
         using var saida = new MemoryStream();
         wb.SaveAs(saida);
@@ -132,7 +142,8 @@ public static class PricingExcel
 
     /// <summary>
     /// A linha da moeda na caixa "Moedas" da planilha — USD 1, EUR 2, GBP 3,
-    /// CLP 4 — ou nada quando a planilha não tem a moeda (PEN e R$).
+    /// CLP 4 (a ordem de BD_pricing!A2:A5) — ou nada quando a planilha não tem
+    /// a moeda (PEN e R$).
     /// </summary>
     public static int? IndiceDaMoeda(Moeda moeda) => moeda switch
     {
