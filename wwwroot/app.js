@@ -39,3 +39,13 @@ window.appRolarPara = (id) => {
     const el = document.getElementById(id);
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 };
+
+// Rascunho da proposta no navegador: o que a pessoa preenche é guardado aqui a
+// cada alteração, para sobreviver a recarregar a página (o estado do servidor
+// se perde nesse caso). Tudo em try/catch: navegação privada ou site bloqueado
+// só significa "sem rascunho", nunca erro na tela.
+window.appRascunho = {
+    ler: (chave) => { try { return localStorage.getItem('axiais.rascunho.' + chave); } catch (e) { return null; } },
+    gravar: (chave, valor) => { try { localStorage.setItem('axiais.rascunho.' + chave, valor); } catch (e) { } },
+    limpar: (chave) => { try { localStorage.removeItem('axiais.rascunho.' + chave); } catch (e) { } },
+};

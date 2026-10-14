@@ -1923,6 +1923,126 @@
     private Proposta _proposta = Nascer();
     private List<Proposta> _gravadas = new();
 
+    // ---------- rascunho no navegador ----------
+    //
+    // O que está preenchido vive na memória do servidor; recarregar a página
+    // (ou perder a conexão por mais tempo que o servidor guarda a sessão) o
+    // apagava. Por isso a proposta em andamento é copiada para o navegador a
+    // cada alteração, e volta quando a página abre — enquanto não for gravada
+    // (💾 Salvar), que é quando o rascunho deixa de ser necessário.
+
+    /// <summary>A proposta como está gravada (ou como nasceu): o que NÃO é rascunho.</summary>
+    private string _baseSalva = "";
+
+    /// <summary>O último rascunho escrito no navegador, para não reescrever o mesmo.</summary>
+    private string _ultimoRascunho = "";
+
+    /// <summary>Com que chave o rascunho foi escrito (o id da proposta, ou "novo").</summary>
+    private string _chaveRascunho = "";
+
+    /// <summary>Só depois de tentar recuperar o rascunho é que se pode escrever um: antes, a tela em branco o apagaria.</summary>
+    private bool _rascunhoPronto;
+
+    private string Foto() => System.Text.Json.JsonSerializer.Serialize(_proposta);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        try
+        {
+            if (firstRender)
+            {
+                await RecuperarRascunho();
+                _rascunhoPronto = true;
+                return;
+            }
+
+            if (_rascunhoPronto) await GuardarRascunho();
+        }
+        catch (Exception)
+        {
+            // rascunho é uma rede de segurança: nunca derruba a tela
+        }
+    }
+
+    private async Task RecuperarRascunho()
+    {
+        // a rota manda: /axiais/proposta/{id} só recupera o rascunho DAQUELA
+        // proposta; sem id, vale o último que a pessoa estava editando
+        var chave = !string.IsNullOrWhiteSpace(Id)
+            ? Id!
+            : await JS.InvokeAsync<string?>("appRascunho.ler", "ultima") ?? "novo";
+
+        var texto = await JS.InvokeAsync<string?>("appRascunho.ler", chave);
+        if (string.IsNullOrEmpty(texto)) return;
+
+        var recuperada = System.Text.Json.JsonSerializer.Deserialize<Proposta>(texto);
+        if (recuperada is null) return;
+
+        // uma proposta que já está no banco só é "recuperada" se o rascunho for
+        // diferente do que está gravado — e se ela foi apagada, o rascunho some
+        if (recuperada.Id.Length > 0)
+        {
+            var gravada = Repo.Achar(recuperada.Id);
+            if (gravada is null)
+            {
+                await JS.InvokeVoidAsync("appRascunho.limpar", chave);
+                return;
+            }
+
+            _baseSalva = System.Text.Json.JsonSerializer.Serialize(gravada);
+            _revisaoAberta = gravada.Revisao;
+
+            if (_baseSalva == texto) return;
+        }
+        else
+        {
+            _baseSalva = Foto();
+        }
+
+        _proposta = recuperada;
+        _ultimoRascunho = texto;
+        _chaveRascunho = chave;
+        AjustarEscolhasLivres();
+
+        Aviso("Recuperei o que você estava preenchendo e ainda não tinha gravado. " +
+              "Grave com 💾 Salvar — ou descarte com + Nova.");
+        StateHasChanged();
+    }
+
+    private async Task GuardarRascunho()
+    {
+        var atual = Foto();
+        var chave = _proposta.Id.Length > 0 ? _proposta.Id : "novo";
+
+        // a chave mudou (a proposta nova ganhou id ao ser gravada): o rascunho
+        // da chave antiga não vale mais
+        if (_chaveRascunho.Length > 0 && _chaveRascunho != chave)
+        {
+            await JS.InvokeVoidAsync("appRascunho.limpar", _chaveRascunho);
+            _ultimoRascunho = "";
+        }
+
+        // igual ao que está gravado: não há o que guardar
+        if (atual == _baseSalva)
+        {
+            if (_ultimoRascunho.Length > 0 || _chaveRascunho.Length > 0)
+            {
+                await JS.InvokeVoidAsync("appRascunho.limpar", chave);
+                _ultimoRascunho = "";
+            }
+
+            _chaveRascunho = chave;
+            return;
+        }
+
+        if (atual == _ultimoRascunho && _chaveRascunho == chave) return;
+
+        await JS.InvokeVoidAsync("appRascunho.gravar", chave, atual);
+        await JS.InvokeVoidAsync("appRascunho.gravar", "ultima", chave);
+        _ultimoRascunho = atual;
+        _chaveRascunho = chave;
+    }
+
     /// <summary>
     /// A revisão que a proposta tinha quando foi aberta (ou gravada pela última
     /// vez). Se a pessoa muda o número da revisão e grava, não é a mesma proposta
@@ -1997,7 +2117,11 @@
     /// <summary>Id na rota: /axiais/proposta/{id} abre aquela proposta direto.</summary>
     [Parameter] public string? Id { get; set; }
 
-    protected override void OnInitialized() => Recarregar();
+    protected override void OnInitialized()
+    {
+        _baseSalva = Foto();
+        Recarregar();
+    }
 
     /// <summary>
     /// A rota manda. Como a mesma página atende /axiais/proposta e
@@ -2011,6 +2135,7 @@
         {
             _proposta = achada;
             _revisaoAberta = achada.Revisao;
+            _baseSalva = Foto();
             AjustarEscolhasLivres();
             _aberto = 0;
             Aviso($"Proposta {achada.Numero} aberta.");
@@ -3287,6 +3412,7 @@
 
         Repo.Salvar(_proposta);
         _revisaoAberta = _proposta.Revisao;
+        _baseSalva = Foto();
         Recarregar();
 
         Aviso(novaRevisao
@@ -3298,6 +3424,7 @@
     {
         _proposta = Nascer();
         _revisaoAberta = "";
+        _baseSalva = Foto();
         AjustarEscolhasLivres();
         _aberto = 0;
         _apagando = false;
@@ -3327,6 +3454,7 @@
 
         _proposta = achada;
         _revisaoAberta = achada.Revisao;
+        _baseSalva = Foto();
         AjustarEscolhasLivres();
         _aberto = 0;
         Aviso($"Proposta {achada.Numero} aberta.");
@@ -3346,6 +3474,7 @@
 
         _proposta.EnviadaEm = DateTime.Now.ToString("yyyy-MM-dd");
         Repo.Salvar(_proposta);
+        _baseSalva = Foto();
 
         Recarregar();
         Aviso($"Proposta {_proposta.Numero} marcada como enviada em {DataCurta(_proposta.EnviadaEm)}.");
@@ -3361,6 +3490,7 @@
 
         _proposta.EnviadaEm = "";
         Repo.Salvar(_proposta);
+        _baseSalva = Foto();
 
         Recarregar();
         Aviso($"Proposta {_proposta.Numero} voltou para \"em elaboração\".");

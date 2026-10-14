@@ -178,6 +178,16 @@ a revisão já existir, o sistema recusa e avisa.
 
 A guia **Base** (planilha solta) foi retirada; o sistema abre na **Proposta**.
 
+## Rascunho: recarregar a página não perde a proposta
+
+A proposta em andamento é copiada para o navegador (localStorage) a cada alteração e volta quando a
+página abre — inclusive depois de recarregar (F5) ou de o servidor reiniciar. O rascunho vale
+enquanto a proposta não for gravada: **Salvar** (ou **+ Nova**) o apaga. Abrindo uma proposta gravada,
+só é recuperado o que for diferente do que está gravado. Cada proposta tem o seu rascunho; sem id na
+rota, volta a que estava sendo editada por último. O rascunho é do navegador e da máquina da pessoa
+(não vai para a pasta de rede) e, como os campos de texto só confirmam ao sair deles, o que ainda está
+sendo digitado no momento do recarregamento não entra.
+
 ## A aba Base
 
 Hoje o sistema tem uma aba, **Base**, com a planilha da equipe:
