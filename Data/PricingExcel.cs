@@ -1,5 +1,3 @@
-using ClosedXML.Excel;
-
 namespace HowdenAxiais.Poc.Data;
 
 /// <summary>
@@ -41,108 +39,107 @@ public static class PricingExcel
     public static byte[] Gerar(Proposta proposta, decimal custoTotal,
         CalculoPricing.Resultado pricing, string caminhoDoModelo)
     {
-        using var wb = new XLWorkbook(caminhoDoModelo);
-        var ws = wb.Worksheet(Aba);
+        // a planilha da equipe é editada no pacote, sem regravar: assim as imagens,
+        // os botões e as macros chegam como o modelo as tem
+        using var pacote = new PacoteXlsm(caminhoDoModelo);
+        var ws = pacote.AbaDe(Aba);
 
         // ---------- cabeçalho ----------
-        ws.Cell("E3").Value = proposta.Cliente;
-        ws.Cell("E6").Value = proposta.Numero;
-        ws.Cell("E7").Value = DadosExcel.Numero(proposta.Revisao) is { } rev
-            ? (XLCellValue)(double)rev
-            : proposta.Revisao;
-        ws.Cell("E9").Value = proposta.PreparadaPor;
+        ws.Texto("E3", proposta.Cliente);
+        ws.Texto("E6", proposta.Numero);
+        if (DadosExcel.Numero(proposta.Revisao) is { } rev) ws.Numero("E7", (double)rev);
+        else ws.Texto("E7", proposta.Revisao);
+        ws.Texto("E9", proposta.PreparadaPor);
 
         // sem estas três, a planilha calculava com o que estivesse no modelo —
         // e o preço dela saía diferente do da tela sem ninguém entender por quê
-        ws.Cell("E8").Value = ListasDaProposta.CodigoDaBu(proposta.Bu);
-        ws.Cell("J3").Value = Proposta.SegmentoDoPricing;
+        ws.Texto("E8", ListasDaProposta.CodigoDaBu(proposta.Bu));
+        ws.Texto("J3", Proposta.SegmentoDoPricing);
         // fora do Brasil o pricing não quer UF: quer "Chile", "Peru" ou "EXPORT"
         var estado = ListasDaProposta.EstadoDoPricing(proposta.Pais, proposta.Estado);
-        ws.Cell("J6").Value = estado.Length > 0 ? estado : "preencher";
+        ws.Texto("J6", estado.Length > 0 ? estado : "preencher");
 
-        ws.Cell("J4").Value = proposta.VendaPara;
-        ws.Cell("J5").Value = proposta.Destino;
+        ws.Texto("J4", proposta.VendaPara);
+        ws.Texto("J5", proposta.Destino);
 
         // a equipe pediu: reforma sempre "Não"
-        ws.Cell("J7").Value = "Não";
+        ws.Texto("J7", "Não");
 
         // o prazo entra no custo da fiança (R48 conta os dias de cobertura)
         if (DadosExcel.Numero(proposta.PrazoEntregaDias) is { } prazo)
-            ws.Cell("J8").Value = (double)prazo;
+            ws.Numero("J8", (double)prazo);
 
-        ws.Cell("J9").Value = proposta.Beneficio.Length > 0 ? proposta.Beneficio : "Sem benefício";
+        ws.Texto("J9", proposta.Beneficio.Length > 0 ? proposta.Beneficio : "Sem benefício");
 
-        ws.Cell("P3").Value = proposta.Fianca.Length > 0 ? proposta.Fianca : "Não";
+        ws.Texto("P3", proposta.Fianca.Length > 0 ? proposta.Fianca : "Não");
         // na planilha o portal é Sim/Não (D49 usa isso); no sistema a equipe
         // escolhe QUAL portal, e "Nenhum" é o que vira "Não"
-        ws.Cell("P4").Value = Proposta.TemPortal(proposta.Portal) ? "Sim" : "Não";
-        ws.Cell("P5").Value = proposta.Representante;
-        ws.Cell("P6").Value = proposta.Representante2.Length > 0 ? proposta.Representante2 : "-";
+        ws.Texto("P4", Proposta.TemPortal(proposta.Portal) ? "Sim" : "Não");
+        ws.Texto("P5", proposta.Representante);
+        ws.Texto("P6", proposta.Representante2.Length > 0 ? proposta.Representante2 : "-");
 
         // padrões dos axiais
-        ws.Cell("P7").Value = "Axials";
-        ws.Cell("P8").Value = "PAXIAL4 - Axials Configured Fans";
-        ws.Cell("P9").Value = "Mining";
+        ws.Texto("P7", "Axials");
+        ws.Texto("P8", "PAXIAL4 - Axials Configured Fans");
+        ws.Texto("P9", "Mining");
 
         // ---------- custo e pricing ----------
         // E33 é a soma das rubricas na planilha; como o custo vem inteiro do
         // sistema, ele é escrito no lugar da soma — e G33 recebe o mesmo valor,
         // senão o "risco de variação" (|G33 − E33|) viraria o custo inteiro
         // o pricing trabalha com duas casas: o custo entra arredondado
-        ws.Cell("E33").Value = (double)Math.Round(custoTotal, 2);
-        ws.Cell("G33").Value = (double)Math.Round(custoTotal, 2);
+        ws.Numero("E33", (double)Math.Round(custoTotal, 2));
+        ws.Numero("G33", (double)Math.Round(custoTotal, 2));
 
-        ws.Cell("D36").Value = (double)Proposta.Percentual(proposta.RiscoAdicional,
-            CalculoPricing.RiscoAdicionalPadrao);
-        ws.Cell("D46").Value = (double)Proposta.Percentual(proposta.MargemNegociacao,
-            CalculoPricing.MargemNegociacaoPadrao);
+        ws.Numero("D36", (double)Proposta.Percentual(proposta.RiscoAdicional,
+            CalculoPricing.RiscoAdicionalPadrao));
+        ws.Numero("D46", (double)Proposta.Percentual(proposta.MargemNegociacao,
+            CalculoPricing.MargemNegociacaoPadrao));
 
-        ws.Cell("E40").Value = (double)pricing.Markup;
+        ws.Numero("E40", (double)pricing.Markup);
 
         // a margem que o sistema está usando — a pedida na tela, e não a que o
         // modelo trazia (25%). Sem isto, mudar a margem aqui não mudava o arquivo
-        ws.Cell("P25").Value = (double)pricing.Margem;
+        ws.Numero("P25", (double)pricing.Margem);
 
         // ---------- moeda: a caixa "Moedas" da planilha ----------
         // A planilha calcula na moeda do custo e converte o preço para a moeda
-        // escolhida com Q13 = venda (Q12) ÷ taxa da moeda. A escolha é o número
-        // em BD_pricing!A1 (1 = USD, 2 = EUR, 3 = GBP, 4 = CLP — é a ligação dos
-        // botões de opção) e as taxas são as células I35 (USD), I36 (EUR), I37
-        // (GBP) e I38 (CLP). Aqui vai a taxa EFETIVA do sistema (já com a
+        // escolhida com Q13 = venda (Q12) ÷ taxa da moeda. A escolha é o botão
+        // marcado (e o número em BD_pricing!A1, a ligação dos botões: 1 = USD,
+        // 2 = EUR, 3 = GBP, 4 = CLP) e as taxas são as células I35 (USD), I36
+        // (EUR), I37 (GBP) e I38 (CLP). Vai a taxa EFETIVA do sistema (já com a
         // segurança da moeda) na linha da moeda do preço: a planilha converte
         // exatamente como a tela.
         var codigoDoCusto = proposta.Moeda.Codigo();
         var codigoDoPreco = proposta.MoedaVenda.Codigo();
+        pacote.TrocarMoedaDosFormatos(codigoDoCusto);
 
         var (indice, taxa) = MoedaDaPlanilha(proposta);
         if (indice is int linha)
         {
-            var celulaDaTaxa = ws.Cell(linha switch { 1 => "I35", 2 => "I36", 3 => "I37", _ => "I38" });
-            celulaDaTaxa.Value = (double)Math.Round(taxa, 6);
-            // a planilha rotula tudo como BRL; a taxa é "moeda do custo por 1 moeda do preço"
-            celulaDaTaxa.Style.NumberFormat.Format = $"\"{codigoDoCusto}\" #,##0.0000";
+            var celulaDaTaxa = linha switch { 1 => "I35", 2 => "I36", 3 => "I37", _ => "I38" };
+            ws.Numero(celulaDaTaxa, (double)Math.Round(taxa, 6));
+            // a taxa é "moeda do custo por 1 moeda do preço"
+            ws.Formato(celulaDaTaxa, $"\"{codigoDoCusto}\" #,##0.0000");
 
-            if (wb.TryGetWorksheet("BD_pricing", out var bd)) bd.Cell("A1").Value = linha;
+            pacote.AbaDe("BD_pricing").Numero("A1", linha);
+            pacote.MarcarMoeda(linha);
 
             // o bloco convertido (K13/Q13) só aparece em venda de exportação:
             // preço em outra moeda é, para a planilha, exatamente isso
             if (proposta.MoedaVenda != proposta.Moeda)
-                ws.Cell("J5").Value = "Exportação";
+                ws.Texto("J5", "Exportação");
 
             // o valor convertido (Q13) saía com nove casas: fecha em uma
-            var convertido = ws.Cell("Q13");
-            if (convertido.HasFormula)
-                convertido.FormulaA1 = $"ROUND({convertido.FormulaA1},1)";
-            convertido.Style.NumberFormat.Format = $"\"{codigoDoPreco}\" #,##0.0";
+            ws.Arredondar("Q13", 1);
+            ws.Formato("Q13", $"\"{codigoDoPreco}\" #,##0.0");
         }
 
-        // a venda líquida está na moeda do custo; o modelo a rotulava R$
-        ws.Cell("Q12").Style.NumberFormat.Format = $"\"{codigoDoCusto}\" #,##0.0";
-        ws.Cell("E51").Style.NumberFormat.Format = $"\"{codigoDoCusto}\" #,##0.0";
+        // a venda líquida está na moeda do custo
+        ws.Formato("Q12", $"\"{codigoDoCusto}\" #,##0.0");
+        ws.Formato("E51", $"\"{codigoDoCusto}\" #,##0.0");
 
-        using var saida = new MemoryStream();
-        wb.SaveAs(saida);
-        return saida.ToArray();
+        return pacote.Concluir();
     }
 
     /// <summary>

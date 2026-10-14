@@ -158,7 +158,7 @@ aparece a caixa **Conversão da moeda**:
 O código está em `Data/Cambio.cs`; a moeda do preço, a taxa, o sentido e a segurança ficam gravados
 na proposta. A planilha **Gerar pricing** recebe o custo na moeda do custo, a **margem** usada na tela (padrão 25%) e a
 conversão na caixa **Moedas** (taxa efetiva em I35..I38 — USD, EUR, GBP, CLP — e a moeda escolhida em
-BD_pricing!A1, a ligação dos botões); o valor convertido (Q13) e a venda líquida fecham em uma casa. A caixa só tem USD, EUR, GBP e CLP:
+BD_pricing!A1, a ligação dos botões; o botão da moeda do preço sai marcado); o valor convertido (Q13) e a venda líquida fecham em uma casa. A caixa só tem USD, EUR, GBP e CLP:
 com PEN ou R$ como moeda do preço, a planilha fica na moeda do custo e a tela avisa.
 
 ## Configurações, papéis e revisões
@@ -233,3 +233,10 @@ no `appsettings.json`). Para testar na sua máquina, troque por `"data"`.
 
 Detalhes de arquitetura: [ARQUITETURA.md](ARQUITETURA.md) ·
 [desktop/LEIAME-desktop.md](desktop/LEIAME-desktop.md).
+
+### Como o pricing é preenchido (imagens e botões preservados)
+
+A planilha da equipe é editada **direto no pacote .xlsm** (`Data/PacoteXlsm.cs`), sem ser regravada por uma biblioteca
+de planilhas. Assim as imagens, os botões, as caixas de seleção e as macros chegam como no modelo (antes algumas imagens
+apareciam como "Não é possível exibir esta imagem"). O sistema só escreve as células de entrada, marca o botão da moeda
+do preço na caixa **Moedas** e pede ao Excel para recalcular ao abrir.
