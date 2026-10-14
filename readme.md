@@ -156,7 +156,10 @@ aparece a caixa **Conversão da moeda**:
   convertem. O Word da proposta comercial sai na moeda do preço; o Custo Previsto, na do custo.
 
 O código está em `Data/Cambio.cs`; a moeda do preço, a taxa, o sentido e a segurança ficam gravados
-na proposta. A planilha **Gerar pricing** continua recebendo os valores na moeda do custo.
+na proposta. A planilha **Gerar pricing** recebe o custo na moeda do custo, a **margem** usada na tela (padrão 25%) e a
+conversão na caixa **Moedas** (taxa efetiva em I36..I39 e a moeda escolhida em BD_pricing!A1, como no
+sistema de Serviços); o valor convertido (Q14) fecha em duas casas. A caixa só tem USD, EUR, GBP e CLP:
+com PEN ou R$ como moeda do preço, a planilha fica na moeda do custo e a tela avisa.
 
 ## Configurações, papéis e revisões
 

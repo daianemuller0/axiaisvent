@@ -88,8 +88,9 @@ public static class PricingExcel
         // E33 é a soma das rubricas na planilha; como o custo vem inteiro do
         // sistema, ele é escrito no lugar da soma — e G33 recebe o mesmo valor,
         // senão o "risco de variação" (|G33 − E33|) viraria o custo inteiro
-        ws.Cell("E33").Value = (double)custoTotal;
-        ws.Cell("G33").Value = (double)custoTotal;
+        // o pricing trabalha com duas casas: o custo entra arredondado
+        ws.Cell("E33").Value = (double)Math.Round(custoTotal, 2);
+        ws.Cell("G33").Value = (double)Math.Round(custoTotal, 2);
 
         ws.Cell("D36").Value = (double)Proposta.Percentual(proposta.RiscoAdicional,
             CalculoPricing.RiscoAdicionalPadrao);
@@ -98,10 +99,58 @@ public static class PricingExcel
 
         ws.Cell("E40").Value = (double)pricing.Markup;
 
+        // a margem que o sistema está usando — a pedida na tela, e não a que o
+        // modelo trazia (25%). Sem isto, mudar a margem aqui não mudava o arquivo
+        ws.Cell("P25").Value = (double)pricing.Margem;
+
+        // ---------- moeda: a caixa "Moedas" da planilha (G36:J50) ----------
+        // A planilha calcula na moeda do custo e converte para a moeda do preço
+        // com Q14 = venda ÷ taxa da moeda escolhida. A escolha vem de
+        // BD_pricing!A1 (1 = USD, 2 = EUR, 3 = GBP, 4 = CLP) e as taxas são as
+        // células I36..I39. Aqui vai a taxa EFETIVA do sistema (já com a
+        // segurança da moeda) na linha da moeda do preço — a planilha converte
+        // exatamente como a tela.
+        var (indice, taxa) = MoedaDaPlanilha(proposta);
+        if (indice is int linha)
+        {
+            ws.Cell(linha switch { 1 => "I36", 2 => "I37", 3 => "I38", _ => "I39" }).Value =
+                (double)Math.Round(taxa, 6);
+
+            if (wb.TryGetWorksheet("BD_pricing", out var bd)) bd.Cell("A1").Value = linha;
+
+            // o valor convertido fecha em duas casas (saía com nove)
+            var convertido = ws.Cell("Q14");
+            if (convertido.HasFormula)
+                convertido.FormulaA1 = $"ROUND({convertido.FormulaA1},2)";
+            convertido.Style.NumberFormat.Format = "#,##0.00";
+        }
+
         using var saida = new MemoryStream();
         wb.SaveAs(saida);
         return saida.ToArray();
     }
+
+    /// <summary>
+    /// A linha da moeda na caixa "Moedas" da planilha — USD 1, EUR 2, GBP 3,
+    /// CLP 4 — ou nada quando a planilha não tem a moeda (PEN e R$).
+    /// </summary>
+    public static int? IndiceDaMoeda(Moeda moeda) => moeda switch
+    {
+        Moeda.Usd => 1,
+        Moeda.Eur => 2,
+        Moeda.Clp => 4,
+        _ => null,
+    };
+
+    /// <summary>
+    /// Qual linha da caixa de moedas usar e com que taxa. Com conversão: a linha
+    /// da moeda do preço, com a taxa efetiva. Sem conversão: a linha da moeda do
+    /// custo, com taxa 1 — a planilha mostra o mesmo valor nas duas.
+    /// </summary>
+    public static (int? Indice, decimal Taxa) MoedaDaPlanilha(Proposta p) =>
+        Cambio.Converte(p)
+            ? (IndiceDaMoeda(p.MoedaVenda), Cambio.Efetivo(p))
+            : (IndiceDaMoeda(p.Moeda), 1m);
 
     /// <summary>
     /// O nome do arquivo que a equipe baixa: P_PRP-2026-001-C00.xlsm — o mesmo

@@ -2845,6 +2845,13 @@
             return;
         }
 
+        // com conversão e sem a taxa, a planilha sairia com a moeda errada
+        if (Cambio.FaltaTaxa(_proposta))
+        {
+            Aviso("Informe a taxa de conversão (seção Pricing) antes de gerar o pricing.", erro: true);
+            return;
+        }
+
         try
         {
             var bytes = PricingExcel.Gerar(_proposta, Total, Pricing(), modelo);
@@ -2853,6 +2860,15 @@
                 PricingExcel.NomeDoArquivo(_proposta),
                 "application/vnd.ms-excel.sheet.macroEnabled.12",
                 Convert.ToBase64String(bytes));
+
+            // a planilha só tem USD, EUR, GBP e CLP na caixa de moedas
+            if (Cambio.Converte(_proposta) && PricingExcel.IndiceDaMoeda(_proposta.MoedaVenda) is null)
+            {
+                Aviso($"Pricing gerado: {PricingExcel.NomeDoArquivo(_proposta)}. A planilha não tem " +
+                      $"{_proposta.MoedaVenda.Rotulo()} na caixa de moedas — nela os valores ficam em " +
+                      $"{_proposta.Moeda.Rotulo()}; a conversão vale na tela e na proposta.");
+                return;
+            }
 
             Aviso($"Pricing gerado: {PricingExcel.NomeDoArquivo(_proposta)}.");
         }
