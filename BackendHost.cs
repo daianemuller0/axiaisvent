@@ -60,8 +60,28 @@ public static class BackendHost
         }
 
         // --- Blazor Server (componentes interativos no servidor) ---
+        //
+        // A tela fica "parada" quando o navegador suspende a aba (computador em
+        // repouso, VPN que oscila, aba em segundo plano): a conexão com o
+        // servidor cai. O que está preenchido vive na memória do servidor, num
+        // "circuito" — e o padrão do Blazor o descarta 3 minutos depois de a
+        // conexão cair, o que obrigava a recarregar e perder a proposta. Aqui o
+        // circuito é guardado por horas, e o navegador reconecta sozinho
+        // (ver wwwroot/app.js) assim que a pessoa volta.
         builder.Services.AddRazorComponents()
-            .AddInteractiveServerComponents();
+            .AddInteractiveServerComponents(opcoes =>
+            {
+                opcoes.DisconnectedCircuitRetentionPeriod = TimeSpan.FromHours(12);
+                opcoes.DisconnectedCircuitMaxRetained = 200;
+            });
+
+        // um navegador em segundo plano atrasa os "ping" do SignalR: com o
+        // limite padrão (30 s) o servidor o dava por perdido cedo demais
+        builder.Services.Configure<Microsoft.AspNetCore.SignalR.HubOptions>(opcoes =>
+        {
+            opcoes.KeepAliveInterval = TimeSpan.FromSeconds(15);
+            opcoes.ClientTimeoutInterval = TimeSpan.FromMinutes(5);
+        });
 
         // --- Autenticação por cookie (sessão fica no navegador do usuário) ---
         builder.Services.AddCascadingAuthenticationState();
@@ -78,13 +98,15 @@ public static class BackendHost
         // --- Dados: DuckDB (motor) sobre Parquet numa pasta de rede ---
         var dataFolder = builder.Configuration["Data:Folder"] ?? "data";
         builder.Services.AddSingleton(new ParquetStore(dataFolder));
-        builder.Services.AddScoped<BaseRepository>();
+        builder.Services.AddScoped<UsuarioRepository>();
         builder.Services.AddScoped<EquipamentoRepository>();
         builder.Services.AddScoped<ItemModeloRepository>();
         builder.Services.AddScoped<MotorRepository>();
         builder.Services.AddScoped<LimiteMotorRepository>();
         builder.Services.AddScoped<CaracteristicaRepository>();
         builder.Services.AddScoped<PrecoReferenciaRepository>();
+        builder.Services.AddScoped<ConversaoRepository>();
+        builder.Services.AddScoped<BrandingRepository>();
         builder.Services.AddScoped<PropostaRepository>();
         builder.Services.AddScoped<CondicaoPagamentoRepository>();
         builder.Services.AddScoped<Anexos>();
@@ -159,24 +181,42 @@ public static class BackendHost
         app.UseAuthorization();
 
         // --- Login/logout (precisam do HttpContext para gravar o cookie) ---
-        app.MapPost("/auth/login", async (HttpContext http, IConfiguration cfg) =>
+        app.MapPost("/auth/login", async (HttpContext http, IConfiguration cfg, UsuarioRepository usuarios) =>
         {
             var form = await http.Request.ReadFormAsync();
             var usuario = form["usuario"].ToString().Trim();
             var senha = form["senha"].ToString();
 
-            var cfgUsuario = cfg["Auth:Usuario"] ?? "howden";
-            var cfgSenha = cfg["Auth:Senha"] ?? "howden2026";
+            // quem foi cadastrado em Configurações entra com o papel dele; o
+            // acesso do appsettings.json continua valendo, como ADM — é o que
+            // abre o sistema na primeira vez e nunca deixa ninguém de fora
+            List<Claim> claims;
 
-            if (!usuario.Equals(cfgUsuario, StringComparison.OrdinalIgnoreCase) || senha != cfgSenha)
-                return Results.Redirect("/login?error=1");
-
-            var claims = new List<Claim>
+            if (usuarios.Autenticar(usuario, senha) is { } cadastrado)
             {
-                new(ClaimTypes.NameIdentifier, "equipe"),
-                new(ClaimTypes.Name, "Equipe Howden"),
-                new(ClaimTypes.Role, "admin"),
-            };
+                claims = new List<Claim>
+                {
+                    new(ClaimTypes.NameIdentifier, cadastrado.Id),
+                    new(ClaimTypes.Name, cadastrado.Nome),
+                    new(ClaimTypes.Role, cadastrado.Papel),
+                };
+            }
+            else
+            {
+                var cfgUsuario = cfg["Auth:Usuario"] ?? "howden";
+                var cfgSenha = cfg["Auth:Senha"] ?? "howden2026";
+
+                if (!usuario.Equals(cfgUsuario, StringComparison.OrdinalIgnoreCase) || senha != cfgSenha)
+                    return Results.Redirect("/login?error=1");
+
+                claims = new List<Claim>
+                {
+                    new(ClaimTypes.NameIdentifier, "equipe"),
+                    new(ClaimTypes.Name, "Equipe Howden"),
+                    new(ClaimTypes.Role, Papeis.Adm),
+                };
+            }
+
             var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
             await http.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(identity));
             return Results.Redirect("/");

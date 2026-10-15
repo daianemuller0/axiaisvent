@@ -18,6 +18,13 @@ public sealed class TextosDoEscopo
     public required string Incluso { get; init; }
 
     /// <summary>
+    /// As linhas que SEMPRE estão no escopo de qualquer equipamento, depois do
+    /// que foi escolhido: pintura e embalagem, com a nota da embalagem (a que
+    /// começa com asterisco).
+    /// </summary>
+    public required string[] Padrao { get; init; }
+
+    /// <summary>
     /// O catálogo de "INCLUSO EN EL ALCANCE DE HOWDEN", linha por linha, na
     /// ordem do modelo. A chave é a mesma nas três línguas — é por ela que
     /// <see cref="EscopoDaHowden"/> liga a seleção do equipamento à linha.
@@ -89,6 +96,12 @@ public sealed class TextosDoEscopo
     {
         Secao = "Alcance de Suministro",
         Incluso = "INCLUSO EN EL ALCANCE DE HOWDEN",
+        Padrao = new[]
+        {
+            "Pintura",
+            "Embalaje",
+            "* Ofrecemos embalajes adecuados para el transporte por carretera, solo para piezas pequeñas, que están sujetas a pérdida",
+        },
         Catalogo = new()
         {
             ["ventilador"] = "Ventilador (carcasa + impulsor)",
@@ -238,6 +251,12 @@ public sealed class TextosDoEscopo
     {
         Secao = "Escopo de Fornecimento",
         Incluso = "INCLUSO NO ESCOPO DA HOWDEN",
+        Padrao = new[]
+        {
+            "Pintura",
+            "Embalagem",
+            "* Oferecemos embalagens adequadas para o transporte rodoviário, apenas para peças pequenas, que estão sujeitas a perda",
+        },
         Catalogo = new()
         {
             ["ventilador"] = "Ventilador (carcaça + rotor)",
@@ -384,6 +403,12 @@ public sealed class TextosDoEscopo
     {
         Secao = "Scope of Supply",
         Incluso = "INCLUDED IN HOWDEN'S SCOPE",
+        Padrao = new[]
+        {
+            "Painting",
+            "Packaging",
+            "* We offer packaging suitable for road transport, for small parts only, which are subject to loss",
+        },
         Catalogo = new()
         {
             ["ventilador"] = "Fan (casing + impeller)",

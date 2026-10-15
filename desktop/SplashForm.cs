@@ -31,6 +31,7 @@ public sealed class SplashForm : Form
 
     public SplashForm()
     {
+        Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? Icon;
         FormBorderStyle = FormBorderStyle.None;
         StartPosition = FormStartPosition.CenterScreen;
         Size = new Size(480, 180);

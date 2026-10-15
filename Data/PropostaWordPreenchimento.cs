@@ -34,6 +34,9 @@ internal sealed partial class Preenchimento
     private bool _tecnica;
     private readonly Body _corpo;
     private readonly Moeda _moeda;
+
+    /// <summary>A moeda do PREÇO ao cliente — a do custo, quando não há conversão.</summary>
+    private readonly Moeda _moedaVenda;
     private readonly List<decimal> _precos;
     private readonly decimal _venda;
 
@@ -43,17 +46,23 @@ internal sealed partial class Preenchimento
         _p = p;
         _custo = custo;
         _moeda = p.Moeda;
+        _moedaVenda = p.MoedaVenda;
 
         var idioma = TextosDaProposta.Ler(p.Idioma);
         _t = TextosDaProposta.Do(idioma);
         _te = TextosDoEscopo.Do(idioma);
         _tel = TextosEletricos.Do(idioma);
-        _notas = NotasDosComponentes.Do(idioma);
+        // a placa de identificação do motor sai com os dados do motor escolhido
+        _notas = NotasDosComponentes.Do(idioma, p.Itens
+            .Where(i => i.ComMotor)
+            .Select(custo.MotorDe)
+            .OfType<Motor>()
+            .ToList());
         _espanhol = idioma == IdiomaDaProposta.Espanhol;
 
         _corpo = doc.MainDocumentPart!.Document.Body!;
         _precos = PropostaWord.PrecosDeVenda(p, custo);
-        _venda = CalculoPricing.Da(p, custo.Total(p)).VendaLiquida;
+        _venda = Cambio.ParaVenda(p, CalculoPricing.Da(p, custo.Total(p)).VendaLiquida);
     }
 
     public void Preencher()
@@ -111,7 +120,7 @@ internal sealed partial class Preenchimento
     private void Propriedades()
     {
         var props = _doc.PackageProperties;
-        props.Title = PropostaWord.Referencia(_p);
+        props.Title = _tecnica ? PropostaWord.ReferenciaTecnica(_p) : PropostaWord.Referencia(_p);
         props.Category = _p.Projeto;
         props.Description = _p.AosCuidados;
         props.Keywords = _p.ReferenciaCliente;
@@ -178,7 +187,7 @@ internal sealed partial class Preenchimento
             ["Empresa"] = _p.Cliente,
             ["Categoria"] = _p.Projeto,
             ["Comentários"] = _p.AosCuidados,
-            ["Título"] = PropostaWord.Referencia(_p),
+            ["Título"] = _tecnica ? PropostaWord.ReferenciaTecnica(_p) : PropostaWord.Referencia(_p),
             ["Endereço da Empresa"] = _p.Cidade,
             ["Palavras-chave"] = _p.ReferenciaCliente,
             ["Data de Publicação"] = Hoje(),
@@ -705,7 +714,7 @@ internal sealed partial class Preenchimento
                     new(nome, JustificationValues.Left),
                     // centrado como na tabela de preço, e não à direita: as duas
                     // ficam uma embaixo da outra e a coluna é a mesma
-                    new(PropostaWord.Dinheiro(preco, _moeda), JustificationValues.Center),
+                    new(PropostaWord.Dinheiro(preco, _moedaVenda), JustificationValues.Center),
                 });
             }
         }
@@ -743,7 +752,7 @@ internal sealed partial class Preenchimento
         var fecho = new List<CelulaDePreco>
         {
             new(_t.TotalDaProposta, JustificationValues.Right, Negrito: true, Colunas: 3),
-            new(PropostaWord.Dinheiro(total, _moeda), JustificationValues.Left, Negrito: true),
+            new(PropostaWord.Dinheiro(total, _moedaVenda), JustificationValues.Left, Negrito: true),
         };
 
         foreach (var linha in new[] { cabecalho }.Concat(linhas).Append(fecho))
@@ -838,7 +847,7 @@ internal sealed partial class Preenchimento
         var total = linhas[^1];
         FixoNasCelulas(total, _t.TotalDaProposta);
         EscreverNaCelula(total.Elements<TableCell>().Last(),
-            new[] { PropostaWord.Dinheiro(_venda, _moeda) });
+            new[] { PropostaWord.Dinheiro(_venda, _moedaVenda) });
 
         // todas as linhas de item saem de uma cópia da primeira: é ela que tem
         // o parágrafo de lista do "Incluye:"
@@ -866,8 +875,8 @@ internal sealed partial class Preenchimento
         EscreverNaCelula(celulas[0], new[] { (indice + 1).ToString("D2") });
         EscreverNaCelula(celulas[1], new[] { item.Quantos.ToString() });
         Descricao(celulas[2], item);
-        EscreverNaCelula(celulas[3], new[] { PropostaWord.Dinheiro(unitario, _moeda) });
-        EscreverNaCelula(celulas[4], new[] { PropostaWord.Dinheiro(totalDoItem, _moeda) });
+        EscreverNaCelula(celulas[3], new[] { PropostaWord.Dinheiro(unitario, _moedaVenda) });
+        EscreverNaCelula(celulas[4], new[] { PropostaWord.Dinheiro(totalDoItem, _moedaVenda) });
     }
 
     /// <summary>
@@ -1123,7 +1132,7 @@ internal sealed partial class Preenchimento
         if (Achar("Asesoría Técnica De Campo") is { } titulo) Fixo(titulo, _t.AssessoriaDeCampo);
 
         var moedas = new[] { "CLP", "USD", "EUR", "BRL" };
-        var nossa = _moeda.Codigo();
+        var nossa = _moedaVenda.Codigo();
 
         foreach (var codigo in moedas)
         {
@@ -1136,11 +1145,11 @@ internal sealed partial class Preenchimento
 
             if (codigo == nossa)
             {
-                var (util, dobro) = Diaria(_moeda);
+                var (util, dobro) = Diaria(_moedaVenda);
                 if (diaUtil is not null)
-                    Escrever(diaUtil, $"{_t.DiaUtil} {PropostaWord.Dinheiro(util, _moeda)} {_t.SemImpostoSemDespesas}");
+                    Escrever(diaUtil, $"{_t.DiaUtil} {PropostaWord.Dinheiro(util, _moedaVenda)} {_t.SemImpostoSemDespesas}");
                 if (feriado is not null)
-                    Escrever(feriado, $"{_t.DiaDeFolga} {PropostaWord.Dinheiro(dobro, _moeda)} {_t.SemImpostoSemDespesas}");
+                    Escrever(feriado, $"{_t.DiaDeFolga} {PropostaWord.Dinheiro(dobro, _moedaVenda)} {_t.SemImpostoSemDespesas}");
                 continue;
             }
 
@@ -1173,6 +1182,7 @@ internal sealed partial class Preenchimento
     {
         Moeda.Clp => (1_800_000m, 3_600_000m),
         Moeda.Brl => (6_000m, 12_000m),
+        Moeda.Eur => (1_725m, 3_450m),
         _ => (2_015m, 4_030m),
     };
 

@@ -33,18 +33,24 @@ public static class PropostaWord
 
     private static readonly System.Globalization.CultureInfo Br = new("pt-BR");
 
-    /// <summary>O nome do arquivo, no padrão da equipe: P_PRP-2026-001-00.docx</summary>
+    /// <summary>
+    /// O nome do arquivo da proposta comercial, no padrão da equipe:
+    /// P_PRP-2026-001-C00.docx — "P_", o número da proposta, "-C" de comercial
+    /// e a revisão.
+    /// </summary>
     public static string NomeDoArquivo(Proposta p) => $"{Referencia(p)}.docx";
 
     /// <summary>A referência da proposta — o que o modelo chama de "Nuestra referencia".</summary>
     public static string Referencia(Proposta p) =>
-        $"P_{Ou(p.Numero, "SEM-NUMERO")}-{Ou(p.Revisao, "00")}";
+        $"P_{Ou(p.Numero, "SEM-NUMERO")}-C{Ou(p.Revisao, "00")}";
 
     /// <summary>
     /// A oferta técnica que o preço referencia. No modelo é "XXXXXX-TX"; aqui
-    /// é a referência desta proposta com o -T de técnica.
+    /// é P_PRP-2026-001-T00: o número da proposta, "-T" de técnica e a revisão
+    /// — também o nome do arquivo da proposta técnica.
     /// </summary>
-    public static string ReferenciaTecnica(Proposta p) => Referencia(p) + "-T";
+    public static string ReferenciaTecnica(Proposta p) =>
+        $"P_{Ou(p.Numero, "SEM-NUMERO")}-T{Ou(p.Revisao, "00")}";
 
     public static byte[] Gerar(Proposta p, CustoDaProposta custo, string caminhoDoModelo)
     {
@@ -65,7 +71,7 @@ public static class PropostaWord
     /// a tela não mostrar um número e o Word sair com outro.
     /// </summary>
     public static List<decimal> PrecosDeVenda(Proposta p, CustoDaProposta custo) =>
-        Ratear(p, custo, CalculoPricing.Da(p, custo.Total(p)).VendaLiquida);
+        Ratear(p, custo, Cambio.ParaVenda(p, CalculoPricing.Da(p, custo.Total(p)).VendaLiquida));
 
     /// <summary>
     /// O fator que leva o custo ao preço: a venda líquida da proposta dividida
@@ -84,9 +90,13 @@ public static class PropostaWord
         return CalculoPricing.Da(p, total).VendaLiquida / total;
     }
 
-    /// <summary>O preço de um opcional: o custo dele vezes o fator.</summary>
+    /// <summary>
+    /// O preço de um opcional: o custo dele vezes o fator, já na moeda do preço
+    /// ao cliente (o fator leva o custo ao preço, e a conversão leva o preço à
+    /// moeda do cliente).
+    /// </summary>
     public static decimal PrecoDoOpcional(Proposta p, CustoDaProposta custo, decimal custoDele) =>
-        Math.Round(custoDele * Fator(p, custo), 2);
+        Math.Round(Cambio.ParaVenda(p, custoDele * Fator(p, custo)), 2);
 
     /// <summary>
     /// Reparte o preço de venda entre os equipamentos.

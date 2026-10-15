@@ -1,8 +1,18 @@
 <Router AppAssembly="typeof(Program).Assembly">
     <Found Context="routeData">
         <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(MainLayout)">
-            <NotAuthorized>
-                <RedirectToLogin />
+            <NotAuthorized Context="autenticacao">
+                @if (autenticacao.User.Identity?.IsAuthenticated == true)
+                {
+                    <div class="panel empty" style="padding:22px; margin:24px">
+                        Você não tem acesso a esta guia. Peça a um ADM para ajustar o seu papel em
+                        Configurações.
+                    </div>
+                }
+                else
+                {
+                    <RedirectToLogin />
+                }
             </NotAuthorized>
         </AuthorizeRouteView>
         <FocusOnNavigate RouteData="routeData" Selector="h1" />

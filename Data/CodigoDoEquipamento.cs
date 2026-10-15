@@ -142,6 +142,23 @@ public static class CodigoDoEquipamento
         return linha.Ausencia ? Sem : Falta;
     }
 
+    /// <summary>
+    /// A peça foi escolhida ("Com") neste equipamento? Falso quando o cadastro
+    /// não tem a lista, quando ninguém a decidiu ou quando está em "Sem". É o
+    /// que liga uma nota do documento técnico à escolha do escopo.
+    /// </summary>
+    public static bool Vai(ItemProposta item, CustoDaProposta custo, Moeda moeda,
+        Func<string, bool> casa)
+    {
+        var lista = custo.ListasDoEscopo.FirstOrDefault(l => casa(Textos.Simples(l)));
+        if (lista is null) return false;
+
+        var escolha = item.Escolhas.GetValueOrDefault(lista, "").Trim();
+        if (escolha.Length == 0) return false;
+
+        return !custo.Resolver(item, lista, escolha, moeda).Ausencia;
+    }
+
     private static string Partidor(ItemProposta item, CustoDaProposta custo, Moeda moeda)
     {
         if (custo.LinhaDoPartidor(item, moeda) is not { Ausencia: false } linha) return Sem;

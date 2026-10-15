@@ -16,7 +16,7 @@ internal static class Program
 
 /// <summary>
 /// Fluxo de publicação dinâmica:
-///  - na REDE (\\...\VA\): VA.exe + app\versao.txt + app\&lt;versão&gt;\ (imutável);
+///  - na REDE (\\...\axiais\): VA.exe + app\versao.txt + app\&lt;versão&gt;\ (imutável);
 ///  - na MÁQUINA (%LOCALAPPDATA%\HowdenVA\): cópia local do app E do próprio
 ///    VA.exe — na primeira abertura pela rede, o lançador SE INSTALA aqui e
 ///    cria um atalho na área de trabalho apontando para a cópia local.
@@ -34,6 +34,7 @@ public sealed class FormAtualizacao : Form
 
     public FormAtualizacao()
     {
+        Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? Icon;
         FormBorderStyle = FormBorderStyle.None;
         StartPosition = FormStartPosition.CenterScreen;
         Size = new Size(480, 150);
@@ -196,6 +197,7 @@ public sealed class FormAtualizacao : Form
         atalho.TargetPath = alvo;
         atalho.WorkingDirectory = pastaTrabalho;
         atalho.Description = "VA · Ventiladores Axiais — Howden";
+        atalho.IconLocation = alvo + ",0";   // a logo da Howden, que está dentro do VA.exe
         atalho.Save();
     }
 

@@ -18,7 +18,7 @@
     <div>
         <h1>Proposta</h1>
         <p class="subtitle">
-            O cabeçalho do documento, o cliente e o escopo do ventilador. O preço e o código
+            O cabeçalho do documento, o cliente e o escopo do ventilador. O custo e o código
             de cada item saem do cadastro da guia <strong>Dados</strong> — a proposta guarda a
             escolha, e o valor é lido na hora.
         </p>
@@ -41,6 +41,8 @@
                   @onclick="DesmarcarEnviada">enviada em @DataCurta(_proposta.EnviadaEm)</span>
         }
 
+        <button class="btn-ghost" @onclick="IrParaCustoPrevisto"
+                title="Gerar a planilha de custo previsto para o suprimentos">⬇ Custo previsto</button>
         <button class="btn-primary" @onclick="Salvar">💾 Salvar</button>
     </div>
 </div>
@@ -66,18 +68,20 @@
 
         @if (_proposta.Id.Length > 0)
         {
-            @if (_apagando)
-            {
-                <span class="aviso aviso-alerta" style="margin:0; padding:5px 9px">
-                    Apagar a proposta @_proposta.Numero?
-                </span>
-                <button class="btn-link" @onclick="Apagar">Sim, apagar</button>
-                <button class="btn-link" @onclick="@(() => _apagando = false)">Cancelar</button>
-            }
-            else
-            {
-                <button class="btn-link" @onclick="@(() => _apagando = true)">✕ apagar</button>
-            }
+            <AuthorizeView Roles="adm,admin">
+                @if (_apagando)
+                {
+                    <span class="aviso aviso-alerta" style="margin:0; padding:5px 9px">
+                        Apagar a proposta @_proposta.Numero (rev @_proposta.Revisao)?
+                    </span>
+                    <button class="btn-link" @onclick="Apagar">Sim, apagar</button>
+                    <button class="btn-link" @onclick="@(() => _apagando = false)">Cancelar</button>
+                }
+                else
+                {
+                    <button class="btn-link" @onclick="@(() => _apagando = true)">✕ apagar</button>
+                }
+            </AuthorizeView>
         }
     </div>
 </div>
@@ -503,23 +507,23 @@
             title="Clique para recolher ou abrir"
             @onclick='() => Dobrar("escopo")'><span style="display:inline-block; width:14px; color:var(--azul, #0b3d6b)">@(Aberto("escopo") ? "▾" : "▸")</span>Escopo do ventilador</h2>
         <span style="flex:1"></span>
-        <strong>Moeda</strong>
+        <strong>Moeda do custo</strong>
         @foreach (var m in Moedas.Todas)
         {
             var moeda = m;
             <button class="@(_proposta.Moeda == moeda ? "btn-primary" : "btn-ghost")"
                     @onclick="() => _proposta.MoedaCodigo = moeda.Codigo()">@moeda.Rotulo()</button>
         }
-        <span class="subtitle" style="margin:0">manda em todos os preços</span>
+        <span class="subtitle" style="margin:0">manda em todos os custos</span>
     </div>
         @if (Aberto("escopo"))
         {
 
     <p class="subtitle" style="margin:12px 0 0">
-        O preço de cada linha vem do cadastro e <strong>dá para trocar na própria linha</strong>:
-        serve para o que ainda não tem preço cadastrado e para quando a proposta pede um valor
+        O custo de cada linha vem do cadastro e <strong>dá para trocar na própria linha</strong>:
+        serve para o que ainda não tem custo cadastrado e para quando a proposta pede um valor
         diferente. O que você digita vale <strong>só nesta proposta</strong> — o cadastro não
-        muda — e o <strong>↺</strong> ao lado volta ao preço do cadastro.
+        muda — e o <strong>↺</strong> ao lado volta ao custo do cadastro.
     </p>
 
     <div class="tabs">
@@ -578,7 +582,7 @@
                  && !EhManual(atual, "equipamento"))
             {
                 <span class="subtitle" style="margin:0; color:#c98a00">
-                    este modelo não tem preço em @_proposta.Moeda.Rotulo() — ponha à mão abaixo
+                    este modelo não tem custo em @_proposta.Moeda.Rotulo() — ponha à mão abaixo
                 </span>
             }
             else
@@ -653,7 +657,7 @@
                             <th class="nowrap">FB/HB</th>
                             <th class="nowrap">Nº de estágios</th>
                             <th class="nowrap">Código</th>
-                            <th class="nowrap right">Preço @_proposta.Moeda.Rotulo()</th>
+                            <th class="nowrap right">Custo @_proposta.Moeda.Rotulo()</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -791,7 +795,7 @@
                 <div class="toolbar" style="margin:14px 0 0; flex-wrap:wrap">
                     <span class="val-count">@candidatos.Count motor(es) atendem</span>
                     <span class="subtitle" style="margin:0">
-                        @MotoresComPreco(candidatos) com preço em @_proposta.Moeda.Rotulo()
+                        @MotoresComPreco(candidatos) com custo em @_proposta.Moeda.Rotulo()
                     </span>
                     <button class="btn-link" @onclick="() => LimparFiltro(atual)">limpar filtro</button>
                     <span style="flex:1"></span>
@@ -804,13 +808,13 @@
                             @if (PrecoDoMotor(motor) is null && !EhManual(atual, "motor"))
                             {
                                 <span class="subtitle" style="margin:0; color:#c98a00; white-space:nowrap">
-                                    este motor não tem preço em @_proposta.Moeda.Rotulo() — ponha à mão ao lado
+                                    este motor não tem custo em @_proposta.Moeda.Rotulo() — ponha à mão ao lado
                                 </span>
                             }
                             else
                             {
                                 <span class="subtitle" style="margin:0; white-space:nowrap">
-                                    @(EhManual(atual, "motor") ? "preço à mão" : "catálogo de motores")
+                                    @(EhManual(atual, "motor") ? "custo à mão" : "catálogo de motores")
                                 </span>
                             }
                         }
@@ -1050,7 +1054,7 @@
                                         <th class="nowrap">Opcional</th>
                                         <th class="nowrap right">Qtd.</th>
                                         <th class="nowrap right">Custo unit. @_proposta.Moeda.Rotulo()</th>
-                                        <th class="nowrap right">Preço @_proposta.Moeda.Rotulo()</th>
+                                        <th class="nowrap right">Custo @_proposta.Moeda.Rotulo()</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1062,7 +1066,7 @@
                                             <td class="nowrap right">@item.Quantos</td>
                                             <td class="nowrap right">@Dinheiro(unitario)</td>
                                             <td class="nowrap right">
-                                                <strong>@Dinheiro(PrecoDoOpcional(unitario * item.Quantos))</strong>
+                                                <strong>@DinheiroVenda(PrecoDoOpcional(unitario * item.Quantos))</strong>
                                             </td>
                                         </tr>
                                     }
@@ -1190,11 +1194,47 @@
     @if (FaltaPreco > 0)
     {
         <p class="subtitle" style="margin:10px 0 0">
-            @FaltaPreco item(ns) escolhido(s) ainda sem preço — nem do cadastro, nem à mão. O
-            custo conta só o que já tem valor; para os outros, digite o preço na própria linha
+            @FaltaPreco item(ns) escolhido(s) ainda sem custo — nem do cadastro, nem à mão. O
+            custo conta só o que já tem valor; para os outros, digite o custo na própria linha
             do escopo.
         </p>
     }
+    }
+</div>
+
+<!-- ---------- custo previsto ---------- -->
+<div class="panel" id="custo-previsto" style="margin-bottom:18px">
+    <div class="toolbar" style="flex-wrap:wrap; margin-bottom:0">
+        <h2 style="margin:0; font-size:15px">Custo previsto</h2>
+        <span class="subtitle" style="margin:0">
+            a planilha que o suprimentos usa para comprar as peças — uma linha por item de cada equipamento
+        </span>
+        <span style="flex:1"></span>
+        @if (!_pedindoCustoPrevisto)
+        {
+            <button class="btn-primary" @onclick="PedirCustoPrevisto">⬇ Gerar custo previsto</button>
+        }
+    </div>
+
+    @if (_pedindoCustoPrevisto)
+    {
+        <div class="toolbar" style="flex-wrap:wrap; margin:14px 0 0">
+            <strong>Número do projeto</strong>
+            <input class="cell" style="width:150px" placeholder="ex.: NB0982" value="@_cpProjeto"
+                   @oninput="e => _cpProjeto = e.Value?.ToString() ?? string.Empty" />
+            <strong>Número do pedido</strong>
+            <input class="cell" style="width:150px" value="@_cpPedido"
+                   @oninput="e => _cpPedido = e.Value?.ToString() ?? string.Empty" />
+            <button class="btn-primary" @onclick="GerarCustoPrevisto">⬇ Gerar</button>
+            <button class="btn-ghost" @onclick="@(() => _pedindoCustoPrevisto = false)">Cancelar</button>
+        </div>
+        <p class="subtitle" style="margin:10px 0 0">
+            O arquivo sai como <strong>@(CustoPrevistoExcel.NomeDoArquivo(_cpProjeto.Trim().Length > 0 ? _cpProjeto : "PROJETO"))</strong>.
+            Cada equipamento leva o número do projeto com o dele atrás
+            (@CustoPrevistoExcel.CodigoDaLinha(_cpProjeto.Trim().Length > 0 ? _cpProjeto : "PROJETO", 0),
+            @CustoPrevistoExcel.CodigoDaLinha(_cpProjeto.Trim().Length > 0 ? _cpProjeto : "PROJETO", 1)…).
+            Os valores saem na moeda do custo (@_proposta.Moeda.Rotulo()), indicada em cada célula.
+        </p>
     }
 </div>
 
@@ -1276,6 +1316,80 @@
     @foreach (var aviso in pricing.Avisos)
     {
         <div class="aviso aviso-alerta" style="margin-top:8px">@aviso</div>
+    }
+
+    var converte = Cambio.Converte(_proposta);
+    var moedaCusto = _proposta.Moeda;
+    var moedaVenda = _proposta.MoedaVenda;
+    var pt = new System.Globalization.CultureInfo("pt-BR");
+
+    <div class="toolbar" style="flex-wrap:wrap; margin-top:14px">
+        <strong>Preço ao cliente em</strong>
+        @foreach (var m in Moedas.DePreco)
+        {
+            var moeda = m;
+            <button class="@(moedaVenda == moeda ? "btn-primary" : "btn-ghost")"
+                    @onclick="() => _proposta.MoedaVendaCodigo = moeda.Codigo()">@moeda.Rotulo()</button>
+        }
+        <span class="subtitle" style="margin:0">
+            o custo e o pricing abaixo estão em @moedaCusto.Rotulo(); só o preço final é convertido
+        </span>
+    </div>
+
+    @if (converte)
+    {
+        <div style="margin-top:10px; padding:10px 12px; background:#FFF6E5; border:2px solid #E9A23B; border-radius:8px; font-size:13px">
+            <div style="font-weight:700; color:#7A4E06; margin-bottom:6px">
+                💱 CONVERSÃO DA MOEDA — o custo está em @moedaCusto.Rotulo() e o preço ao cliente sai em @moedaVenda.Rotulo()
+            </div>
+            <div style="display:flex; gap:18px; align-items:center; flex-wrap:wrap">
+                <span>
+                    <b>Taxa de conversão:</b>
+                    <select class="cell" style="width:auto" value="@_proposta.CambioDirecao"
+                            @onchange='e => _proposta.CambioDirecao = e.Value?.ToString() ?? "VendaEmCusto"'>
+                        <option value="VendaEmCusto">1 @moedaVenda.Rotulo() em @moedaCusto.Rotulo()</option>
+                        <option value="CustoEmVenda">1 @moedaCusto.Rotulo() em @moedaVenda.Rotulo()</option>
+                    </select>
+                    =
+                    <input class="cell num" style="width:90px" placeholder="0,00" value="@_proposta.TaxaCambio"
+                           @onchange="e => _proposta.TaxaCambio = e.Value?.ToString() ?? string.Empty" />
+                </span>
+                <span>
+                    <b>Segurança da moeda:</b>
+                    <input class="cell num" style="width:60px" placeholder="0" value="@_proposta.SegurancaCambioPct"
+                           @onchange="e => _proposta.SegurancaCambioPct = e.Value?.ToString() ?? string.Empty" />%
+                    a menos na taxa
+                </span>
+            </div>
+
+            @if (Cambio.Normalizada(_proposta) > 0m)
+            {
+                var taxaBase = Cambio.Normalizada(_proposta);
+                <div style="margin-top:6px; color:#5C6272">
+                    Confira: <b>1 @moedaVenda.Rotulo() = @moedaCusto.Rotulo() @taxaBase.ToString("N4", pt)</b>
+                    &nbsp;·&nbsp;
+                    <b>1 @moedaCusto.Rotulo() = @moedaVenda.Rotulo() @((1m / taxaBase).ToString("N6", pt))</b>
+                </div>
+                <div style="margin-top:3px; color:#5C6272">
+                    → convertendo por @moedaCusto.Rotulo() @Cambio.Efetivo(_proposta).ToString("N4", pt) por @moedaVenda.Rotulo() —
+                    se a moeda cair até @Cambio.Seguranca(_proposta).ToString("0.##", pt)%,
+                    o valor em @moedaCusto.Rotulo() não perde.
+                </div>
+            }
+            else
+            {
+                <div style="margin-top:6px; color:#b3261e; font-weight:600">
+                    ⚠ Informe a taxa de conversão — sem ela o preço sai como se já estivesse em @moedaVenda.Rotulo().
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <p class="subtitle" style="margin:8px 0 0">
+            💱 Custo e preço na mesma moeda (@moedaCusto.Rotulo()) — sem conversão. Escolha outra moeda
+            acima para converter.
+        </p>
     }
 
     <div class="panel" style="padding:0; overflow-x:auto; margin-top:14px">
@@ -1387,7 +1501,7 @@
                     </tr>
                 }
                 <tr>
-                    <td class="nowrap"><strong>Preço ao cliente</strong></td>
+                    <td class="nowrap"><strong>@(Cambio.Converte(_proposta) ? $"Preço com impostos ({_proposta.Moeda.Rotulo()}, antes da conversão)" : "Preço ao cliente")</strong></td>
                     <td class="nowrap"><span class="subtitle">S76</span></td>
                     <td class="nowrap right"><strong>@Dinheiro(pricing.PrecoComImpostos)</strong></td>
                     <td class="nowrap right">—</td>
@@ -1395,6 +1509,30 @@
             </tbody>
         </table>
     </div>
+
+    @if (converte)
+    {
+        <div class="panel" style="padding:0; overflow-x:auto; margin-top:14px">
+            <table class="grid">
+                <thead>
+                    <tr>
+                        <th class="nowrap">Preço ao cliente em @moedaVenda.Rotulo()</th>
+                        <th class="nowrap right">Valor</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="nowrap"><strong>Venda líquida</strong></td>
+                        <td class="nowrap right"><strong>@DinheiroVenda(Cambio.ParaVenda(_proposta, pricing.VendaLiquida))</strong></td>
+                    </tr>
+                    <tr>
+                        <td class="nowrap"><strong>Preço com impostos</strong></td>
+                        <td class="nowrap right"><strong>@DinheiroVenda(Cambio.ParaVenda(_proposta, pricing.PrecoComImpostos))</strong></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    }
 
     <p class="subtitle" style="margin:12px 0 0">
         <strong>O sistema escreve todas as entradas do preço</strong> — inclusive BU (E8),
@@ -1451,7 +1589,7 @@
             <div class="panel" style="margin:0 0 12px; padding:14px">
                 <div class="toolbar" style="margin-bottom:8px">
                     <strong>Item @((indice + 1).ToString("D2"))</strong>
-                    <span class="subtitle">@item.Quantos un. · @Dinheiro(PrecoDeVenda(indice))</span>
+                    <span class="subtitle">@item.Quantos un. · @DinheiroVenda(PrecoDeVenda(indice))</span>
                     <span style="flex:1"></span>
                     @if (item.Descricao.Trim().Length > 0)
                     {
@@ -1785,6 +1923,133 @@
     private Proposta _proposta = Nascer();
     private List<Proposta> _gravadas = new();
 
+    // ---------- rascunho no navegador ----------
+    //
+    // O que está preenchido vive na memória do servidor; recarregar a página
+    // (ou perder a conexão por mais tempo que o servidor guarda a sessão) o
+    // apagava. Por isso a proposta em andamento é copiada para o navegador a
+    // cada alteração, e volta quando a página abre — enquanto não for gravada
+    // (💾 Salvar), que é quando o rascunho deixa de ser necessário.
+
+    /// <summary>A proposta como está gravada (ou como nasceu): o que NÃO é rascunho.</summary>
+    private string _baseSalva = "";
+
+    /// <summary>O último rascunho escrito no navegador, para não reescrever o mesmo.</summary>
+    private string _ultimoRascunho = "";
+
+    /// <summary>Com que chave o rascunho foi escrito (o id da proposta, ou "novo").</summary>
+    private string _chaveRascunho = "";
+
+    /// <summary>Só depois de tentar recuperar o rascunho é que se pode escrever um: antes, a tela em branco o apagaria.</summary>
+    private bool _rascunhoPronto;
+
+    private string Foto() => System.Text.Json.JsonSerializer.Serialize(_proposta);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        try
+        {
+            if (firstRender)
+            {
+                await RecuperarRascunho();
+                _rascunhoPronto = true;
+                return;
+            }
+
+            if (_rascunhoPronto) await GuardarRascunho();
+        }
+        catch (Exception)
+        {
+            // rascunho é uma rede de segurança: nunca derruba a tela
+        }
+    }
+
+    private async Task RecuperarRascunho()
+    {
+        // a rota manda: /axiais/proposta/{id} só recupera o rascunho DAQUELA
+        // proposta; sem id, vale o último que a pessoa estava editando
+        var chave = !string.IsNullOrWhiteSpace(Id)
+            ? Id!
+            : await JS.InvokeAsync<string?>("appRascunho.ler", "ultima") ?? "novo";
+
+        var texto = await JS.InvokeAsync<string?>("appRascunho.ler", chave);
+        if (string.IsNullOrEmpty(texto)) return;
+
+        var recuperada = System.Text.Json.JsonSerializer.Deserialize<Proposta>(texto);
+        if (recuperada is null) return;
+
+        // uma proposta que já está no banco só é "recuperada" se o rascunho for
+        // diferente do que está gravado — e se ela foi apagada, o rascunho some
+        if (recuperada.Id.Length > 0)
+        {
+            var gravada = Repo.Achar(recuperada.Id);
+            if (gravada is null)
+            {
+                await JS.InvokeVoidAsync("appRascunho.limpar", chave);
+                return;
+            }
+
+            _baseSalva = System.Text.Json.JsonSerializer.Serialize(gravada);
+            _revisaoAberta = gravada.Revisao;
+
+            if (_baseSalva == texto) return;
+        }
+        else
+        {
+            _baseSalva = Foto();
+        }
+
+        _proposta = recuperada;
+        _ultimoRascunho = texto;
+        _chaveRascunho = chave;
+        AjustarEscolhasLivres();
+
+        Aviso("Recuperei o que você estava preenchendo e ainda não tinha gravado. " +
+              "Grave com 💾 Salvar — ou descarte com + Nova.");
+        StateHasChanged();
+    }
+
+    private async Task GuardarRascunho()
+    {
+        var atual = Foto();
+        var chave = _proposta.Id.Length > 0 ? _proposta.Id : "novo";
+
+        // a chave mudou (a proposta nova ganhou id ao ser gravada): o rascunho
+        // da chave antiga não vale mais
+        if (_chaveRascunho.Length > 0 && _chaveRascunho != chave)
+        {
+            await JS.InvokeVoidAsync("appRascunho.limpar", _chaveRascunho);
+            _ultimoRascunho = "";
+        }
+
+        // igual ao que está gravado: não há o que guardar
+        if (atual == _baseSalva)
+        {
+            if (_ultimoRascunho.Length > 0 || _chaveRascunho.Length > 0)
+            {
+                await JS.InvokeVoidAsync("appRascunho.limpar", chave);
+                _ultimoRascunho = "";
+            }
+
+            _chaveRascunho = chave;
+            return;
+        }
+
+        if (atual == _ultimoRascunho && _chaveRascunho == chave) return;
+
+        await JS.InvokeVoidAsync("appRascunho.gravar", chave, atual);
+        await JS.InvokeVoidAsync("appRascunho.gravar", "ultima", chave);
+        _ultimoRascunho = atual;
+        _chaveRascunho = chave;
+    }
+
+    /// <summary>
+    /// A revisão que a proposta tinha quando foi aberta (ou gravada pela última
+    /// vez). Se a pessoa muda o número da revisão e grava, não é a mesma proposta
+    /// que se atualiza: é uma NOVA revisão, e a anterior fica como estava.
+    /// </summary>
+    private string _revisaoAberta = "";
+
     private List<Equipamento> _equipamentos = new();
     private List<Motor> _motores = new();
     private List<LimiteMotor> _limites = new();
@@ -1852,7 +2117,11 @@
     /// <summary>Id na rota: /axiais/proposta/{id} abre aquela proposta direto.</summary>
     [Parameter] public string? Id { get; set; }
 
-    protected override void OnInitialized() => Recarregar();
+    protected override void OnInitialized()
+    {
+        _baseSalva = Foto();
+        Recarregar();
+    }
 
     /// <summary>
     /// A rota manda. Como a mesma página atende /axiais/proposta e
@@ -1865,6 +2134,8 @@
         if (Repo.Achar(Id) is { } achada)
         {
             _proposta = achada;
+            _revisaoAberta = achada.Revisao;
+            _baseSalva = Foto();
             AjustarEscolhasLivres();
             _aberto = 0;
             Aviso($"Proposta {achada.Numero} aberta.");
@@ -2008,7 +2279,7 @@
                          text-overflow:ellipsis">
                 @(codigo.Length > 0 ? $"código {codigo}" : "sem código")
                 ·
-                @(EhManual(item, chave) ? "preço à mão" : origem)
+                @(EhManual(item, chave) ? "custo à mão" : origem)
             </span>
             @Preco(item, chave, puxado)
         </div>
@@ -2022,7 +2293,7 @@
                    @onchange="e => DefinirPrecoManual(item, chave, e.Value?.ToString() ?? string.Empty, puxado)" />
             @if (EhManual(item, chave))
             {
-                <button class="btn-link" title="Voltar ao preço do cadastro"
+                <button class="btn-link" title="Voltar ao custo do cadastro"
                         @onclick="() => item.PrecosManuais.Remove(chave)">↺</button>
             }
         </div>
@@ -2208,7 +2479,7 @@
     /// </summary>
     private string RotuloDoModelo(Equipamento e) => PrecoDoEquipamento(e) is { } preco
         ? $"{e.Rotulo} · {preco.ToString("N2", new System.Globalization.CultureInfo("pt-BR"))}"
-        : $"{e.Rotulo} · sem preço";
+        : $"{e.Rotulo} · sem custo";
 
     /// <summary>
     /// A série com a conta de quantos modelos dela têm preço — para dar a
@@ -2219,8 +2490,13 @@
         var todos = modelos.ToList();
         var comPreco = todos.Count(e => PrecoDoEquipamento(e) is not null);
 
-        return $"{serie} — {comPreco} de {todos.Count} com preço em {_proposta.Moeda.Rotulo()}";
+        return $"{serie} — {comPreco} de {todos.Count} com custo em {_proposta.Moeda.Rotulo()}";
     }
+
+    /// <summary>Um valor na moeda do PREÇO ao cliente (a do custo, quando não há conversão).</summary>
+    private string DinheiroVenda(decimal? valor) => valor is null
+        ? "—"
+        : $"{_proposta.MoedaVenda.Rotulo()} {valor.Value.ToString("N2", new System.Globalization.CultureInfo("pt-BR"))}";
 
     private string Dinheiro(decimal? valor) => valor is null
         ? "—"
@@ -2624,6 +2900,66 @@
         return new ImagemDaCurva(File.ReadAllBytes(caminho), Path.GetExtension(caminho));
     }
 
+    private bool _pedindoCustoPrevisto;
+    private string _cpProjeto = "";
+    private string _cpPedido = "";
+
+    /// <summary>
+    /// O atalho do alto da tela: o painel do custo previsto fica no meio da
+    /// proposta, e a tela é comprida. Abre o pedido do projeto e do pedido e
+    /// rola até lá.
+    /// </summary>
+    private async Task IrParaCustoPrevisto()
+    {
+        PedirCustoPrevisto();
+        await JS.InvokeVoidAsync("appRolarPara", "custo-previsto");
+    }
+
+    private void PedirCustoPrevisto()
+    {
+        _msg = null;
+        _pedindoCustoPrevisto = true;
+    }
+
+    /// <summary>
+    /// A planilha de custo previsto, depois de pedir o projeto e o pedido —
+    /// os dois entram em todas as linhas. Ver <see cref="CustoPrevistoExcel"/>.
+    /// </summary>
+    private async Task GerarCustoPrevisto()
+    {
+        var projeto = _cpProjeto.Trim();
+        var pedido = _cpPedido.Trim();
+
+        if (projeto.Length == 0 || pedido.Length == 0)
+        {
+            Aviso("Informe o número do projeto e o número do pedido.", erro: true);
+            return;
+        }
+
+        if (_proposta.Itens.Count == 0)
+        {
+            Aviso("A proposta não tem equipamento para gerar o custo previsto.", erro: true);
+            return;
+        }
+
+        try
+        {
+            var bytes = CustoPrevistoExcel.Gerar(_proposta, _custo, projeto, pedido, DateTime.Now);
+            var nome = CustoPrevistoExcel.NomeDoArquivo(projeto);
+
+            await JS.InvokeVoidAsync("appDownload", nome,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                Convert.ToBase64String(bytes));
+
+            _pedindoCustoPrevisto = false;
+            Aviso($"Custo previsto gerado: {nome}.");
+        }
+        catch (Exception ex)
+        {
+            Aviso($"Não consegui gerar o custo previsto: {ex.Message}", erro: true);
+        }
+    }
+
     private async Task GerarPricing()
     {
         var modelo = Path.Combine(Ambiente.ContentRootPath, PricingExcel.CaminhoDoModelo);
@@ -2631,6 +2967,13 @@
         if (!File.Exists(modelo))
         {
             Aviso($"A planilha modelo não está em {PricingExcel.CaminhoDoModelo}.", erro: true);
+            return;
+        }
+
+        // com conversão e sem a taxa, a planilha sairia com a moeda errada
+        if (Cambio.FaltaTaxa(_proposta))
+        {
+            Aviso("Informe a taxa de conversão (seção Pricing) antes de gerar o pricing.", erro: true);
             return;
         }
 
@@ -2642,6 +2985,15 @@
                 PricingExcel.NomeDoArquivo(_proposta),
                 "application/vnd.ms-excel.sheet.macroEnabled.12",
                 Convert.ToBase64String(bytes));
+
+            // a planilha só tem USD, EUR, GBP e CLP na caixa de moedas
+            if (Cambio.Converte(_proposta) && PricingExcel.IndiceDaMoeda(_proposta.MoedaVenda) is null)
+            {
+                Aviso($"Pricing gerado: {PricingExcel.NomeDoArquivo(_proposta)}. A planilha não tem " +
+                      $"{_proposta.MoedaVenda.Rotulo()} na caixa de moedas — nela os valores ficam em " +
+                      $"{_proposta.Moeda.Rotulo()}; a conversão vale na tela e na proposta.");
+                return;
+            }
 
             Aviso($"Pricing gerado: {PricingExcel.NomeDoArquivo(_proposta)}.");
         }
@@ -3026,16 +3378,53 @@
 
     // ---------- gravar / abrir ----------
 
+    /// <summary>
+    /// Mudou o número da revisão de uma proposta que já estava gravada? Aí o que
+    /// se grava é outra proposta.
+    /// </summary>
+    private bool NovaRevisaoPendente =>
+        _proposta.Id.Length > 0 && _proposta.Revisao.Trim() != _revisaoAberta.Trim();
+
     private void Salvar()
     {
+        var novaRevisao = NovaRevisaoPendente;
+
+        if (novaRevisao)
+        {
+            var revisao = _proposta.Revisao.Trim();
+
+            // a revisão que já existe não se sobrescreve nem por este caminho
+            if (Repo.Todas().Any(x => x.Id != _proposta.Id && x.Numero == _proposta.Numero
+                                      && x.Revisao.Trim() == revisao))
+            {
+                Aviso($"A revisão {revisao} da proposta {_proposta.Numero} já existe. " +
+                      "Abra-a pela Base de Dados ou use outro número de revisão.", erro: true);
+                return;
+            }
+
+            // a anterior fica intacta no banco: o que se grava daqui é uma
+            // proposta nova, com o mesmo número e a revisão atualizada — e ainda
+            // não enviada, porque ninguém mandou esta revisão ao cliente
+            _proposta.Id = "";
+            _proposta.CriadaEm = "";
+            _proposta.EnviadaEm = "";
+        }
+
         Repo.Salvar(_proposta);
+        _revisaoAberta = _proposta.Revisao;
+        _baseSalva = Foto();
         Recarregar();
-        Aviso($"Proposta {_proposta.Numero} gravada.");
+
+        Aviso(novaRevisao
+            ? $"Revisão {_proposta.Revisao.Trim()} gravada como uma proposta nova — a revisão anterior continua como estava."
+            : $"Proposta {_proposta.Numero} gravada.");
     }
 
     private void Nova()
     {
         _proposta = Nascer();
+        _revisaoAberta = "";
+        _baseSalva = Foto();
         AjustarEscolhasLivres();
         _aberto = 0;
         _apagando = false;
@@ -3064,6 +3453,8 @@
         }
 
         _proposta = achada;
+        _revisaoAberta = achada.Revisao;
+        _baseSalva = Foto();
         AjustarEscolhasLivres();
         _aberto = 0;
         Aviso($"Proposta {achada.Numero} aberta.");
@@ -3075,8 +3466,15 @@
     /// </summary>
     private void MarcarEnviada()
     {
+        if (NovaRevisaoPendente)
+        {
+            Aviso("A revisão mudou: grave a nova revisão (💾 Salvar) antes de marcar como enviada.", erro: true);
+            return;
+        }
+
         _proposta.EnviadaEm = DateTime.Now.ToString("yyyy-MM-dd");
         Repo.Salvar(_proposta);
+        _baseSalva = Foto();
 
         Recarregar();
         Aviso($"Proposta {_proposta.Numero} marcada como enviada em {DataCurta(_proposta.EnviadaEm)}.");
@@ -3084,8 +3482,15 @@
 
     private void DesmarcarEnviada()
     {
+        if (NovaRevisaoPendente)
+        {
+            Aviso("A revisão mudou: grave a nova revisão (💾 Salvar) antes.", erro: true);
+            return;
+        }
+
         _proposta.EnviadaEm = "";
         Repo.Salvar(_proposta);
+        _baseSalva = Foto();
 
         Recarregar();
         Aviso($"Proposta {_proposta.Numero} voltou para \"em elaboração\".");

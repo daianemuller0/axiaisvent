@@ -10,7 +10,7 @@
 
 <div class="page-head">
     <div>
-        <h1>Propostas</h1>
+        <h1>Base de Dados</h1>
         <p class="subtitle">
             O histórico do que foi cotado. Clique numa linha para abrir a proposta inteira —
             cabeçalho, escopo, parte elétrica e pricing, como ficou gravada.
@@ -61,6 +61,9 @@ else
             <thead>
                 <tr>
                     <th class="nowrap">Número</th>
+                    <AuthorizeView Roles="adm,admin">
+                        <th class="nowrap" style="width:80px">Rev.</th>
+                    </AuthorizeView>
                     <th class="nowrap">Cliente</th>
                     <th class="nowrap">Projeto</th>
                     <th class="nowrap right" style="width:90px">Qtde.</th>
@@ -68,6 +71,9 @@ else
                     <th class="nowrap">Quem fez</th>
                     <th class="nowrap" style="width:130px">Data</th>
                     <th class="nowrap" style="width:120px">Situação</th>
+                    <AuthorizeView Roles="adm,admin">
+                        <th class="nowrap" style="width:150px"></th>
+                    </AuthorizeView>
                 </tr>
             </thead>
             <tbody>
@@ -76,6 +82,9 @@ else
                     var proposta = p;
                     <tr @key="proposta.Id" style="cursor:pointer" @onclick="() => Abrir(proposta)">
                         <td class="nowrap"><strong>@(proposta.Numero.Length > 0 ? proposta.Numero : "—")</strong></td>
+                        <AuthorizeView Roles="adm,admin">
+                            <td class="nowrap">@(proposta.Revisao.Length > 0 ? proposta.Revisao : "—")</td>
+                        </AuthorizeView>
                         <td class="nowrap">@(proposta.Cliente.Length > 0 ? proposta.Cliente : "(sem cliente)")</td>
                         <td class="nowrap"><span class="subtitle">@proposta.Projeto</span></td>
                         <td class="nowrap right">@CustoDaProposta.Quantidade(proposta)</td>
@@ -92,6 +101,24 @@ else
                                 <span class="subtitle">em elaboração</span>
                             }
                         </td>
+                        <AuthorizeView Roles="adm,admin">
+                            <td class="nowrap">
+                                @if (_apagando == proposta.Id)
+                                {
+                                    <span class="subtitle" style="margin:0">Apagar?</span>
+                                    <button class="btn-link" @onclick="() => Apagar(proposta)"
+                                            @onclick:stopPropagation="true">Sim</button>
+                                    <button class="btn-link" @onclick="() => _apagando = null"
+                                            @onclick:stopPropagation="true">Não</button>
+                                }
+                                else
+                                {
+                                    <button class="btn-link" title="Excluir esta proposta"
+                                            @onclick="() => _apagando = proposta.Id"
+                                            @onclick:stopPropagation="true">🗑 Excluir</button>
+                                }
+                            </td>
+                        </AuthorizeView>
                     </tr>
                 }
             </tbody>
@@ -109,6 +136,9 @@ else
     private List<Proposta> _todas = new();
     private CustoDaProposta _custo = default!;
 
+    /// <summary>A proposta que está pedindo confirmação para ser excluída.</summary>
+    private string? _apagando;
+
     private string _filtro = "enviadas";
     private string _busca = "";
 
@@ -120,6 +150,17 @@ else
     };
 
     protected override void OnInitialized() => Recarregar();
+
+    /// <summary>
+    /// Exclui uma proposta — só o ADM vê o botão. Cada revisão é uma proposta à
+    /// parte, então excluir uma não leva as outras.
+    /// </summary>
+    private void Apagar(Proposta proposta)
+    {
+        Repo.Apagar(proposta.Id);
+        _apagando = null;
+        Recarregar();
+    }
 
     private void Recarregar()
     {
@@ -164,7 +205,7 @@ else
 
         var pricing = CalculoPricing.Da(p, custo);
 
-        return $"{p.Moeda.Rotulo()} {pricing.VendaLiquida.ToString("N2", Br)}";
+        return $"{p.MoedaVenda.Rotulo()} {Cambio.ParaVenda(p, pricing.VendaLiquida).ToString("N2", Br)}";
     }
 
     private static string Data(Proposta p)
