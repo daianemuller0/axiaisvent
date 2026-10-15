@@ -21,7 +21,7 @@ telas de proposta e o motor de pricing de serviço saíram, e no lugar entrou a 
 | Pasta de dados | `…\DB\servicos` | **`\\BZVCPFIL003\proj_ramires$\DB\axiais`** |
 | Rotas | `/servicos/…` | `/axiais/…` |
 | Telas | proposta, pricing, cadastros | uma só: **Base** |
-| Lançador na rede | `…\SV\SV.exe` | `…\VA\VA.exe` |
+| Lançador na rede | `…\SV\SV.exe` | `…\axiais\VA.exe` |
 | Pasta local do app | `%LOCALAPPDATA%\HowdenSV` | `%LOCALAPPDATA%\HowdenVA` |
 
 ### Stack
@@ -81,7 +81,7 @@ for `true`, abre o navegador padrão nessa porta quando a aplicação inicia.
 (Kestrel), janela nativa (WinForms) e navegador embutido (WebView2):
 
 ```
-VA.exe (lançador, na rede \\BZVCPFIL003\proj_ramires$\VA)
+VA.exe (lançador, na rede \\BZVCPFIL003\proj_ramires$\axiais)
  ├─  5% lê app\versao.txt na rede
  ├─ 10–90% versão nova? copia app\<versão>\ → %LOCALAPPDATA%\HowdenVA\<versão>\
  └─ 95% abre HowdenAxiais.exe local e se fecha
@@ -181,7 +181,7 @@ A pasta vem de `Data:Folder` no `appsettings.json`
 ## 7. Publicação
 
 `.\publicar.ps1` compila o desktop auto-contido, compila o lançador, copia a versão
-nova para `\\BZVCPFIL003\proj_ramires$\VA\app\<versão>\` e só então troca o
+nova para `\\BZVCPFIL003\proj_ramires$\axiais\app\<versão>\` e só então troca o
 `versao.txt`. Ninguém executa nada direto da rede, então nenhum arquivo fica travado
 e dá para publicar a qualquer hora — quem está com o programa aberto recebe a
 atualização ao fechar e abrir.

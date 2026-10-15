@@ -7,7 +7,7 @@ processo** faz três papéis — servidor ASP.NET Core (Kestrel), janela nativa
 ## Fluxo de inicialização (com a barra de %)
 
 ```
-VA.exe (lançador, na rede \\BZVCPFIL003\proj_ramires$\VA)
+VA.exe (lançador, na rede \\BZVCPFIL003\proj_ramires$\axiais)
  ├─  5% verifica app\versao.txt na rede
  ├─ 10–90% se a versão local for outra: copia app\<versão>\ →
  │          %LOCALAPPDATA%\HowdenVA\<versão>\  (barra por bytes copiados)
@@ -55,7 +55,7 @@ Na sua máquina (na pasta do projeto):
 O script compila o app (auto-contido — as máquinas não precisam ter .NET),
 compila o lançador, copia a versão nova para a rede, troca o `versao.txt` e
 limpa versões antigas. O atalho dos usuários aponta para
-`\\BZVCPFIL003\proj_ramires$\VA\VA.exe`.
+`\\BZVCPFIL003\proj_ramires$\axiais\VA.exe`.
 
 ## Arquivos
 

@@ -14,6 +14,8 @@
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <!-- permite compilar/publicar o alvo Windows a partir de qualquer SO -->
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <!-- a logo da Howden: no .exe, no atalho e na janela -->
+    <ApplicationIcon>howden.ico</ApplicationIcon>
     <!-- app local de usuário: sem servidor IIS etc. -->
     <IsPackable>false</IsPackable>
   </PropertyGroup>

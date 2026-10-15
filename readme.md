@@ -229,7 +229,7 @@ no `appsettings.json`). Para testar na sua máquina, troque por `"data"`.
 
 - `desktop/` — a janela própria (WinForms + WebView2 + Kestrel no mesmo processo).
 - `launcher/` — o `VA.exe` que mora na rede, compara versões e abre o app local.
-- `.\publicar.ps1` — publica em `\\BZVCPFIL003\proj_ramires$\VA`.
+- `.\publicar.ps1` — publica em `\\BZVCPFIL003\proj_ramires$\axiais`.
 
 Detalhes de arquitetura: [ARQUITETURA.md](ARQUITETURA.md) ·
 [desktop/LEIAME-desktop.md](desktop/LEIAME-desktop.md).
@@ -240,3 +240,10 @@ A planilha da equipe é editada **direto no pacote .xlsm** (`Data/PacoteXlsm.cs`
 de planilhas. Assim as imagens, os botões, as caixas de seleção e as macros chegam como no modelo (antes algumas imagens
 apareciam como "Não é possível exibir esta imagem"). O sistema só escreve as células de entrada, marca o botão da moeda
 do preço na caixa **Moedas** e pede ao Excel para recalcular ao abrir.
+
+### Publicar na rede e o atalho com a logo
+
+`.\publicar.ps1` publica em `\\BZVCPFIL003\proj_ramires$\axiais` (o `VA.exe` e a pasta `app\<versão>`) e deixa lá um
+atalho **VA - Ventiladores Axiais Howden.lnk** com a logo da Howden. A logo (`howden.ico`, em `launcher/` e `desktop/`) é o
+ícone do `VA.exe`, do aplicativo e das janelas; na primeira abertura pela rede o lançador cria o mesmo atalho, com a logo,
+na área de trabalho do usuário. Rode o script no Windows, em uma máquina que enxergue a pasta de rede.

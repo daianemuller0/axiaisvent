@@ -1,7 +1,7 @@
 # =====================================================================
 # Publica o VA na pasta de rede, em versao nova (ninguem trava arquivo):
 #
-#   \\BZVCPFIL003\proj_ramires$\VA\
+#   \\BZVCPFIL003\proj_ramires$\axiais\
 #     VA.exe               <- lancador (atalho dos usuarios aponta pra ele)
 #     app\versao.txt       <- nome da versao atual (ex.: v2026-09-09_1530)
 #     app\v2026-09-09_1530\  <- arquivos publicados desta versao
@@ -13,7 +13,7 @@
 #       .\publicar.ps1 -Destino \\outro\caminho
 # =====================================================================
 param(
-    [string]$Destino = '\\BZVCPFIL003\proj_ramires$\VA',
+    [string]$Destino = '\\BZVCPFIL003\proj_ramires$\axiais',
     [int]$ManterVersoes = 5
 )
 
@@ -73,6 +73,21 @@ try {
     Write-Warning "Nao consegui atualizar o VA.exe (alguem deve estar abrindo o app agora). Rode de novo mais tarde se o lancador tiver mudado."
 }
 
+# Atalho pronto na propria pasta de rede, com a logo da Howden (o icone vem
+# de dentro do VA.exe). Quem abrir pela rede ganha tambem um atalho na area
+# de trabalho - o lancador cria na primeira abertura.
+try {
+    $shell = New-Object -ComObject WScript.Shell
+    $lnk = $shell.CreateShortcut("$Destino\VA - Ventiladores Axiais Howden.lnk")
+    $lnk.TargetPath = "$Destino\VA.exe"
+    $lnk.WorkingDirectory = $Destino
+    $lnk.IconLocation = "$Destino\VA.exe,0"
+    $lnk.Description = 'VA - Ventiladores Axiais - Howden'
+    $lnk.Save()
+} catch {
+    Write-Warning "Nao consegui criar o atalho na pasta de rede: $($_.Exception.Message)"
+}
+
 # 5) Limpa versoes antigas na rede (mantem as ultimas N)
 Write-Host "`n[5/5] Limpando versoes antigas..." -ForegroundColor Yellow
 Get-ChildItem "$Destino\app" -Directory -Filter 'v*' |
@@ -84,6 +99,6 @@ Get-ChildItem "$Destino\app" -Directory -Filter 'v*' |
     }
 
 Write-Host "`n== Pronto! Versao $versao publicada. ==" -ForegroundColor Green
-Write-Host "Atalho para os usuarios: $Destino\VA.exe"
+Write-Host "Atalho para os usuarios: $Destino\VA.exe (ou o .lnk com a logo, na mesma pasta)"
 Write-Host 'Quem estiver com o programa aberto recebe a atualizacao na proxima vez que abrir.'
 Stop-Transcript | Out-Null
