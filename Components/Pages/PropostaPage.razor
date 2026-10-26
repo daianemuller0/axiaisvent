@@ -1780,8 +1780,8 @@
                         }
                     </strong>
                     <InputFile OnChange="@(e => SubirCurva(e, indice))"
-                               accept=".pdf,.png,.jpg,.jpeg" class="cell" />
-                    <span class="subtitle">PDF ou imagem — dá para juntar mais de uma</span>
+                               accept=".pdf,.png,.jpg,.jpeg,.txt" class="cell" />
+                    <span class="subtitle">PDF, imagem ou TXT — dá para juntar mais de uma</span>
                 </div>
 
                 @* o que a tela mostra é a IMAGEM, que é o que vai para o
@@ -3286,9 +3286,13 @@
             // a curva é um desenho, e é como imagem que ela vai para a
             // proposta: o PDF vira PNG aqui, já aparado, e a tela mostra
             // exatamente o que vai ser colado no documento
-            if (Path.GetExtension(e.File.Name).Equals(".pdf", StringComparison.OrdinalIgnoreCase))
+            // o TXT (os dados de performance em texto) também vira imagem
+            var extensao = Path.GetExtension(e.File.Name).ToLowerInvariant();
+            if (extensao is ".pdf" or ".txt")
             {
-                var png = CurvaEmImagem.De(memoria.ToArray());
+                var png = extensao == ".pdf"
+                    ? CurvaEmImagem.De(memoria.ToArray())
+                    : TextoEmImagem.De(memoria.ToArray());
                 using var imagem = new MemoryStream(png);
                 curva.Imagem = await Anexos.Guardar(_proposta.Id, imagem, "curva.png");
             }

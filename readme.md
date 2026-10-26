@@ -255,3 +255,9 @@ em `wwwroot/_content/HowdenAxiais.Poc/modelos` (regra do SDK para o projeto refe
 nos dois lugares (`Data/Modelos.cs`), e o `publicar.ps1` copia os modelos também para `wwwroot/modelos` e confere, antes
 de mandar para a rede, se os modelos, o `pdfium.dll` (leitura do PDF da curva), o `libSkiaSharp.dll`, o `duckdb.dll` e o
 `appsettings.json` estão na versão publicada.
+
+### Curvas de performance: PDF, imagem ou TXT
+
+Na proposta técnica, a caixa **Curvas de performance** aceita PDF, PNG, JPG e **TXT**. Como no documento a curva entra
+como imagem, o PDF é desenhado em PNG (`CurvaEmImagem`) e o TXT também (`TextoEmImagem`, em fonte de largura fixa para as
+colunas dos dados de performance continuarem alinhadas). O arquivo original fica guardado nos anexos.

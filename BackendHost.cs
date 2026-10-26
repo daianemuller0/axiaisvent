@@ -242,6 +242,7 @@ public static class BackendHost
                     ".png" => "image/png",
                     ".jpg" or ".jpeg" => "image/jpeg",
                     ".pdf" => "application/pdf",
+                    ".txt" => "text/plain; charset=utf-8",
                     _ => "application/octet-stream",
                 };
 
