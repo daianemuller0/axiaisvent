@@ -247,3 +247,11 @@ do preço na caixa **Moedas** e pede ao Excel para recalcular ao abrir.
 atalho **VA - Ventiladores Axiais Howden.lnk** com a logo da Howden. A logo (`howden.ico`, em `launcher/` e `desktop/`) é o
 ícone do `VA.exe`, do aplicativo e das janelas; na primeira abertura pela rede o lançador cria o mesmo atalho, com a logo,
 na área de trabalho do usuário. Rode o script no Windows, em uma máquina que enxergue a pasta de rede.
+
+### Modelos na versão publicada
+
+No aplicativo publicado os modelos (`proposta-comercial.docx` e `pricing.xlsm`) não ficam em `wwwroot/modelos`, e sim
+em `wwwroot/_content/HowdenAxiais.Poc/modelos` (regra do SDK para o projeto referenciado pelo desktop). O sistema procura
+nos dois lugares (`Data/Modelos.cs`), e o `publicar.ps1` copia os modelos também para `wwwroot/modelos` e confere, antes
+de mandar para a rede, se os modelos, o `pdfium.dll` (leitura do PDF da curva), o `libSkiaSharp.dll`, o `duckdb.dll` e o
+`appsettings.json` estão na versão publicada.

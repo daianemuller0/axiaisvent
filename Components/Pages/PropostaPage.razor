@@ -2835,9 +2835,9 @@
 
         try
         {
-            var modelo = Path.Combine(Ambiente.ContentRootPath, PropostaWord.CaminhoDoModelo);
+            var modelo = Modelos.Achar(Ambiente.ContentRootPath, PropostaWord.CaminhoDoModelo);
 
-            if (!File.Exists(modelo))
+            if (modelo is null)
             {
                 Aviso($"O modelo da proposta não está em {PropostaWord.CaminhoDoModelo}.", erro: true);
                 return;
@@ -2868,9 +2868,9 @@
 
         try
         {
-            var modelo = Path.Combine(Ambiente.ContentRootPath, PropostaWord.CaminhoDoModelo);
+            var modelo = Modelos.Achar(Ambiente.ContentRootPath, PropostaWord.CaminhoDoModelo);
 
-            if (!File.Exists(modelo))
+            if (modelo is null)
             {
                 Aviso($"O modelo da proposta não está em {PropostaWord.CaminhoDoModelo}.", erro: true);
                 return;
@@ -2962,9 +2962,9 @@
 
     private async Task GerarPricing()
     {
-        var modelo = Path.Combine(Ambiente.ContentRootPath, PricingExcel.CaminhoDoModelo);
+        var modelo = Modelos.Achar(Ambiente.ContentRootPath, PricingExcel.CaminhoDoModelo);
 
-        if (!File.Exists(modelo))
+        if (modelo is null)
         {
             Aviso($"A planilha modelo não está em {PricingExcel.CaminhoDoModelo}.", erro: true);
             return;

@@ -42,6 +42,29 @@ if ($LASTEXITCODE -ne 0) {
     throw 'Falha ao compilar o aplicativo desktop - os detalhes estao acima e em publicar.log.'
 }
 
+# Os modelos (proposta em Word e pricing) tambem ficam em wwwroot\modelos,
+# onde o sistema procura primeiro - e a publicacao so segue se tudo o que
+# gera documento e le arquivo estiver na pasta.
+$pastaApp = "$raiz\out\app\$versao"
+New-Item -ItemType Directory -Force -Path "$pastaApp\wwwroot\modelos" | Out-Null
+Copy-Item "$raiz\wwwroot\modelos\*" "$pastaApp\wwwroot\modelos" -Recurse -Force
+# a pasta de dados e o login vem do appsettings.json principal
+if (-not (Test-Path "$pastaApp\appsettings.json")) {
+    Copy-Item "$raiz\appsettings.json" "$pastaApp\appsettings.json" -Force
+}
+$faltando = @(
+    'wwwroot\modelos\proposta-comercial.docx',
+    'wwwroot\modelos\pricing.xlsm',
+    'pdfium.dll',
+    'libSkiaSharp.dll',
+    'duckdb.dll',
+    'appsettings.json'
+) | Where-Object { -not (Test-Path (Join-Path $pastaApp $_)) }
+if ($faltando.Count -gt 0) {
+    Stop-Transcript | Out-Null
+    throw "A versao publicada ficou sem: $($faltando -join ', '). Nada foi copiado para a rede."
+}
+
 # 2) Compila o lancador (um .exe unico e pequeno)
 Write-Host "`n[2/5] Compilando o lancador..." -ForegroundColor Yellow
 dotnet publish "$raiz\launcher\HowdenAxiais.Launcher.csproj" -c Release -r win-x64 `
