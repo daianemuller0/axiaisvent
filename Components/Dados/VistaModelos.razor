@@ -8,7 +8,7 @@
     <strong>mesma lista</strong>: cada linha diz na coluna <em>Série</em> de qual linha de
     produto ela é. O modelo é a linha inteira — <strong>série, ventilador, cubo, FB/HB e
     nº de estágios</strong> —, então o mesmo par pode aparecer duas vezes se o FB/HB ou o
-    estagiamento for outro: são dois modelos, com código e preço próprios.
+    estagiamento for outro: são dois modelos, com código e custo próprios.
 </p>
 
 <!-- ---------- verificador ---------- -->
@@ -92,11 +92,11 @@
     }
 </div>
 
-<!-- ---------- a lista cruzada: código e preço ---------- -->
-<h3 style="margin:26px 0 6px">Equipamentos — código e preço</h3>
+<!-- ---------- a lista cruzada: código e custo ---------- -->
+<h3 style="margin:26px 0 6px">Equipamentos — código e custo</h3>
 <p class="subtitle">
     Uma lista só, <strong>cruzando ventilador e cubo</strong>: cada linha é uma célula amarela
-    da matriz, ou seja, um equipamento de verdade. É por isso que o código e o preço estão
+    da matriz, ou seja, um equipamento de verdade. É por isso que o código e o custo estão
     aqui e não em duas listas soltas — o 3000 no cubo 1800 e o 3000 no cubo 2100 são dois
     equipamentos diferentes.
 </p>
@@ -199,9 +199,12 @@
                 <th class="nowrap" style="width:150px">Frame máx IEC</th>
                 <th class="nowrap" style="width:150px">Frame máx NEMA</th>
                 <th class="nowrap" style="width:130px">Código</th>
-                <th class="nowrap" style="width:120px">Preço USD</th>
-                <th class="nowrap" style="width:120px">Preço CLP</th>
-                <th class="nowrap" style="width:120px">Preço R$</th>
+                <th class="nowrap" style="width:120px">Custo USD</th>
+                <th class="nowrap" style="width:120px">Custo CLP</th>
+                @if (Moedas.UsaReal)
+                {
+                    <th class="nowrap" style="width:120px">Custo R$</th>
+                }
                 <th class="nowrap" style="width:90px"></th>
             </tr>
         </thead>
@@ -247,7 +250,10 @@
                     </td>
                     <td>@PrecoDe(eq, Moeda.Usd)</td>
                     <td>@PrecoDe(eq, Moeda.Clp)</td>
-                    <td>@PrecoDe(eq, Moeda.Brl)</td>
+                    @if (Moedas.UsaReal)
+                    {
+                        <td>@PrecoDe(eq, Moeda.Brl)</td>
+                    }
                     <td class="nowrap center">
                         @if (_apagarComb == eq.Id)
                         {
@@ -670,7 +676,7 @@
                (codigo.Length > 0 ? $"código {codigo}" : "sem código");
     }
 
-    /// <summary>As três moedas em que a equipe cadastra preço.</summary>
+    /// <summary>As três moedas em que a equipe cadastra custo.</summary>
     private enum Moeda { Usd, Clp, Brl }
 
     private static string Rotulo(Moeda m) => m switch
@@ -683,7 +689,7 @@
         Moeda.Usd => eq.PrecoUsd, Moeda.Clp => eq.PrecoClp, _ => eq.Preco,
     };
 
-    /// <summary>Um dos três campos de preço da linha.</summary>
+    /// <summary>Um dos três campos de custo da linha.</summary>
     private RenderFragment PrecoDe(Equipamento eq, Moeda moeda) => @<text>
         <input class="cell" style="max-width:100px; text-align:right" placeholder="—"
                value="@ValorDe(eq, moeda)"
@@ -697,7 +703,7 @@
 
         if (preco.Length > 0 && DadosExcel.Numero(preco) is null)
         {
-            _msg = $"\"{preco}\" não parece um preço. Use 1234,56 ou 1234.56.";
+            _msg = $"\"{preco}\" não parece um custo. Use 1234,56 ou 1234.56.";
             Recarregar();   // devolve o campo ao valor gravado
             return;
         }

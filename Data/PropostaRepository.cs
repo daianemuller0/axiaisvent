@@ -326,8 +326,8 @@ public sealed class Proposta
     /// <summary>"margem" (a partir da margem pedida) ou "preco" (a partir do preço-meta).</summary>
     public string ModoDoPreco { get; set; } = "margem";
 
-    /// <summary>Margem pedida, em % (P25). Padrão 28%.</summary>
-    public string MargemAlvo { get; set; } = "28";
+    /// <summary>Margem pedida, em % (P25). Padrão 25%.</summary>
+    public string MargemAlvo { get; set; } = "25";
 
     /// <summary>Preço-meta, quando o cálculo parte dele.</summary>
     public string PrecoMeta { get; set; } = "";
@@ -393,8 +393,29 @@ public sealed class Proposta
     public string Contato2Telefones { get; set; } = "";
 
     // ---------- escopo do ventilador ----------
-    /// <summary>"USD", "CLP" ou "BRL" — manda em todos os preços da proposta.</summary>
+    /// <summary>"USD", "CLP" ou "BRL" — a moeda do CUSTO: manda em todos os custos da proposta.</summary>
     public string MoedaCodigo { get; set; } = "USD";
+
+    // ---------- conversão de moeda (custo numa moeda, preço ao cliente em outra) ----------
+    /// <summary>
+    /// A moeda do PREÇO ao cliente. Vazio = a mesma do custo, sem conversão.
+    /// </summary>
+    public string MoedaVendaCodigo { get; set; } = "";
+
+    /// <summary>
+    /// A taxa digitada. Como ela é lida depende de <see cref="CambioDirecao"/>.
+    /// Vazia = sem conversão (e a tela avisa).
+    /// </summary>
+    public string TaxaCambio { get; set; } = "";
+
+    /// <summary>
+    /// "VendaEmCusto": 1 moeda do PREÇO vale X da moeda do CUSTO (1 USD = 950
+    /// CLP, com custo em CLP). "CustoEmVenda": o contrário.
+    /// </summary>
+    public string CambioDirecao { get; set; } = "VendaEmCusto";
+
+    /// <summary>% tirado da taxa ao converter — se a moeda cair até isso, o valor no custo não perde.</summary>
+    public string SegurancaCambioPct { get; set; } = "0";
 
     /// <summary>
     /// Os equipamentos da proposta, cada um com a sua quantidade e o seu escopo.
@@ -406,6 +427,9 @@ public sealed class Proposta
     public List<ItemProposta> Itens { get; set; } = new();
 
     public Moeda Moeda => Moedas.Ler(MoedaCodigo);
+
+    /// <summary>A moeda do preço ao cliente: a escolhida, ou a do custo quando não há escolha.</summary>
+    public Moeda MoedaVenda => MoedaVendaCodigo.Length > 0 ? Moedas.Ler(MoedaVendaCodigo) : Moeda;
 
     public string ItensComoTexto() => JsonSerializer.Serialize(Itens);
 
@@ -476,6 +500,7 @@ public sealed class Proposta
     /// <summary>Como a proposta aparece numa lista.</summary>
     public string Titulo =>
         (Numero.Length > 0 ? Numero : "(sem número)") +
+        (Revisao.Trim().Length > 0 ? $" rev {Revisao.Trim()}" : "") +
         (Cliente.Length > 0 ? $" · {Cliente}" : "") +
         (Projeto.Length > 0 ? $" · {Projeto}" : "");
 }
@@ -878,6 +903,7 @@ public sealed class PropostaRepository
         "contatoArea",
         "contato2Nome", "contato2Cargo", "contato2Area", "contato2Email", "contato2Telefones",
         "diasDeAssessoria", "diasDeAssessoriaEmCampo",
+        "moedaVenda", "taxaCambio", "cambioDirecao", "segurancaCambioPct",
     };
 
     private readonly ParquetStore _store;
@@ -901,7 +927,7 @@ public sealed class PropostaRepository
             Representante2 = S(r, 32), Representante2Contato = S(r, 33),
             Beneficio = S(r, 34), Fianca = Ou(S(r, 35), "Não"),
             RiscoAdicional = Ou(S(r, 36), "2"), MargemNegociacao = Ou(S(r, 37), "3"),
-            ModoDoPreco = Ou(S(r, 38), "margem"), MargemAlvo = Ou(S(r, 39), "28"),
+            ModoDoPreco = Ou(S(r, 38), "margem"), MargemAlvo = Ou(S(r, 39), "25"),
             PrecoMeta = S(r, 40),
             EnviadaEm = S(r, 41), CriadaEm = S(r, 42),
             MoedaCodigo = S(r, 43),
@@ -913,6 +939,8 @@ public sealed class PropostaRepository
             Contato2Nome = S(r, 55), Contato2Cargo = S(r, 56), Contato2Area = S(r, 57),
             Contato2Email = S(r, 58), Contato2Telefones = S(r, 59),
             DiasDeAssessoria = S(r, 60), DiasDeAssessoriaEmCampo = S(r, 61),
+            MoedaVendaCodigo = S(r, 62), TaxaCambio = S(r, 63),
+            CambioDirecao = Ou(S(r, 64), "VendaEmCusto"), SegurancaCambioPct = Ou(S(r, 65), "0"),
         })
         .OrderByDescending(p => p.Numero)
         .ToList();
@@ -948,6 +976,7 @@ public sealed class PropostaRepository
             p.Contato2Nome, p.Contato2Cargo, p.Contato2Area,
             p.Contato2Email, p.Contato2Telefones,
             p.DiasDeAssessoria, p.DiasDeAssessoriaEmCampo,
+            p.MoedaVendaCodigo, p.TaxaCambio, p.CambioDirecao, p.SegurancaCambioPct,
         };
 
         _store.WriteRow(Entidade, Campos

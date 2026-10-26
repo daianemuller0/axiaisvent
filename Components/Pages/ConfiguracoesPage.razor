@@ -1,0 +1,212 @@
+@page "/axiais/configuracoes"
+@page "/axiais/marca"
+@attribute [Authorize(Roles = "adm,admin")]
+@rendermode InteractiveServer
+@inject UsuarioRepository Usuarios
+@inject NavigationManager Navegacao
+
+<div class="page-head">
+    <div>
+        <h1>Configurações</h1>
+        <p class="subtitle">
+            Os usuários do sistema e o que cada um pode fazer, e a identidade visual (os
+            logos). Quem for cadastrado aqui entra pela tela de login com o usuário e a senha
+            definidos, e o <strong>papel</strong> decide o que cada um pode fazer.
+        </p>
+    </div>
+</div>
+
+<div class="tabs" style="margin-top:6px">
+    @foreach (var (chave, titulo) in Abas)
+    {
+        var a = chave;
+        <button class="tab @(_aba == a ? "active" : "")" @onclick="() => _aba = a">@titulo</button>
+    }
+</div>
+
+@if (_aba == "identidade")
+{
+    <VistaIdentidade />
+}
+else
+{
+<div class="panel" style="margin-bottom:18px">
+    <h3 class="dash-title">Novo usuário</h3>
+
+    <div class="toolbar" style="flex-wrap:wrap; margin-bottom:0">
+        <input class="cell" style="width:200px" placeholder="nome da pessoa"
+               value="@_nome" @oninput="e => _nome = e.Value?.ToString() ?? string.Empty" />
+        <input class="cell" style="width:150px" placeholder="usuário (login)" autocomplete="off"
+               value="@_login" @oninput="e => _login = e.Value?.ToString() ?? string.Empty" />
+        <input class="cell" style="width:150px" type="password" placeholder="senha (mín. 6)" autocomplete="new-password"
+               value="@_senha" @oninput="e => _senha = e.Value?.ToString() ?? string.Empty" />
+
+        <select class="cell" style="width:auto" value="@_papel"
+                @onchange="e => _papel = e.Value?.ToString() ?? Papeis.Comercial">
+            @foreach (var p in Papeis.Todos)
+            {
+                <option value="@p.Chave">@p.Rotulo</option>
+            }
+        </select>
+
+        <button class="btn-primary" @onclick="Criar">+ Criar usuário</button>
+    </div>
+
+    <ul class="subtitle" style="margin:12px 0 0; padding-left:18px">
+        @foreach (var p in Papeis.Todos)
+        {
+            <li><strong>@p.Rotulo</strong> — @p.Descricao</li>
+        }
+    </ul>
+</div>
+
+@if (_msg is not null)
+{
+    <div class="@(_erro ? "aviso aviso-erro" : "aviso aviso-ok")" style="margin-bottom:14px">@_msg</div>
+}
+
+<div class="panel" style="padding:0; overflow-x:auto">
+    <table class="grid">
+        <thead>
+            <tr>
+                <th class="nowrap">Nome</th>
+                <th class="nowrap">Usuário</th>
+                <th class="nowrap" style="width:150px">Papel</th>
+                <th class="nowrap" style="width:110px">Situação</th>
+                <th class="nowrap">Nova senha</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (_todos.Count == 0)
+            {
+                <tr>
+                    <td colspan="5" class="subtitle" style="padding:16px">
+                        Nenhum usuário cadastrado ainda. O acesso do <code>appsettings.json</code>
+                        (Auth) continua valendo como ADM.
+                    </td>
+                </tr>
+            }
+
+            @foreach (var u in _todos)
+            {
+                var usuario = u;
+                <tr @key="usuario.Id">
+                    <td class="nowrap"><strong>@usuario.Nome</strong></td>
+                    <td class="nowrap">@usuario.Login</td>
+                    <td class="nowrap">
+                        <select class="cell" style="width:auto" value="@usuario.Papel"
+                                @onchange="e => MudarPapel(usuario, e.Value?.ToString() ?? usuario.Papel)">
+                            @foreach (var p in Papeis.Todos)
+                            {
+                                <option value="@p.Chave">@p.Rotulo</option>
+                            }
+                        </select>
+                    </td>
+                    <td class="nowrap">
+                        <button class="btn-link" title="Clique para alternar"
+                                @onclick="() => AlternarAtivo(usuario)">
+                            @(usuario.Ativo ? "ativo" : "inativo")
+                        </button>
+                    </td>
+                    <td class="nowrap">
+                        <input class="cell" style="width:150px" type="password" placeholder="nova senha"
+                               autocomplete="new-password"
+                               value="@NovaSenha(usuario)"
+                               @oninput="e => _novasSenhas[usuario.Id] = e.Value?.ToString() ?? string.Empty" />
+                        <button class="btn-ghost" @onclick="() => TrocarSenha(usuario)">Trocar</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<p class="subtitle" style="margin:12px 0 0">
+    Usuário <strong>inativo</strong> não consegue entrar, mas continua cadastrado. O acesso
+    definido em <code>appsettings.json</code> (Auth:Usuario e Auth:Senha) segue valendo como ADM — é
+    ele que abre o sistema na primeira vez.
+</p>
+
+}
+
+@code {
+    private static readonly (string Chave, string Titulo)[] Abas =
+    {
+        ("usuarios", "Usuários"), ("identidade", "Identidade Visual"),
+    };
+
+    /// <summary>A seção à vista. /axiais/marca (o endereço antigo) abre na identidade visual.</summary>
+    private string _aba = "usuarios";
+
+    private List<Usuario> _todos = new();
+
+    private string _nome = "";
+    private string _login = "";
+    private string _senha = "";
+    private string _papel = Papeis.Comercial;
+
+    private readonly Dictionary<string, string> _novasSenhas = new();
+
+    private string? _msg;
+    private bool _erro;
+
+    protected override void OnInitialized()
+    {
+        _todos = Usuarios.Todos();
+
+        if (Navegacao.ToBaseRelativePath(Navegacao.Uri).Contains("marca", StringComparison.OrdinalIgnoreCase))
+            _aba = "identidade";
+    }
+
+    private string NovaSenha(Usuario u) => _novasSenhas.GetValueOrDefault(u.Id, "");
+
+    private void Criar()
+    {
+        var motivo = Usuarios.Criar(_login, _nome, _senha, _papel);
+        if (motivo is not null)
+        {
+            Aviso(motivo, erro: true);
+            return;
+        }
+
+        Aviso($"Usuário \"{_login.Trim()}\" criado como {Papeis.Rotulo(_papel)}.");
+        _nome = _login = _senha = "";
+        _papel = Papeis.Comercial;
+        _todos = Usuarios.Todos();
+    }
+
+    private void MudarPapel(Usuario u, string papel)
+    {
+        if (!Papeis.Conhecido(papel) || papel == u.Papel) return;
+
+        u.Papel = papel;
+        Usuarios.Salvar(u);
+        Aviso($"{u.Nome} agora é {Papeis.Rotulo(papel)}. Vale na próxima vez que entrar.");
+    }
+
+    private void AlternarAtivo(Usuario u)
+    {
+        u.Ativo = !u.Ativo;
+        Usuarios.Salvar(u);
+        Aviso($"{u.Nome} ficou {(u.Ativo ? "ativo" : "inativo")}.");
+    }
+
+    private void TrocarSenha(Usuario u)
+    {
+        var motivo = Usuarios.DefinirSenha(u, NovaSenha(u));
+        if (motivo is not null)
+        {
+            Aviso(motivo, erro: true);
+            return;
+        }
+
+        _novasSenhas.Remove(u.Id);
+        Aviso($"Senha de {u.Nome} trocada.");
+    }
+
+    private void Aviso(string texto, bool erro = false)
+    {
+        _msg = texto;
+        _erro = erro;
+    }
+}

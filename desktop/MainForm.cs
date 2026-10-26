@@ -22,6 +22,7 @@ public sealed class MainForm : Form
         _pronto = pronto;
 
         Text = "VA · Ventiladores Axiais — Howden";
+        Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? Icon;
         StartPosition = FormStartPosition.CenterScreen;
         Size = new Size(1440, 900);
         MinimumSize = new Size(1000, 640);

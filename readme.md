@@ -113,6 +113,81 @@ duas escadas independentes.
 Onde a rotação está vazia, o campo sugere em cinza a rotação síncrona de polos +
 frequência; é só dica, o valor gravado é o que você digitar.
 
+## A seção Conversão
+
+Quarta seção da guia Dados (`/axiais/conversao`): converte o custo em **CLP** para **USD**. A
+equipe digita a taxa do jeito que se fala — `1 USD = X CLP` — e o **Ver o que muda** mostra
+quantos valores serão recalculados em modelos, motores, características e tabelas por
+referência. Confirmado, o USD de **todo item que tem CLP** é gravado (CLP ÷ taxa, duas casas) e
+as propostas já usam os valores novos. Item sem CLP não é tocado. A opção *só preencher o que
+está vazio* preserva o USD digitado à mão. A taxa fica gravada (`taxas_conversao`) com a data da
+última gravação; o código está em `Data/ConversaoRepository.cs`.
+
+**O real está fora de uso por enquanto.** O interruptor é `Moedas.UsaReal` (`Data/Moeda.cs`):
+desligado, a coluna R$ some das telas e das planilhas de Dados, a moeda R$ some da proposta e a
+conversão só trata o dólar. Os valores em R$ já gravados continuam no banco; para religar, basta
+trocar o valor para `true`. Na guia Dados, o que se chamava *preço* agora é *custo*.
+
+## Identidade Visual
+
+Seção **Identidade Visual** dentro de **Configurações** (`/axiais/configuracoes`, ou `/axiais/marca`): troca os dois logos do sistema, sem mexer
+em código. O **logo da página inicial** aparece na tela de entrada (login) e o **logo do
+sistema** na barra lateral, em todas as telas. Aceita PNG ou JPG de até 1 MB (de preferência
+PNG com fundo transparente); a troca vale na hora, inclusive na barra lateral de quem já está
+com o sistema aberto. Sem logo enviado, cada lugar volta ao padrão da Howden. Os logos ficam
+gravados na pasta de dados (entidade `branding`, `Data/BrandingRepository.cs`). O logo do
+documento das propostas não passa por aqui: ele é o do modelo em Word da equipe.
+
+## Conversão de moeda da proposta
+
+O custo pode estar numa moeda e o preço ao cliente em outra — o mesmo funcionamento do sistema
+de Serviços. Na tela **Proposta**: a **moeda do custo** é a do escopo (de onde o cadastro puxa o
+custo) e, na seção **Pricing**, **Preço ao cliente em** escolhe a moeda do preço. Sendo diferentes,
+aparece a caixa **Conversão da moeda**:
+
+- **Taxa de conversão**, nos dois sentidos: `1 <moeda do preço> em <moeda do custo>` ou o inverso
+  (internamente guardada sempre no primeiro). Ex.: custo em CLP, preço em USD, `1 USD = 950 CLP`.
+- **Segurança da moeda**: % tirado da taxa. Com 5% a conversão usa 902,5 em vez de 950 — o preço em
+  USD sobe, e se o dólar cair até 5% o valor em pesos não perde.
+- Preço = custo ÷ taxa efetiva, com duas casas. O custo e todo o pricing continuam na moeda do
+  custo; só o valor final é convertido (venda líquida e preço com impostos, o preço de cada
+  equipamento, os opcionais e o valor do histórico).
+- Sem taxa informada a tela avisa e o preço sai sem conversão. Custo e preço na mesma moeda nunca
+  convertem. O Word da proposta comercial sai na moeda do preço; o Custo Previsto, na do custo.
+
+O código está em `Data/Cambio.cs`; a moeda do preço, a taxa, o sentido e a segurança ficam gravados
+na proposta. A planilha **Gerar pricing** recebe o custo na moeda do custo, a **margem** usada na tela (padrão 25%) e a
+conversão na caixa **Moedas** (taxa efetiva em I35..I38 — USD, EUR, GBP, CLP — e a moeda escolhida em
+BD_pricing!A1, a ligação dos botões; o botão da moeda do preço sai marcado); o valor convertido (Q13) e a venda líquida fecham em uma casa. A caixa só tem USD, EUR, GBP e CLP:
+com PEN ou R$ como moeda do preço, a planilha fica na moeda do custo e a tela avisa.
+
+## Configurações, papéis e revisões
+
+**Configurações** (`/axiais/configuracoes`, só ADM): cria usuários com **papel de acesso** — ADM
+(tudo: Configurações, Identidade Visual, Dados e excluir propostas), Cadastro (Proposta, Base de
+Dados e Dados) e Comercial (Proposta e Base de Dados). A senha é guardada só como resumo (PBKDF2).
+Usuário inativo não entra. O acesso de `appsettings.json` (Auth:Usuario / Auth:Senha) continua
+valendo como ADM, para abrir o sistema na primeira vez. O menu mostra só o que o papel permite.
+
+**Base de Dados** (antiga lista de propostas): para o ADM, ganha a coluna **Rev.** e o botão
+**Excluir** (com confirmação; cada revisão é uma proposta à parte).
+
+**Revisões:** abrir uma proposta gravada, mudar o número da revisão e **Salvar** não sobrescreve a
+anterior — grava uma proposta nova, com o mesmo número e a revisão atualizada (ainda não enviada). Se
+a revisão já existir, o sistema recusa e avisa.
+
+A guia **Base** (planilha solta) foi retirada; o sistema abre na **Proposta**.
+
+## Rascunho: recarregar a página não perde a proposta
+
+A proposta em andamento é copiada para o navegador (localStorage) a cada alteração e volta quando a
+página abre — inclusive depois de recarregar (F5) ou de o servidor reiniciar. O rascunho vale
+enquanto a proposta não for gravada: **Salvar** (ou **+ Nova**) o apaga. Abrindo uma proposta gravada,
+só é recuperado o que for diferente do que está gravado. Cada proposta tem o seu rascunho; sem id na
+rota, volta a que estava sendo editada por último. O rascunho é do navegador e da máquina da pessoa
+(não vai para a pasta de rede) e, como os campos de texto só confirmam ao sair deles, o que ainda está
+sendo digitado no momento do recarregamento não entra.
+
 ## A aba Base
 
 Hoje o sistema tem uma aba, **Base**, com a planilha da equipe:
@@ -154,7 +229,35 @@ no `appsettings.json`). Para testar na sua máquina, troque por `"data"`.
 
 - `desktop/` — a janela própria (WinForms + WebView2 + Kestrel no mesmo processo).
 - `launcher/` — o `VA.exe` que mora na rede, compara versões e abre o app local.
-- `.\publicar.ps1` — publica em `\\BZVCPFIL003\proj_ramires$\VA`.
+- `.\publicar.ps1` — publica em `\\BZVCPFIL003\proj_ramires$\axiais`.
 
 Detalhes de arquitetura: [ARQUITETURA.md](ARQUITETURA.md) ·
 [desktop/LEIAME-desktop.md](desktop/LEIAME-desktop.md).
+
+### Como o pricing é preenchido (imagens e botões preservados)
+
+A planilha da equipe é editada **direto no pacote .xlsm** (`Data/PacoteXlsm.cs`), sem ser regravada por uma biblioteca
+de planilhas. Assim as imagens, os botões, as caixas de seleção e as macros chegam como no modelo (antes algumas imagens
+apareciam como "Não é possível exibir esta imagem"). O sistema só escreve as células de entrada, marca o botão da moeda
+do preço na caixa **Moedas** e pede ao Excel para recalcular ao abrir.
+
+### Publicar na rede e o atalho com a logo
+
+`.\publicar.ps1` publica em `\\BZVCPFIL003\proj_ramires$\axiais` (o `VA.exe` e a pasta `app\<versão>`) e deixa lá um
+atalho **VA - Ventiladores Axiais Howden.lnk** com a logo da Howden. A logo (`howden.ico`, em `launcher/` e `desktop/`) é o
+ícone do `VA.exe`, do aplicativo e das janelas; na primeira abertura pela rede o lançador cria o mesmo atalho, com a logo,
+na área de trabalho do usuário. Rode o script no Windows, em uma máquina que enxergue a pasta de rede.
+
+### Modelos na versão publicada
+
+No aplicativo publicado os modelos (`proposta-comercial.docx` e `pricing.xlsm`) não ficam em `wwwroot/modelos`, e sim
+em `wwwroot/_content/HowdenAxiais.Poc/modelos` (regra do SDK para o projeto referenciado pelo desktop). O sistema procura
+nos dois lugares (`Data/Modelos.cs`), e o `publicar.ps1` copia os modelos também para `wwwroot/modelos` e confere, antes
+de mandar para a rede, se os modelos, o `pdfium.dll` (leitura do PDF da curva), o `libSkiaSharp.dll`, o `duckdb.dll` e o
+`appsettings.json` estão na versão publicada.
+
+### Curvas de performance: PDF, imagem ou TXT
+
+Na proposta técnica, a caixa **Curvas de performance** aceita PDF, PNG, JPG e **TXT**. Como no documento a curva entra
+como imagem, o PDF é desenhado em PNG (`CurvaEmImagem`) e o TXT também (`TextoEmImagem`, em fonte de largura fixa para as
+colunas dos dados de performance continuarem alinhadas). O arquivo original fica guardado nos anexos.
