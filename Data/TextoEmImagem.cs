@@ -22,21 +22,27 @@ public static class TextoEmImagem
         using var tipo = SKTypeface.FromFamilyName("Consolas")
                          ?? SKTypeface.FromFamilyName("Courier New")
                          ?? SKTypeface.Default;
-        using var fonte = new SKFont(tipo, TamanhoDaFonte);
-        using var pincel = new SKPaint { Color = SKColors.Black, IsAntialias = true };
+        // tudo pelo SKPaint: é a API de texto que esta versão do SkiaSharp tem por inteiro
+        using var pincel = new SKPaint
+        {
+            Color = SKColors.Black,
+            IsAntialias = true,
+            Typeface = tipo,
+            TextSize = TamanhoDaFonte,
+        };
 
-        var alturaDaLinha = (int)Math.Ceiling(fonte.Spacing);
-        var largura = (int)Math.Ceiling(linhas.Select(l => fonte.MeasureText(l)).DefaultIfEmpty(0).Max()) + 2 * Margem;
+        var alturaDaLinha = (int)Math.Ceiling(pincel.FontSpacing);
+        var largura = (int)Math.Ceiling(linhas.Select(l => pincel.MeasureText(l)).DefaultIfEmpty(0).Max()) + 2 * Margem;
         var altura = linhas.Count * alturaDaLinha + 2 * Margem;
 
         using var bitmap = new SKBitmap(Math.Max(largura, 200), Math.Max(altura, 100));
         using (var tela = new SKCanvas(bitmap))
         {
             tela.Clear(SKColors.White);
-            var y = Margem - fonte.Metrics.Ascent;
+            var y = Margem - pincel.FontMetrics.Ascent;
             foreach (var linha in linhas)
             {
-                tela.DrawText(linha, Margem, y, fonte, pincel);
+                tela.DrawText(linha, Margem, y, pincel);
                 y += alturaDaLinha;
             }
         }
