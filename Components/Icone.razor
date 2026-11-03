@@ -79,11 +79,17 @@
             <polyline points="11 17 6 12 11 7" />
             <polyline points="18 17 13 12 18 7" />
             break;
+        // a área para soltar arquivos (item 19)
+        case "subir":
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="17 8 12 3 7 8" />
+            <line x1="12" y1="3" x2="12" y2="15" />
+            break;
     }
 </svg>
 
 @code {
-    /// <summary>salvar, baixar, copiar, enviar, lista, ajuda, relogio, alerta, desfazer, fechar, mais, pasta, seta, ok ou recolher.</summary>
+    /// <summary>salvar, baixar, copiar, enviar, lista, ajuda, relogio, alerta, desfazer, fechar, mais, pasta, seta, ok, recolher ou subir.</summary>
     [Parameter] public string Nome { get; set; } = "";
 
     /// <summary>Uma classe a mais, para o ícone que muda de tamanho ou gira.</summary>

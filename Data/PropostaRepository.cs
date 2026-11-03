@@ -191,6 +191,37 @@ public sealed class ItemProposta
     /// </summary>
     public string Coluna { get; set; } = "";
 
+    // ---------- dados técnicos digitados na tela (item 09) ----------
+    // Texto, como os da seleção: vão no JSON de "itens", então uma proposta
+    // antiga lê os três como vazios, sem mudar o esquema.
+
+    /// <summary>O diâmetro do ventilador em mm, para a linha "Diámetro" da técnica. É do modelo: a cópia leva.</summary>
+    public string DiametroMm { get; set; } = "";
+
+    /// <summary>A altitude do local, em m.s.n.m. É da mina, e não do modelo: a cópia para outro projeto não leva.</summary>
+    public string AltitudeMsnm { get; set; } = "";
+
+    /// <summary>
+    /// O ruído em dB(A) a 1 m. Depende do ponto de operação, como os dados da
+    /// seleção: nunca é lembrado de outra proposta nem copiado para outro equipamento.
+    /// </summary>
+    public string RuidoDb { get; set; } = "";
+
+    /// <summary>
+    /// As listas que a folha de dados respondeu — a célula não estava vazia,
+    /// mesmo quando dizia "-" ou um texto que o sistema não entendeu (item 15).
+    /// Um escopo trazido depois (outro equipamento, padrão da série, última
+    /// proposta do cliente) nunca preenche estas: o que o cliente respondeu manda.
+    /// </summary>
+    public List<string> RespondidasNaFolha { get; set; } = new();
+
+    /// <summary>
+    /// Os campos do filtro do motor que o sistema preencheu sozinho (item 16),
+    /// pela seleção ou pela última proposta do cliente. O filtro feito à mão
+    /// nunca é tocado, e "refazer" limpa só estes — mesmo depois de reabrir a proposta.
+    /// </summary>
+    public List<string> FiltroAuto { get; set; } = new();
+
     public int Quantos => int.TryParse(Quantidade.Trim(), out var n) && n > 0 ? n : 1;
 }
 

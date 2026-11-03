@@ -92,10 +92,95 @@ public partial class PropostaPage : IAsyncDisposable
         if (_etapa == 1 && antes != 1) AtualizarGravadas();
     }
 
+    /// <summary>O id do começo do conteúdo do equipamento, logo abaixo da faixa fixa.</summary>
+    private const string ConteudoDoEquipamento = "equip-conteudo";
+
+    /// <summary>
+    /// Abre um equipamento pela faixa fixa (ou pelo rodapé). Se a tela estava
+    /// rolada lá embaixo, ela volta ao começo do conteúdo dele — e só nesse
+    /// caso: com o começo à vista, nada se mexe (ver appRolarPara).
+    /// </summary>
     private void AbrirEquipamento(int indice)
     {
         _aberto = indice;
         _apagandoItem = null;
+        _rolarPara = ConteudoDoEquipamento;
+    }
+
+    /// <summary>Troca a aba do equipamento aberto (Escopo, Opcionais, Técnica), com a mesma regra de rolagem.</summary>
+    private void TrocarAba(string aba)
+    {
+        _abaItem = aba;
+        _rolarPara = ConteudoDoEquipamento;
+    }
+
+    // ---------- o caminho da etapa Equipamentos ----------
+
+    /// <summary>Um passo do rodapé da etapa 3: um equipamento e uma aba dele.</summary>
+    private sealed record Passo(int Item, string Aba);
+
+    /// <summary>
+    /// A aba Opcionais só entra no caminho do rodapé quando algum equipamento
+    /// já tem opcional: numa proposta sem opcionais ela seria dois cliques a
+    /// mais em cada equipamento. Sem ela no caminho, fica um link ao lado do botão.
+    /// </summary>
+    private bool OpcionaisNoCaminho => _proposta.Itens.Any(i =>
+        i.Opcionais.Values.Any(v => v.Trim().Length > 0)
+        || i.InstrumentacaoOpcional.Count > 0
+        || i.MotorOpcionalId.Trim().Length > 0);
+
+    /// <summary>Escopo → (Opcionais) → Técnica de cada equipamento, um depois do outro.</summary>
+    private List<Passo> CaminhoDosEquipamentos()
+    {
+        var abas = OpcionaisNoCaminho
+            ? new[] { "escopo", "opcionais", "tecnica" }
+            : new[] { "escopo", "tecnica" };
+        return Enumerable.Range(0, _proposta.Itens.Count)
+            .SelectMany(i => abas.Select(a => new Passo(i, a)))
+            .ToList();
+    }
+
+    /// <summary>A ordem de um passo — vale também para a aba Opcionais aberta à mão, fora do caminho.</summary>
+    private static int OrdemDoPasso(Passo p) => p.Item * 3 + p.Aba switch
+    {
+        "escopo" => 0,
+        "opcionais" => 1,
+        _ => 2,
+    };
+
+    private Passo PassoAtual => new(PosicaoValida, _abaItem);
+
+    /// <summary>O próximo passo do rodapé; nulo no fim (a Técnica do último equipamento), que é a vez do Preço.</summary>
+    private Passo? ProximoPasso()
+    {
+        var aqui = OrdemDoPasso(PassoAtual);
+        return CaminhoDosEquipamentos().FirstOrDefault(p => OrdemDoPasso(p) > aqui);
+    }
+
+    /// <summary>O passo anterior; nulo no Escopo do equipamento 1, que volta à etapa Cliente.</summary>
+    private Passo? PassoAnterior()
+    {
+        var aqui = OrdemDoPasso(PassoAtual);
+        return CaminhoDosEquipamentos().LastOrDefault(p => OrdemDoPasso(p) < aqui);
+    }
+
+    /// <summary>"Técnica do equip. 1", "Equip. 2" (o escopo de outro equipamento é ele inteiro).</summary>
+    private string RotuloDoPasso(Passo p)
+    {
+        var numero = p.Item + 1;
+        return p.Aba switch
+        {
+            "escopo" when p.Item != PosicaoValida => $"Equip. {numero}",
+            "escopo" => $"Escopo do equip. {numero}",
+            "opcionais" => $"Opcionais do equip. {numero}",
+            _ => $"Técnica do equip. {numero}",
+        };
+    }
+
+    private void IrAoPasso(Passo p)
+    {
+        if (p.Item != PosicaoValida) AbrirEquipamento(p.Item);
+        TrocarAba(p.Aba);
     }
 
     private async Task Rolar()
@@ -112,6 +197,17 @@ public partial class PropostaPage : IAsyncDisposable
             {
                 _rolarPara = null;
                 await JS.InvokeVoidAsync("appRolarPara", alvo);
+                if (alvo == ConteudoDoEquipamento) await JS.InvokeVoidAsync("appChipAtivo");
+            }
+
+            if (_irAoCampo is { } campo)
+            {
+                _irAoCampo = null;
+                // o campo pode não estar desenhado (o motor com o "Com"
+                // desligado): aí a tela fica no topo da aba, sem erro
+                if (!await JS.InvokeAsync<bool>("appIrAoCampo", campo))
+                    await JS.InvokeVoidAsync("appTopo");
+                if (_etapa == 3) await JS.InvokeVoidAsync("appChipAtivo");
             }
         }
         catch (Exception)
@@ -328,74 +424,214 @@ public partial class PropostaPage : IAsyncDisposable
     /// <summary>
     /// Uma coisa que falta para os documentos saírem completos, e onde ela se
     /// resolve: a etapa e, quando é de um equipamento, qual e em que aba.
+    /// <para><paramref name="Alvo"/> é o id do campo na tela (f-cliente,
+    /// f-modelo, f-custo-0-motor…): a pendência leva até ele, e não só à etapa —
+    /// achar o campo numa aba comprida era metade do trabalho.</para>
+    /// <para><paramref name="SoAviso"/> é o que sai em branco no documento mas
+    /// não impede a proposta de estar pronta (a aplicação, a montagem, a
+    /// referência do cliente). Fica fora da contagem, do selo da etapa e do
+    /// "Nada pendente", num grupo recolhido: uma proposta preliminar pode ficar
+    /// sem pendência, e a equipe não aprende a ignorar o painel.</para>
     /// </summary>
-    private sealed record Pendencia(string Texto, int Etapa, int Item = -1, string Aba = "");
+    private sealed record Pendencia(string Texto, int Etapa, int Item = -1, string Aba = "",
+        string Alvo = "", bool SoAviso = false);
+
+    /// <summary>O campo para onde a pendência leva, depois de desenhar (ver appIrAoCampo no app.js).</summary>
+    private string? _irAoCampo;
 
     private void IrPara(Pendencia p)
     {
         IrParaEtapa(p.Etapa);
-        if (p.Item >= 0) _aberto = p.Item;
+        if (p.Item >= 0)
+        {
+            _aberto = p.Item;
+            _apagandoItem = null;
+        }
         if (p.Aba.Length > 0) _abaItem = p.Aba;
+
+        AntesDeIrAoCampo(p);
+
+        // com um campo, a tela vai até ele em vez de voltar ao topo; se ele não
+        // estiver desenhado (o motor com o "Com" desligado), fica no topo
+        if (p.Alvo.Length == 0) return;
+        _rolarTopo = false;
+        _irAoCampo = p.Alvo;
     }
+
+    /// <summary>O id do campo de custo de uma linha: o índice do equipamento evita id repetido na etapa Preço, que mostra todos.</summary>
+    private static string AlvoDoCusto(int indice, string chave) => $"f-custo-{indice}-{Slug(chave)}";
+
+    /// <summary>"lista:Cone de entrada" → "lista-Cone-de-entrada": o que não é letra nem número vira hífen.</summary>
+    private static string Slug(string texto) =>
+        new(texto.Select(c => char.IsLetterOrDigit(c) ? c : '-').ToArray());
 
     /// <summary>
     /// Tudo o que os documentos deixariam em branco, de todas as etapas. Não
     /// impede de gerar — muita proposta sai para conferência antes de fechar —,
     /// mas fica à vista o tempo todo, em vez de aparecer só ao abrir o Word.
+    /// Os avisos (<see cref="Pendencia.SoAviso"/>) vêm na mesma lista; quem
+    /// conta separa.
     /// </summary>
     private List<Pendencia> Pendencias()
     {
         var lista = new List<Pendencia>();
 
-        void Falta(bool falta, string texto, int etapa)
+        void Falta(bool falta, string texto, int etapa, string alvo)
         {
-            if (falta) lista.Add(new Pendencia(texto, etapa));
+            if (falta) lista.Add(new Pendencia(texto, etapa, Alvo: alvo));
         }
 
-        Falta(_proposta.Cliente.Trim().Length == 0, "Cliente", 2);
-        Falta(_proposta.AosCuidados.Trim().Length == 0, "Aos cuidados de", 2);
-        Falta(_proposta.Cidade.Trim().Length == 0, "Cidade do cliente", 2);
-        Falta(EhBrasil && _proposta.Estado.Trim().Length == 0, "Estado / UF (ICMS do pricing)", 2);
-        Falta(_proposta.CondicaoPagamento.Trim().Length == 0, "Condição de pagamento", 2);
-        Falta(_proposta.Incoterm.Trim().Length == 0, "Entrega (incoterm)", 2);
-        Falta(_proposta.Incoterm.Trim().Length > 0 && !_incotermLivre && PedeDestino
-              && _proposta.IncotermDestino.Trim().Length == 0, RotuloDoDestino, 2);
-        Falta(_proposta.Armado.Trim().Length == 0, "Armado ou desarmado", 2);
-        Falta(_proposta.ContatoNome.Trim().Length == 0, "Contato Howden", 2);
+        void SoAvisa(bool falta, string texto, int etapa, string alvo)
+        {
+            if (falta) lista.Add(new Pendencia(texto, etapa, Alvo: alvo, SoAviso: true));
+        }
 
-        Falta(_proposta.Itens.Count == 0, "Nenhum equipamento no escopo", 3);
+        Falta(_proposta.Cliente.Trim().Length == 0, "Cliente", 2, "f-cliente");
+        Falta(_proposta.AosCuidados.Trim().Length == 0, "Aos cuidados de", 2, "f-aos-cuidados");
+        Falta(_proposta.Cidade.Trim().Length == 0, "Cidade do cliente", 2, "f-cidade");
+        Falta(EhBrasil && _proposta.Estado.Trim().Length == 0, "Estado / UF (ICMS do pricing)", 2, "f-uf");
+        Falta(_proposta.CondicaoPagamento.Trim().Length == 0, "Condição de pagamento", 2, "f-pagamento");
+        Falta(_proposta.Incoterm.Trim().Length == 0, "Entrega (incoterm)", 2, "f-incoterm");
+        Falta(_proposta.Incoterm.Trim().Length > 0 && !_incotermLivre && PedeDestino
+              && _proposta.IncotermDestino.Trim().Length == 0, RotuloDoDestino, 2, "f-destino-incoterm");
+        Falta(_proposta.Armado.Trim().Length == 0, "Armado ou desarmado", 2, "f-armado");
+        Falta(_proposta.ContatoNome.Trim().Length == 0, "Contato Howden", 2, "f-contato");
+
+        // saem no cabeçalho de todas as páginas, mas a proposta preliminar
+        // costuma ir sem elas: avisam, não pendem
+        SoAvisa(_proposta.ReferenciaCliente.Trim().Length == 0, "Referência do cliente", 2, "f-referencia");
+        SoAvisa(_proposta.Projeto.Trim().Length == 0, "Projeto", 2, "f-projeto");
+
+        Falta(_proposta.Itens.Count == 0, "Nenhum equipamento no escopo", 3, "f-equipamento-novo");
         for (var i = 0; i < _proposta.Itens.Count; i++)
         {
-            var item = _proposta.Itens[i];
-            var nome = $"Equip. {i + 1}";
+            var indice = i;
+            var item = _proposta.Itens[indice];
+            var nome = $"Equip. {indice + 1}";
 
-            if (ModeloDe(item) is null)
-            {
-                lista.Add(new Pendencia($"{nome}: escolher o modelo", 3, i, "escopo"));
-                continue;
-            }
+            void DoItem(string texto, string aba, string alvo, bool soAviso = false) =>
+                lista.Add(new Pendencia($"{nome}: {texto}", 3, indice, aba, alvo, soAviso));
 
-            if (item.ComMotor && MotorDe(item) is null)
-                lista.Add(new Pendencia($"{nome}: motor ainda não definido", 3, i, "escopo"));
+            // sem modelo, o resto continua sendo conferido (antes a conta parava
+            // aqui, e o painel dizia "2 linhas sem custo" enquanto a etapa Preço
+            // dizia 6). Só o custo e o motor esperam o modelo: é pelo diâmetro
+            // que as listas se precificam, e sem série o catálogo de motores
+            // aceita as duas linhas
+            var temModelo = ModeloDe(item) is not null;
+
+            if (!temModelo)
+                DoItem("escolher o modelo", "escopo", "f-modelo");
+            else if (item.ComMotor && MotorDe(item) is null)
+                DoItem("motor ainda não definido", "escopo", "f-motor");
 
             if (item.ComPartidor && item.Partidor.Trim().Length == 0)
-                lista.Add(new Pendencia($"{nome}: escolher o partidor", 3, i, "escopo"));
+                DoItem("escolher o partidor", "escopo", "f-partidor");
 
-            var semCusto = LinhasDePreco(item).Count(l => Efetivo(item, l.Chave, l.Puxado) is null);
-            if (semCusto > 0)
-                lista.Add(new Pendencia($"{nome}: {Plural(semCusto, "linha sem custo", "linhas sem custo")}", 3, i, "escopo"));
+            if (temModelo)
+            {
+                // a pendência leva à PRIMEIRA linha sem custo, na ordem da tela
+                var semCusto = LinhasDePreco(item).Where(l => Efetivo(item, l.Chave, l.Puxado) is null).ToList();
+                if (semCusto.Count > 0)
+                    DoItem(Plural(semCusto.Count, "linha sem custo", "linhas sem custo"), "escopo",
+                        AlvoDoCusto(indice, semCusto[0].Chave));
+            }
+
+            // saem em branco na técnica (Aplicación e Tipo de montaje), mas não
+            // impedem a proposta de sair
+            if (item.Aplicacao.Trim().Length == 0)
+                DoItem("aplicação", "escopo", "f-aplicacao", soAviso: true);
+            if (item.Arranjo.Trim().Length == 0 || item.Montagem.Trim().Length == 0)
+                DoItem("arranjo/montagem", "escopo", "f-montagem", soAviso: true);
+
+            PendenciasDoEscopo(lista, item, indice);
 
             if (item.Tecnicos.Count == 0)
-                lista.Add(new Pendencia($"{nome}: dados da seleção", 3, i, "tecnica"));
+                DoItem("dados da seleção", "tecnica", "f-selecao");
 
             if (item.Curvas.Count == 0)
-                lista.Add(new Pendencia($"{nome}: curva de performance", 3, i, "tecnica"));
+                DoItem("curva de performance", "tecnica", "f-curva");
+
+            PendenciasDaTecnica(lista, item, indice);
         }
 
-        Falta(Cambio.FaltaTaxa(_proposta), "Taxa de câmbio", 4);
+        Falta(Cambio.FaltaTaxa(_proposta), "Taxa de câmbio", 4, "f-taxa");
 
         return lista;
     }
+
+    /// <summary>
+    /// As pendências do painel, por lugar: as da proposta (Cliente e
+    /// condições, Preço) e as de cada equipamento ("Equip. 2 · 3"). Na ordem
+    /// em que aparecem na lista, que é a ordem das etapas.
+    /// </summary>
+    private static List<(string Nome, int Item, List<Pendencia> Itens)> PorLugar(IEnumerable<Pendencia> pendencias) =>
+        pendencias
+            .GroupBy(p => p.Item >= 0 ? $"Equip. {p.Item + 1}" : NomeDaEtapa(p.Etapa))
+            .Select(g => (g.Key, g.First().Item, g.ToList()))
+            .ToList();
+
+    /// <summary>O texto dentro do grupo do equipamento, sem repetir o "Equip. 2: " do título.</summary>
+    private static string SemOEquipamento(Pendencia p)
+    {
+        var prefixo = $"Equip. {p.Item + 1}: ";
+        return p.Item >= 0 && p.Texto.StartsWith(prefixo, StringComparison.Ordinal) ? p.Texto[prefixo.Length..] : p.Texto;
+    }
+
+    // ---------- ganchos da fase B ----------
+    //
+    // Cada pista da fase B escreve num arquivo próprio da classe parcial (ver
+    // mapa-fase-b.md) e liga o que precisa por estes ganchos, sem mexer nas
+    // linhas que chamam: assim duas pistas não editam o mesmo trecho. Sem
+    // implementação, o compilador apaga a chamada.
+
+    /// <summary>Pendências e avisos da aba Técnica de um equipamento. Dona: a pista da Técnica (item 09: diâmetro, altitude, ruído).</summary>
+    partial void PendenciasDaTecnica(List<Pendencia> lista, ItemProposta item, int indice);
+
+    /// <summary>Pendências e avisos da aba Escopo de um equipamento. Dona: a pista do Escopo (item 13: "k listas a decidir").</summary>
+    partial void PendenciasDoEscopo(List<Pendencia> lista, ItemProposta item, int indice);
+
+    /// <summary>Antes de ir ao campo de uma pendência. Dona: a pista do Cliente (item 12: a de condições abre a edição).</summary>
+    partial void AntesDeIrAoCampo(Pendencia p);
+
+    // Um gancho tem UMA pista dona (só uma implementação compila); quando duas
+    // áreas precisam do mesmo momento, cada uma tem o seu gancho, chamados um
+    // depois do outro no mesmo lugar.
+
+    /// <summary>
+    /// O primeiro modelo de um equipamento acabou de ser escolhido, logo depois
+    /// do escopo padrão da série (TrocarModelo). Dona: a pista do Escopo — o
+    /// escopo inicial do item 15 (que também decide o que fazer com o
+    /// AplicarPadraoSeHouver, chamado logo antes).
+    /// </summary>
+    partial void DepoisDoPrimeiroModelo(ItemProposta item);
+
+    /// <summary>Mesmo momento, para a pista da Técnica: o diâmetro e a altitude lembrados (item 09).</summary>
+    partial void DadosTecnicosDoPrimeiroModelo(ItemProposta item);
+
+    /// <summary>
+    /// Fim de TrocarModelo, a cada troca (o primeiro modelo inclusive, depois
+    /// dos dois ganchos acima). Dona: a pista do Motor — o motor fecha pelo
+    /// modelo novo quando já está ligado (item 16).
+    /// </summary>
+    partial void DepoisDeTrocarModelo(ItemProposta item, bool primeiroModelo);
+
+    /// <summary>A seleção acabou de entrar no equipamento (fim de AplicarSelecao). Dona: a pista do Motor (item 16).</summary>
+    partial void DepoisDaSelecao(ItemProposta item);
+
+    /// <summary>
+    /// A dica só de leitura sob o campo de custo (Preco): "último à mão: CLP
+    /// 1.340.000 · PRP-2026-104 · 12/09/2026". Nula, nada aparece. Dona: a pista
+    /// do item 22.
+    /// </summary>
+    partial void DicaDoCusto(ItemProposta item, string chave, decimal? puxado, ref string? dica);
+
+    /// <summary>
+    /// Fecha o motor pela seleção e pelo histórico do mesmo cliente, quando
+    /// dá (item 16). Só declarado aqui: a pista do Motor implementa e chama (do
+    /// "Com" do motor e dos dois ganchos acima); outra pista pode chamar sem
+    /// esperar — até a junção, a chamada não faz nada.
+    /// </summary>
+    partial void FecharMotorSeDer(ItemProposta item);
 
     private enum Selo { Neutro, Pendente, Ok }
 
@@ -830,6 +1066,12 @@ public partial class PropostaPage : IAsyncDisposable
             item.CurvaNome = "";
             item.CurvaImagem = "";
             item.Coluna = "";
+            // o ruído é do ponto de operação, como a seleção; a altitude é da
+            // mina, e o projeto da cópia é outro. O diâmetro, que é do modelo, fica
+            item.RuidoDb = "";
+            item.AltitudeMsnm = "";
+            // RespondidasNaFolha e FiltroAuto vão junto, como o escopo e o
+            // filtro do motor de que eles falam
         }
 
         _proposta = copia;
@@ -1307,13 +1549,30 @@ public partial class PropostaPage : IAsyncDisposable
     /// equipamento e cada curva também — pelo número no nome do arquivo quando
     /// ele diz ("eq2", "item 3"), senão para o primeiro que ainda não tem.
     /// Sem equipamento livre, nasce um.
+    /// <para>Com <paramref name="destinoFixo"/> (a área de soltar da aba
+    /// Técnica, item 19), tudo vai para aquele equipamento: nenhum nasce, o
+    /// aberto continua aberto, a seleção nova substitui a anterior e a folha de
+    /// dados é ignorada — ela cria e reordena equipamentos, e entra pela etapa
+    /// Começar.</para>
     /// </summary>
-    private async Task ImportarArquivos(InputFileChangeEventArgs e)
+    private async Task ImportarArquivos(InputFileChangeEventArgs e, int? destinoFixo = null)
     {
+        if (destinoFixo is { } fixo && (fixo < 0 || fixo >= _proposta.Itens.Count))
+        {
+            Aviso("Esse equipamento não está mais na proposta.", erro: true);
+            return;
+        }
+
         _lendo = true;
         _importados = new();
-        _avisos = new();
-        _daPlanilha = new();
+        var folhaIgnorada = false;
+
+        // o que veio da folha só se apaga quando uma folha nova pode chegar
+        if (destinoFixo is null)
+        {
+            _avisos = new();
+            _daPlanilha = new();
+        }
 
         try
         {
@@ -1331,6 +1590,13 @@ public partial class PropostaPage : IAsyncDisposable
 
             foreach (var (nome, _, bytes) in lidos.Where(l => l.Ext is ".xlsx" or ".xlsm"))
             {
+                if (destinoFixo is not null)
+                {
+                    folhaIgnorada = true;
+                    _importados.Add((nome, "ignorado: a folha de dados entra pela etapa Começar"));
+                    continue;
+                }
+
                 var equipamentos = LerFolha(bytes);
                 _origem = "importada";
                 _importados.Add((nome, equipamentos > 0
@@ -1347,6 +1613,7 @@ public partial class PropostaPage : IAsyncDisposable
             }
 
             var curvas = lidos.Where(l => ExtensoesDeCurva.Contains(l.Ext)).ToList();
+            var selecoesNoFixo = 0;
 
             foreach (var (nome, ext, bytes) in lidos.Where(l => l.Ext is ".docx" or ".txt" or ".doc"))
             {
@@ -1369,15 +1636,30 @@ public partial class PropostaPage : IAsyncDisposable
                     continue;
                 }
 
-                var indice = Destino(nome, i => i.Tecnicos.Count == 0 && i.ArquivoDaSelecao.Length == 0);
+                // num equipamento só, a seleção é uma: a segunda apagaria a primeira
+                if (destinoFixo is not null && selecoesNoFixo++ > 0)
+                {
+                    _importados.Add((nome, "ignorado: o equipamento já recebeu uma seleção neste envio"));
+                    continue;
+                }
+
+                var indice = Destino(nome, i => i.Tecnicos.Count == 0 && i.ArquivoDaSelecao.Length == 0, destinoFixo);
+
+                // a seleção nova substitui a anterior inteira: AplicarSelecao só
+                // sobrescreve chaves, e um dado que só existia no arquivo antigo
+                // ficaria lá, parecendo ter vindo do novo
+                var substituiu = destinoFixo is not null && _proposta.Itens[indice].Tecnicos.Count > 0;
+                if (substituiu) TirarSelecao(indice);
+
                 var curvasDoWord = await AplicarSelecao(leitura, ext, bytes, nome, indice);
                 _importados.Add((nome, $"seleção do equipamento {indice + 1}"
-                    + (curvasDoWord > 0 ? $", com {Plural(curvasDoWord, "curva", "curvas")}" : "")));
+                    + (curvasDoWord > 0 ? $", com {Plural(curvasDoWord, "curva", "curvas")}" : "")
+                    + (substituiu ? " (no lugar da anterior)" : "")));
             }
 
             foreach (var (nome, _, bytes) in curvas.OrderBy(c => c.Nome, StringComparer.OrdinalIgnoreCase))
             {
-                var indice = Destino(nome, i => i.Curvas.Count == 0);
+                var indice = Destino(nome, i => i.Curvas.Count == 0, destinoFixo);
                 await AnexarCurva(bytes, nome, indice);
                 _importados.Add((nome, $"curva do equipamento {indice + 1}"));
             }
@@ -1390,6 +1672,22 @@ public partial class PropostaPage : IAsyncDisposable
             }
 
             if (!Textos.Igual(clienteAntes, _proposta.Cliente)) LembrarCliente();
+
+            if (destinoFixo is { } aberto)
+            {
+                // na aba do equipamento não há a lista "arquivo → destino": o aviso diz
+                var ignorados = _importados.Count(x => x.Destino.StartsWith("ignorado", StringComparison.Ordinal));
+                var entraram = _importados.Count - ignorados;
+                var texto = entraram > 0
+                    ? $"{Plural(entraram, "arquivo entrou", "arquivos entraram")} no equipamento {aberto + 1}."
+                    : $"Nenhum arquivo entrou no equipamento {aberto + 1}.";
+                if (folhaIgnorada) texto += " A folha de dados entra pela etapa Começar.";
+                else if (ignorados > 0) texto += $" {Plural(ignorados, "arquivo ignorado", "arquivos ignorados")}.";
+
+                // algo ficou de fora: o aviso espera ser lido
+                Aviso(texto, fica: ignorados > 0);
+                return;
+            }
 
             _aberto = 0;
             // o que foi para onde está logo abaixo do botão: o aviso só conta
@@ -1408,10 +1706,13 @@ public partial class PropostaPage : IAsyncDisposable
     /// <summary>
     /// Para qual equipamento vai um arquivo: o que o nome aponta ("eq2",
     /// "equipamento 3", "item 1", "fan 2"), quando ele ainda está livre; senão
-    /// o primeiro livre; senão um equipamento novo.
+    /// o primeiro livre; senão um equipamento novo. Com
+    /// <paramref name="destinoFixo"/>, é sempre ele — e nunca nasce equipamento.
     /// </summary>
-    private int Destino(string nome, Func<ItemProposta, bool> livre)
+    private int Destino(string nome, Func<ItemProposta, bool> livre, int? destinoFixo = null)
     {
+        if (destinoFixo is { } fixo) return fixo;
+
         var aponta = Regex.Match(Path.GetFileNameWithoutExtension(nome),
             @"(?:eq|equip\w*|item|ventilador|vent|fan)\s*[-_ ]?\s*(\d{1,2})\b", RegexOptions.IgnoreCase);
 
@@ -1431,6 +1732,19 @@ public partial class PropostaPage : IAsyncDisposable
     // =====================================================================
     // equipamentos: filtro do modelo, duplicar, escopo padrão, motor sugerido
     // =====================================================================
+
+    /// <summary>
+    /// O modelo curto, para o chip da faixa do equipamento: "Joy 27 1/7" (série
+    /// e diâmetro). O rótulo inteiro fica no title do chip.
+    /// </summary>
+    private string ModeloCurto(ItemProposta item) => ModeloDe(item) is { } m
+        ? $"{m.Serie} {m.Diametro}".Trim()
+        : "sem modelo";
+
+    /// <summary>O title do chip: o rótulo inteiro do modelo e, quando veio da folha, a coluna.</summary>
+    private string TituloDoChip(ItemProposta item) =>
+        (ModeloDe(item)?.Rotulo ?? "sem modelo escolhido")
+        + (item.Coluna.Length > 0 ? $" · coluna {item.Coluna} da folha de dados" : "");
 
     /// <summary>O que foi digitado no filtro do modelo (encurta a lista de ~100 modelos).</summary>
     private string _filtroModelo = "";
@@ -1466,12 +1780,17 @@ public partial class PropostaPage : IAsyncDisposable
         copia.Curva = "";
         copia.CurvaNome = "";
         copia.CurvaImagem = "";
+        // o ruído vem do ponto de operação, que é de cada ventilador; a
+        // altitude (a mesma mina), o diâmetro (o mesmo modelo), as listas que a
+        // folha respondeu e os campos automáticos do motor ficam com o escopo
+        copia.RuidoDb = "";
 
         _proposta.Itens.Insert(posicao + 1, copia);
         _faltouNaSelecao.Clear();
         _aberto = posicao + 1;
         _abaItem = "escopo";
         _apagandoItem = null;
+        _rolarPara = ConteudoDoEquipamento;
 
         Aviso($"Equipamento {posicao + 1} duplicado como equipamento {posicao + 2}: confira o modelo e a " +
               "quantidade, e suba a seleção e a curva dele.", fica: true);

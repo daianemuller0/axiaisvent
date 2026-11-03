@@ -1,0 +1,17 @@
+@*
+    "Mudou desde a rev 00", na etapa Documentos (item 21 do plano): compara a
+    proposta aberta com a revisão anterior do mesmo número, entre as gravadas —
+    preço total e, por equipamento, modelo, quantidade, listas com escolha
+    diferente e motor.
+
+    Por enquanto não desenha nada: o lugar dele na etapa 5 (entre o Gerar tudo
+    e a lista dos equipamentos) já está reservado, e o item 21 só preenche
+    este arquivo, sem mexer na PropostaPage. Sem diferença, também não desenha.
+*@
+@code {
+    /// <summary>A proposta que está na tela.</summary>
+    [Parameter] public Proposta Atual { get; set; } = default!;
+
+    /// <summary>As propostas gravadas (a revisão anterior sai daqui, pelo mesmo número).</summary>
+    [Parameter] public List<Proposta> Gravadas { get; set; } = new();
+}

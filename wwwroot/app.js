@@ -34,11 +34,128 @@ window.appDownload = (fileName, mime, base64) => {
     iniciar();
 })();
 
-// Rola a página até um elemento (atalhos no alto de telas compridas).
+// A altura das faixas fixas no alto da proposta (o topo do app, a barra de
+// etapas e, na etapa Equipamentos, a faixa do equipamento), em px: a soma do
+// --faixas-fixas do app.css, que já desconta a faixa quando ela não está na
+// tela. O valor da variável é um calc() de somas em px, e é assim que ele é lido.
+window.appFaixasFixas = () => {
+    try {
+        const proposta = document.querySelector('.proposta');
+        const valor = proposta ? getComputedStyle(proposta).getPropertyValue('--faixas-fixas') : '';
+        const somas = (valor.match(/-?\d+(\.\d+)?(?=px)/g) || []).map(Number);
+        if (somas.length) return somas.reduce((a, b) => a + b, 0);
+    } catch (e) { }
+    return 140;
+};
+
+// Rola até um elemento, sem pôr foco em nada. Só rola quando o começo dele
+// está fora da vista: acima das faixas fixas (trocou de equipamento com a tela
+// rolada lá embaixo) ou na parte de baixo da tela (o custo previsto, no fim da
+// etapa Documentos, que abre um formulário logo abaixo). Com o começo à vista
+// no alto, nada se mexe — trocar de aba no alto da tela não dá um pulo.
 window.appRolarPara = (id) => {
     const el = document.getElementById(id);
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (!el) return;
+    const topo = el.getBoundingClientRect().top;
+    if (topo >= window.appFaixasFixas() && topo < window.innerHeight * 0.6) return;
+    // o scroll-margin-top do app.css deixa o começo logo abaixo das faixas
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 };
+
+// Com muitos equipamentos os chips da faixa rolam na horizontal: o do
+// equipamento aberto não pode ficar escondido fora da faixa.
+window.appChipAtivo = () => {
+    const area = document.querySelector('.equip-chips');
+    const chip = area ? area.querySelector('.equip-chip.ativo') : null;
+    if (!chip) return;
+    const a = area.getBoundingClientRect(), c = chip.getBoundingClientRect();
+    // a folga de 36 px passa da borda esmaecida (32 px, app.css)
+    if (c.left < a.left + 32) area.scrollLeft -= a.left - c.left + 36;
+    else if (c.right > a.right - 32) area.scrollLeft += c.right - a.right + 36;
+};
+
+// Os chips da faixa do equipamento, quando não cabem: as classes mais-esq e
+// mais-dir esmaecem a borda do lado em que há mais chips (app.css), e a roda
+// do mouse rola a faixa na horizontal — sem isso, só o Shift+roda chegava lá.
+// A faixa nasce e some com a etapa 3: o MutationObserver acha a nova.
+(function () {
+    let pedido = 0;
+    const marcar = () => {
+        pedido = 0;
+        const area = document.querySelector('.equip-chips');
+        if (!area) return;
+        if (!area._ligada) {
+            area._ligada = true;
+            area.addEventListener('scroll', marcar, { passive: true });
+            area.addEventListener('wheel', (e) => {
+                if (area.scrollWidth <= area.clientWidth || Math.abs(e.deltaX) >= Math.abs(e.deltaY)) return;
+                e.preventDefault();
+                area.scrollLeft += e.deltaY;
+            }, { passive: false });
+        }
+        const resto = area.scrollWidth - area.clientWidth - area.scrollLeft;
+        area.classList.toggle('mais-dir', resto > 1);
+        area.classList.toggle('mais-esq', area.scrollLeft > 1);
+    };
+    const agendar = () => { if (!pedido) pedido = requestAnimationFrame(marcar); };
+    new MutationObserver(agendar).observe(document.documentElement, { childList: true, subtree: true });
+    window.addEventListener('resize', agendar);
+})();
+
+// Leva até o campo de uma pendência: o campo no meio da tela, o foco no
+// primeiro input, select ou textarea dele (sem rolar de novo) e um anel âmbar
+// por 1,8 s, para o olho achar. Devolve falso quando o campo não está
+// desenhado (ex.: o motor com o "Com" desligado) — aí a tela fica no topo.
+window.appIrAoCampo = (id) => {
+    const el = document.getElementById(id);
+    if (!el) return false;
+    el.scrollIntoView({ block: 'center' });
+    const campo = el.matches('input, select, textarea') ? el : el.querySelector('input, select, textarea');
+    if (campo && typeof campo.focus === 'function') campo.focus({ preventScroll: true });
+    // o mesmo campo pedido duas vezes seguidas: a animação recomeça
+    el.classList.remove('realce');
+    void el.offsetWidth;
+    el.classList.add('realce');
+    clearTimeout(el._realce);
+    el._realce = setTimeout(() => el.classList.remove('realce'), 1800);
+    return true;
+};
+
+// Arquivo solto fora de uma área de soltar (.dropzone) não faz nada. Sem isto,
+// no WebView2 o navegador abre o arquivo no lugar da tela, e o circuito do
+// Blazor cai no meio da proposta. Dentro da área, o InputFile que fica por
+// cima dela recebe o arquivo do jeito normal (o mesmo OnChange do clique).
+(function () {
+    const naArea = (e) => e.target instanceof Element && e.target.closest('.dropzone');
+    const segurar = (e) => {
+        if (naArea(e)) return;
+        e.preventDefault();
+        if (e.dataTransfer) e.dataTransfer.dropEffect = 'none';
+    };
+    document.addEventListener('dragover', segurar);
+    document.addEventListener('drop', segurar);
+
+    // o realce da área enquanto o arquivo passa por cima: a contagem de
+    // entradas e saídas segue os filhos dela (o InputFile, o ícone, o texto)
+    const limpar = () => document.querySelectorAll('.dropzone.arrastando').forEach((z) => {
+        z.classList.remove('arrastando');
+        z._entradas = 0;
+    });
+    document.addEventListener('dragenter', (e) => {
+        const zona = naArea(e);
+        if (!zona) return;
+        zona._entradas = (zona._entradas || 0) + 1;
+        zona.classList.add('arrastando');
+    });
+    document.addEventListener('dragleave', (e) => {
+        const zona = naArea(e);
+        if (!zona) return;
+        zona._entradas = Math.max(0, (zona._entradas || 1) - 1);
+        if (zona._entradas === 0) zona.classList.remove('arrastando');
+    });
+    document.addEventListener('drop', limpar, true);
+    document.addEventListener('dragend', limpar, true);
+})();
 
 // Rascunho da proposta no navegador: o que a pessoa preenche é guardado aqui a
 // cada alteração, para sobreviver a recarregar a página (o estado do servidor

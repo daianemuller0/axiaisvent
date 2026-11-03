@@ -6,6 +6,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
     <link rel="stylesheet" href="app.css?v=@Versao" />
+    @* os estilos da proposta, um arquivo por área: cada um fica com a sua parte
+       da tela, e mexer numa não esbarra na outra. Vêm depois do app.css, que é
+       a base comum (cores, botões, aviso). No app desktop o servidor acha estes
+       arquivos em _content/HowdenAxiais.Poc, como o app.css (ver BackendHost) *@
+    <link rel="stylesheet" href="proposta-tecnica.css?v=@Versao" />
+    <link rel="stylesheet" href="proposta-preco.css?v=@Versao" />
+    <link rel="stylesheet" href="proposta-cliente.css?v=@Versao" />
+    <link rel="stylesheet" href="proposta-escopo.css?v=@Versao" />
+    <link rel="stylesheet" href="proposta-motor.css?v=@Versao" />
+    <link rel="stylesheet" href="proposta-extras.css?v=@Versao" />
     <title>Howden Ventiladores Axiais</title>
     <HeadOutlet />
 </head>
@@ -17,6 +27,7 @@
     <Routes />
     <script src="_framework/blazor.web.js" autostart="false"></script>
     <script src="app.js?v=@Versao"></script>
+    <script src="proposta-extras.js?v=@Versao"></script>
 </body>
 
 </html>

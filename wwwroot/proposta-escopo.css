@@ -1,0 +1,5 @@
+/* Estilos da proposta: aba Escopo do equipamento (itens 13, 14, 15, 17 e 18: linha em grade, modelo pela seleção, escopo que nasce pronto, aplicação lembrada, opcionais).
+   Um arquivo por área da fase B, carregado depois do app.css (Components/App.razor):
+   cada pista escreve só no seu, e o app.css não vira ponto de conflito.
+   Use os tokens do app.css (--primary, --warn-*, --info-*, --border...) e escreva
+   as regras sob .proposta, para não mexer nas outras telas. */

@@ -15,8 +15,11 @@
 @inject Anexos Anexos
 @{
     // calculadas uma vez por desenho: a barra de etapas, o painel do lado e a
-    // etapa Documentos olham as mesmas listas
-    var pendencias = Pendencias();
+    // etapa Documentos olham as mesmas listas. Os avisos (SoAviso) ficam fora
+    // de toda contagem: só o grupo recolhido do painel os mostra
+    var todasAsPendencias = Pendencias();
+    var pendencias = todasAsPendencias.Where(p => !p.SoAviso).ToList();
+    var avisosDoPainel = todasAsPendencias.Where(p => p.SoAviso).ToList();
     var pricingAtual = Pricing();
 }
 <div class="proposta @(_compacto ? "compacto" : "")">
@@ -187,7 +190,7 @@
         </div>
         <div class="comecar-box">
             <strong>Importar arquivos</strong>
-            <InputFile OnChange="ImportarArquivos" multiple
+            <InputFile OnChange="@(e => ImportarArquivos(e))" multiple
                        accept=".xlsx,.xlsm,.txt,.docx,.pdf,.png,.jpg,.jpeg" class="cell" />
             <span class="subtitle" style="margin:0">
                 Folha de dados (.xlsx), seleções (.txt do Joy, .docx do VAX) e curvas (PDF, imagem
@@ -249,7 +252,7 @@
     <h2 style="margin:0 0 12px; font-size:15px">Cliente</h2>
     <div class="form3">
         <label>@Campo("Cliente", "D6 · pricing E3")
-            <input class="cell" placeholder="Empresa cliente" list="clientes-gravados"
+            <input id="f-cliente" class="cell" placeholder="Empresa cliente" list="clientes-gravados"
                    value="@_proposta.Cliente"
                    @onchange="e => MudarCliente(e.Value?.ToString() ?? string.Empty)" />
             <datalist id="clientes-gravados">
@@ -259,7 +262,7 @@
                 }
             </datalist></label>
         <label>@Campo("Aos cuidados de", "D13")
-            <input class="cell" placeholder="Nome do contato" @bind="_proposta.AosCuidados" /></label>
+            <input id="f-aos-cuidados" class="cell" placeholder="Nome do contato" @bind="_proposta.AosCuidados" /></label>
         <label>@Campo("E-mail", "D14")
             <input class="cell" placeholder="contato@@empresa.com" @bind="_proposta.Email" /></label>
         <label>@Campo("Telefone", "D15")
@@ -267,7 +270,7 @@
         @* a cidade e a referência do cliente existem por causa da proposta:
            saem no cabeçalho de todas as páginas, como "Ciudad" e "Su referencia" *@
         <label>@Campo("Cidade")
-            <input class="cell" placeholder="Cidade do cliente" @bind="_proposta.Cidade" /></label>
+            <input id="f-cidade" class="cell" placeholder="Cidade do cliente" @bind="_proposta.Cidade" /></label>
         <label>@Campo("País")
             <select class="cell" @bind="_proposta.Pais">
                 @foreach (var x in ListasDaProposta.Paises)
@@ -288,7 +291,7 @@
         @if (EhBrasil)
         {
             <label>@Campo("Estado / UF", "pricing J6")
-                <select class="cell" @bind="_proposta.Estado">
+                <select id="f-uf" class="cell" @bind="_proposta.Estado">
                     <option value="">— escolher —</option>
                     @foreach (var uf in ListasDaProposta.Estados.Where(u => u.Length == 2))
                     {
@@ -298,9 +301,9 @@
             </label>
         }
         <label>@Campo("Referência do cliente")
-            <input class="cell" placeholder="O número que o cliente deu" @bind="_proposta.ReferenciaCliente" /></label>
+            <input id="f-referencia" class="cell" placeholder="O número que o cliente deu" @bind="_proposta.ReferenciaCliente" /></label>
         <label>@Campo("Projeto")
-            <input class="cell" @bind="_proposta.Projeto" /></label>
+            <input id="f-projeto" class="cell" @bind="_proposta.Projeto" /></label>
     </div>
     @if (_sugestaoCliente is { } sugestao)
     {
@@ -490,7 +493,7 @@
 
         <div class="form3">
             <label>@Campo("Condição de pagamento")
-                <select class="cell" value="@(_pagamentoLivre ? OutroPagamento : _proposta.CondicaoPagamento)"
+                <select id="f-pagamento" class="cell" value="@(_pagamentoLivre ? OutroPagamento : _proposta.CondicaoPagamento)"
                         @onchange="e => EscolherPagamento(e.Value?.ToString() ?? string.Empty)">
                     <option value="">— escolher —</option>
                     @foreach (var c in _condicoes)
@@ -503,7 +506,7 @@
                 </select></label>
 
             <label>@Campo("Entrega (Incoterm 2020)")
-                <select class="cell" value="@(_incotermLivre ? OutroIncoterm : _proposta.Incoterm)"
+                <select id="f-incoterm" class="cell" value="@(_incotermLivre ? OutroIncoterm : _proposta.Incoterm)"
                         @onchange="e => EscolherIncoterm(e.Value?.ToString() ?? string.Empty)">
                     <option value="">— escolher —</option>
                     @foreach (var i in ListasDaProposta.Incoterms)
@@ -516,7 +519,7 @@
                 </select></label>
 
             <label>@Campo("Entrega do equipamento")
-                <select class="cell" @bind="_proposta.Armado">
+                <select id="f-armado" class="cell" @bind="_proposta.Armado">
                     <option value="">— escolher —</option>
                     @foreach (var (codigo, _) in ListasDaProposta.Armados)
                     {
@@ -543,7 +546,7 @@
                (PAÍS DE DESTINO)" para alguém preencher. O rótulo diz o que
                falta — só o lugar, porque o "Puerto de" já está na frase *@
             <label style="display:block; margin-top:12px">@Campo(RotuloDoDestino)
-                <input class="cell" style="width:100%"
+                <input id="f-destino-incoterm" class="cell" style="width:100%"
                        placeholder="@ExemploDoDestino" @bind="_proposta.IncotermDestino" /></label>
         }
 
@@ -610,7 +613,7 @@
         do representante — nenhum dos dois precisa ser escolhido aqui.
     </p>
 
-    @Contato("Contato 1", _proposta.ContatoNome, n => EscolherContato(n, 1))
+    @Contato("Contato 1", _proposta.ContatoNome, n => EscolherContato(n, 1), "f-contato")
     <div class="form3">
         <label>@Campo("Nome")<input class="cell" @bind="_proposta.ContatoNome" /></label>
         <label>@Campo("Cargo")<input class="cell" @bind="_proposta.ContatoCargo" /></label>
@@ -643,55 +646,47 @@
 }
 @if (_etapa == 3)
 {
-<div class="panel" style="margin-bottom:14px">
-    <div class="toolbar" style="flex-wrap:wrap; margin-bottom:12px">
-        <span style="flex:1"></span>
-        <strong>Moeda do custo</strong>
-        <div class="seg" role="group" aria-label="Moeda do custo">
-            @foreach (var m in Moedas.Todas)
-            {
-                var moeda = m;
-                <button class="@(_proposta.Moeda == moeda ? "on" : "")" aria-pressed="@(_proposta.Moeda == moeda ? "true" : "false")"
-                        @onclick="() => _proposta.MoedaCodigo = moeda.Codigo()">@moeda.Rotulo()</button>
-            }
-        </div>
-        <span class="subtitle ajuda">manda em todos os custos</span>
-    </div>
-    <div class="tabs" style="margin-bottom:0">
+@* a faixa do equipamento fica presa logo abaixo das etapas: trocar de
+   equipamento ou de aba não pede mais rolar até o alto do painel. O ponto
+   âmbar diz que o equipamento tem pendência (antes eram dois números, "2×" e
+   "2", que se confundiam) *@
+<div class="equip-barra" role="navigation" aria-label="Equipamentos da proposta">
+    <div class="equip-chips">
         @for (var i = 0; i < _proposta.Itens.Count; i++)
         {
             var indice = i;
             var item = _proposta.Itens[indice];
             var faltamNoItem = pendencias.Count(p => p.Item == indice);
-            <button class="tab @(PosicaoValida == indice ? "active" : "")" @onclick="() => AbrirEquipamento(indice)">
-                Equipamento @(indice + 1)
-                <span class="tab-badge quantos">@item.Quantos×</span>
+            var ativo = PosicaoValida == indice;
+            <button class="equip-chip @(ativo ? "ativo" : "")" aria-current="@(ativo ? "true" : null)"
+                    title="@TituloDoChip(item)"
+                    @onclick="() => AbrirEquipamento(indice)">
+                <span class="equip-chip-num">Equip. @(indice + 1)</span>
+                <span class="equip-chip-modelo">· @ModeloCurto(item)</span>
+                <span class="equip-chip-qtd">· @item.Quantos un.</span>
                 @if (faltamNoItem > 0)
                 {
-                    <span class="tab-badge warn" title="pendências deste equipamento">@faltamNoItem</span>
-                }
-                @if (item.Coluna.Length > 0)
-                {
-                    <span class="subtitle ajuda" style="margin-left:6px">col. @item.Coluna</span>
+                    var quantas = Plural(faltamNoItem, "pendência", "pendências");
+                    <span class="ponto-pendente" title="@quantas" role="img" aria-label="@quantas"></span>
                 }
             </button>
         }
-        <button class="tab" @onclick="Acrescentar">+ equipamento</button>
     </div>
+    <button id="f-equipamento-novo" class="equip-chip novo" @onclick="Acrescentar">+ equipamento</button>
     @if (_proposta.Itens.Count > 0)
     {
         var aberto = _proposta.Itens[PosicaoValida];
         var opcionaisDoAberto = _custo.Opcionais(aberto, _proposta.Moeda).Count;
-        <div class="sub-abas">
-            <button class="sub-aba @(_abaItem == "escopo" ? "ativa" : "")"
-                    @onclick='() => _abaItem = "escopo"'>Escopo e parte elétrica</button>
-            <button class="sub-aba @(_abaItem == "opcionais" ? "ativa" : "")"
-                    @onclick='() => _abaItem = "opcionais"'>
+        <div class="equip-abas" role="group" aria-label="Abas do equipamento @(PosicaoValida + 1)">
+            <button class="sub-aba @(_abaItem == "escopo" ? "ativa" : "")" aria-current="@(_abaItem == "escopo" ? "true" : null)"
+                    @onclick='() => TrocarAba("escopo")'>Escopo</button>
+            <button class="sub-aba @(_abaItem == "opcionais" ? "ativa" : "")" aria-current="@(_abaItem == "opcionais" ? "true" : null)"
+                    @onclick='() => TrocarAba("opcionais")'>
                 Opcionais@(opcionaisDoAberto > 0 ? $" ({opcionaisDoAberto})" : "")
             </button>
-            <button class="sub-aba @(_abaItem == "tecnica" ? "ativa" : "")"
-                    @onclick='() => _abaItem = "tecnica"'>
-                Técnica: seleção e curva
+            <button class="sub-aba @(_abaItem == "tecnica" ? "ativa" : "")" aria-current="@(_abaItem == "tecnica" ? "true" : null)"
+                    @onclick='() => TrocarAba("tecnica")'>
+                Técnica
                 @if (aberto.Tecnicos.Count > 0 && aberto.Curvas.Count > 0)
                 {
                     <span class="etapa-ok" title="seleção e curva"><Icone Nome="ok" /></span>
@@ -701,9 +696,27 @@
     }
 </div>
 
+@* o começo do conteúdo do equipamento: é para cá que a tela volta ao trocar
+   de equipamento ou de aba com a tela rolada (ver AbrirEquipamento) *@
+<div id="equip-conteudo">
     @if (_abaItem == "escopo")
     {
 <div class="panel" style="margin-bottom:14px">
+
+    @* a moeda manda em todos os custos da proposta, mas é aqui, no escopo,
+       que os custos aparecem *@
+    <div class="toolbar moeda-do-custo">
+        <strong>Moeda do custo</strong>
+        <div class="seg" role="group" aria-label="Moeda do custo">
+            @foreach (var m in Moedas.Todas)
+            {
+                var moeda = m;
+                <button class="@(_proposta.Moeda == moeda ? "on" : "")" aria-pressed="@(_proposta.Moeda == moeda ? "true" : "false")"
+                        @onclick="() => _proposta.MoedaCodigo = moeda.Codigo()">@moeda.Rotulo()</button>
+            }
+        </div>
+        <span class="subtitle ajuda" style="margin:0">manda em todos os custos</span>
+    </div>
 
     <p class="subtitle ajuda" style="margin:0 0 12px">
         O custo de cada linha vem do cadastro e <strong>dá para trocar na própria linha</strong>:
@@ -738,7 +751,7 @@
                    title="Digite parte do modelo (ex.: 54, VAX 1800) para encurtar a lista"
                    value="@_filtroModelo"
                    @oninput="e => _filtroModelo = e.Value?.ToString() ?? string.Empty" />
-            <select class="cell" style="min-width:340px" value="@atual.EquipamentoId"
+            <select id="f-modelo" class="cell" style="min-width:340px" value="@atual.EquipamentoId"
                     @onchange="e => TrocarModelo(atual, e.Value?.ToString() ?? string.Empty)">
                 <option value="">— escolher o equipamento —</option>
                 @foreach (var serie in ModelosDoFiltro(atual).GroupBy(x => x.Serie))
@@ -771,14 +784,17 @@
                 <span class="subtitle ajuda" style="margin:0">preencher manual</span>
             }
 
-            <strong style="margin-left:10px">Tipo</strong>
-            <div class="seg" role="group" aria-label="Tipo">
-                <button class="@(atual.Especial ? "" : "on")" aria-pressed="@(atual.Especial ? "false" : "true")"
-                        @onclick="() => atual.Especial = false">Padrão</button>
-                <button class="@(atual.Especial ? "on" : "")" aria-pressed="@(atual.Especial ? "true" : "false")"
-                        @onclick="() => atual.Especial = true">Especial</button>
-            </div>
-            <span class="subtitle ajuda">a 2ª letra do código</span>
+            @* o rótulo e o controle juntos: quebrando a linha, o "Tipo" ficava sozinho no fim de uma e o Padrão/Especial na outra *@
+            <span style="display:inline-flex; align-items:center; gap:8px; margin-left:10px">
+                <strong>Tipo</strong>
+                <span class="seg" role="group" aria-label="Tipo">
+                    <button class="@(atual.Especial ? "" : "on")" aria-pressed="@(atual.Especial ? "false" : "true")"
+                            @onclick="() => atual.Especial = false">Padrão</button>
+                    <button class="@(atual.Especial ? "on" : "")" aria-pressed="@(atual.Especial ? "true" : "false")"
+                            @onclick="() => atual.Especial = true">Especial</button>
+                </span>
+                <span class="subtitle ajuda" style="margin:0">a 2ª letra do código</span>
+            </span>
 
             <span style="flex:1"></span>
             <button class="btn-link" @onclick="DuplicarEquipamento"
@@ -797,7 +813,7 @@
             }
         </div>
 
-        <div class="toolbar" style="flex-wrap:wrap">
+        <div id="f-montagem" class="toolbar" style="flex-wrap:wrap">
             <strong style="min-width:210px">@Campo("Arranjo / Instalação", "linha 40")</strong>
             <div class="seg" role="group" aria-label="Arranjo / Instalação">
                 @foreach (var a in ListasDaProposta.Arranjos)
@@ -829,7 +845,7 @@
 
         <div class="toolbar" style="flex-wrap:wrap">
             <strong style="min-width:210px">@Campo("Aplicação")</strong>
-            <input class="cell" style="flex:1; max-width:520px"
+            <input id="f-aplicacao" class="cell" style="flex:1; max-width:520px"
                    placeholder="onde o ventilador vai trabalhar"
                    value="@atual.Aplicacao"
                    @onchange="e => atual.Aplicacao = e.Value?.ToString() ?? string.Empty" />
@@ -994,7 +1010,7 @@
         {
             var candidatos = Candidatos(atual);
 
-            <div class="panel" style="margin:0 0 14px; border-left:3px solid var(--primary)">
+            <div id="f-motor" class="panel" style="margin:0 0 14px; border-left:3px solid var(--primary)">
                 @if (SugestaoDoMotor(atual) is { } sugestaoDoMotor)
                 {
                     <div class="aviso aviso-neutro sugestao-motor">
@@ -1087,7 +1103,7 @@
 
             @if (atual.ComPartidor)
             {
-                <select class="cell" style="min-width:260px" value="@atual.Partidor"
+                <select id="f-partidor" class="cell" style="min-width:260px" value="@atual.Partidor"
                         @onchange="e => atual.Partidor = e.Value?.ToString() ?? string.Empty">
                     <option value="">— escolher —</option>
                     @foreach (var o in OpcoesReais(ListaDosPartidores))
@@ -1356,7 +1372,7 @@
                 </div>
 
                 @* ----- seleção ----- *@
-                <div class="toolbar" style="flex-wrap:wrap">
+                <div id="f-selecao" class="toolbar" style="flex-wrap:wrap">
                     <strong style="min-width:150px; font-size:12.5px">Seleção</strong>
                     <InputFile OnChange="@(e => SubirSelecao(e, indice))" accept=".txt,.docx" class="cell" />
                     <span class="subtitle">.txt (Joy) ou .docx (VAX)</span>
@@ -1467,7 +1483,7 @@
                 </div>
 
                 @* ----- curvas ----- *@
-                <div class="toolbar" style="flex-wrap:wrap; margin-top:14px; padding-top:12px;
+                <div id="f-curva" class="toolbar" style="flex-wrap:wrap; margin-top:14px; padding-top:12px;
                                             border-top:1px solid var(--border)">
                     <strong style="min-width:150px; font-size:12.5px">
                         Curvas de performance
@@ -1600,6 +1616,7 @@
 </div>
 
     }
+</div>
 }
 @if (_etapa == 4)
 {
@@ -1831,7 +1848,7 @@
                         <option value="CustoEmVenda">1 @moedaCusto.Rotulo() em @moedaVenda.Rotulo()</option>
                     </select>
                     =
-                    <input class="cell num" style="width:90px" placeholder="0,00" value="@_proposta.TaxaCambio"
+                    <input id="f-taxa" class="cell num" style="width:90px" placeholder="0,00" value="@_proposta.TaxaCambio"
                            @onchange="e => MudarTaxa(e.Value?.ToString() ?? string.Empty)" />
                     @if (_taxaDoDia)
                     {
@@ -2074,6 +2091,8 @@
         </div>
     }
 </div>
+@* "Mudou desde a rev 00": o item 21 preenche este componente; por enquanto ele não desenha nada *@
+<MudancasDaRevisao Atual="_proposta" Gravadas="_gravadas" />
 <div class="panel" style="margin-bottom:14px">
     <div class="toolbar" style="flex-wrap:wrap">
         <h2 style="margin:0; font-size:15px">Proposta comercial</h2>
@@ -2191,6 +2210,40 @@
 </div>
 
 <div class="etapa-rodape">
+    @if (_etapa == 3 && _proposta.Itens.Count > 0)
+    {
+        @* a etapa Equipamentos anda por dentro: Escopo → (Opcionais) → Técnica
+           de cada equipamento. Antes, de qualquer aba, o botão ia direto ao
+           Preço e pulava a Técnica e o equipamento 2. Só o último passo grava *@
+        var anterior = PassoAnterior();
+        var proximo = ProximoPasso();
+
+        if (anterior is not null)
+        {
+            <button class="btn-ghost" @onclick="() => IrAoPasso(anterior)">← @RotuloDoPasso(anterior)</button>
+        }
+        else
+        {
+            <button class="btn-ghost" @onclick="() => IrParaEtapa(2)">← @NomeDaEtapa(2)</button>
+        }
+        <span style="flex:1"></span>
+        @if (!OpcionaisNoCaminho && _abaItem != "opcionais")
+        {
+            <button class="btn-link" @onclick='() => TrocarAba("opcionais")'
+                    title="Os opcionais do equipamento @(PosicaoValida + 1)">Opcionais</button>
+        }
+        @if (proximo is not null)
+        {
+            <button class="btn-link" @onclick="() => IrParaEtapa(4)">ir para Preço</button>
+            <button class="btn-primary" @onclick="() => IrAoPasso(proximo)">Continuar: @RotuloDoPasso(proximo)</button>
+        }
+        else
+        {
+            <button class="btn-primary" @onclick="SalvarEContinuar">Salvar e continuar → @NomeDaEtapa(4)</button>
+        }
+    }
+    else
+    {
     @if (_etapa > 1)
     {
         <button class="btn-ghost" @onclick="() => IrParaEtapa(_etapa - 1)">← @NomeDaEtapa(_etapa - 1)</button>
@@ -2207,6 +2260,7 @@
     else
     {
         <button class="btn-accent" @onclick="GerarTudo"><Icone Nome="baixar" /> Gerar tudo</button>
+    }
     }
 </div>
 
@@ -2288,23 +2342,47 @@
     }
     @if (pendencias.Count > 0)
     {
-        @* quatro de cada vez: o painel tem de caber num notebook de 768 px *@
+        @* por lugar — a proposta e cada equipamento —, para caber num notebook de
+           768 px: um grupo com uma só aparece direto; com mais, "Equip. 2 · 3"
+           abre a lista dele. O do equipamento aberto na etapa 3 já vem aberto *@
         <div class="pendencias-lado">
             <strong>Pendências (@pendencias.Count)</strong>
-            @foreach (var p in pendencias.Take(4))
+            @foreach (var (lugar, itemDoLugar, doLugar) in PorLugar(pendencias))
             {
-                var alvo = p;
-                <button class="pendencia" @onclick="() => IrPara(alvo)">@p.Texto →</button>
-            }
-            @if (pendencias.Count > 4)
-            {
-                <button class="pendencia" @onclick="() => IrParaEtapa(5)"><strong>ver todas (@pendencias.Count)</strong></button>
+                if (doLugar.Count == 1)
+                {
+                    var unica = doLugar[0];
+                    <button class="pendencia" @onclick="() => IrPara(unica)">@unica.Texto →</button>
+                    continue;
+                }
+
+                <details class="pend-grupo" open="@(_etapa == 3 && itemDoLugar >= 0 && itemDoLugar == PosicaoValida)">
+                    <summary>@lugar · @doLugar.Count</summary>
+                    @foreach (var p in doLugar)
+                    {
+                        var alvo = p;
+                        <button class="pendencia" @onclick="() => IrPara(alvo)">@SemOEquipamento(p) →</button>
+                    }
+                </details>
             }
         </div>
     }
     else
     {
         <div class="side-ok">Nada pendente para os documentos.</div>
+    }
+    @if (avisosDoPainel.Count > 0)
+    {
+        @* o que sai em branco mas não impede de gerar: fechado, fora da conta *@
+        <details class="avisos-lado">
+            <summary>Avisos (@avisosDoPainel.Count)</summary>
+            <span class="nota">saem em branco nos documentos, mas não impedem de gerar</span>
+            @foreach (var a in avisosDoPainel)
+            {
+                var alvo = a;
+                <button class="pendencia" @onclick="() => IrPara(alvo)">@a.Texto →</button>
+            }
+        </details>
     }
 </aside>
 
@@ -2716,7 +2794,9 @@
     /// <summary>O campo de preço de uma linha: puxado, editável, e com volta.</summary>
     private RenderFragment Preco(ItemProposta item, string chave, decimal? puxado) => @<text>
         <div style="display:flex; align-items:center; gap:6px; justify-content:flex-end">
-            <input class="cell num" style="max-width:150px" placeholder="—"
+            @* o índice do equipamento no id: a etapa Preço mostra as linhas de
+               todos, e a pendência de custo leva a este campo (item 06) *@
+            <input id="@AlvoDoCusto(_proposta.Itens.IndexOf(item), chave)" class="cell num" style="max-width:150px" placeholder="—"
                    value="@TextoDoPreco(item, chave, puxado)"
                    @onchange="e => DefinirPrecoManual(item, chave, e.Value?.ToString() ?? string.Empty, puxado)" />
             @if (EhManual(item, chave))
@@ -2725,6 +2805,15 @@
                         @onclick="() => item.PrecosManuais.Remove(chave)"><Icone Nome="desfazer" /></button>
             }
         </div>
+        @{
+            // a dica só de leitura do último custo à mão (item 22, num arquivo à parte); sem ela, nada
+            string? dica = null;
+            DicaDoCusto(item, chave, puxado, ref dica);
+        }
+        @if (dica is { Length: > 0 })
+        {
+            <span class="nota dica-do-custo">@dica</span>
+        }
     </text>;
 
     /// <summary>
@@ -2877,12 +2966,25 @@
             && antigo.Trim().Length > 0;
 
         item.EquipamentoId = id;
-        if (primeiroModelo) AplicarPadraoSeHouver(item);
+        if (primeiroModelo)
+        {
+            AplicarPadraoSeHouver(item);
+            // o resto do primeiro modelo entra pelos ganchos, cada um num
+            // arquivo à parte da fase B: o escopo inicial (item 15) e o
+            // diâmetro e a altitude lembrados (item 09)
+            DepoisDoPrimeiroModelo(item);
+            DadosTecnicosDoPrimeiroModelo(item);
+        }
 
-        if (!tinha) return;
+        if (tinha)
+        {
+            item.PrecosManuais.Remove("equipamento");
+            Aviso($"Modelo trocado: o preço à mão do anterior ({antigo}) foi descartado.", fica: true);
+        }
 
-        item.PrecosManuais.Remove("equipamento");
-        Aviso($"Modelo trocado: o preço à mão do anterior ({antigo}) foi descartado.", fica: true);
+        // por último, com o escopo inicial já posto: o motor fecha pelo modelo
+        // novo quando ele já está ligado (item 16)
+        DepoisDeTrocarModelo(item, primeiroModelo);
     }
 
     // ---------- quais modelos têm preço ----------
@@ -2989,6 +3091,7 @@
         _aberto = _proposta.Itens.Count - 1;
         _apagandoItem = null;
         _abaItem = "escopo";
+        _rolarPara = ConteudoDoEquipamento;
     }
 
     private void Remover()
@@ -3004,6 +3107,7 @@
         _faltouNaSelecao.Clear();
         _aberto = 0;
         _apagandoItem = null;
+        _rolarPara = ConteudoDoEquipamento;
     }
 
     /// <summary>
@@ -3509,11 +3613,11 @@
     }
 
     /// <summary>O seletor de um contato do quadro, igual nos dois.</summary>
-    private RenderFragment Contato(string rotulo, string escolhido, Action<string> escolher) => @<text>
+    private RenderFragment Contato(string rotulo, string escolhido, Action<string> escolher, string? id = null) => @<text>
         <div class="toolbar" style="margin-bottom:12px">
             <label style="display:flex; flex-direction:column; gap:5px; font-size:12.5px; color:var(--muted)">
                 @rotulo
-                <select class="cell" style="min-width:340px" value="@escolhido"
+                <select id="@id" class="cell" style="min-width:340px" value="@escolhido"
                         @onchange="e => escolher(e.Value?.ToString() ?? string.Empty)">
                     <option value="">— nenhum —</option>
                     @foreach (var c in ListasDaProposta.Contatos)
@@ -3672,7 +3776,11 @@
 
         if (resultado.NaoAchados.Count > 0) _faltouNaSelecao[indice] = resultado.NaoAchados;
 
-        return extensao == ".docx" ? await CurvasDoWord(new MemoryStream(bytes), indice) : 0;
+        var curvas = extensao == ".docx" ? await CurvasDoWord(new MemoryStream(bytes), indice) : 0;
+
+        // a seleção entrou: o motor pode fechar por ela (item 16, num arquivo à parte)
+        DepoisDaSelecao(item);
+        return curvas;
     }
 
     /// <summary>

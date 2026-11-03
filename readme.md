@@ -242,7 +242,7 @@ termina em **Salvar e continuar**.
   quebra linha; o cronômetro fica só nela.
 - **Painel que cabe no notebook (1366x768)**: venda líquida, **Salvar** azul quando há o que gravar e
   "Salvo" discreto quando não, **Gerar tudo** com seta para os documentos avulsos (comercial,
-  técnica, pricing, custo previsto), os números e quatro pendências com "ver todas".
+  técnica, pricing, custo previsto), os números e as pendências.
 - **Menu do app recolhível**: botão no rodapé do menu; sem escolha guardada, ele recolhe sozinho só
   abaixo de 1400 px de largura.
 - **Base visual**: cores por função nos avisos (contraste do âmbar corrigido), ícones de traço no
@@ -250,6 +250,19 @@ termina em **Salvar e continuar**.
   valores em CLP sem centavos nas telas de leitura (o campo de custo continua com até duas casas),
   "1 item / 3 itens" no lugar de "item(ns)" e os nomes das listas como se leem ("Partidores",
   "Conexão manga descarga") — só na tela; o que é gravado não muda.
+- **Pendências que levam ao campo**: cada pendência abre a etapa, o equipamento e a aba certos, leva
+  o campo para o meio da tela, põe o cursor nele e o marca com um anel âmbar por um instante. Um
+  equipamento sem modelo continua mostrando o que falta (seleção, curva, partidor). No painel, as
+  pendências ficam por lugar ("Equip. 2 · 3" abre a lista dele) e, num grupo cinza fechado, os
+  **avisos** — o que sai em branco mas não impede de gerar (referência do cliente, projeto,
+  aplicação, arranjo/montagem). Os avisos não entram na contagem nem no selo das etapas.
+- **Faixa do equipamento fixa**: na etapa Equipamentos, os chips "Equip. 1 · Joy 27 1/7 · 2 un."
+  (com um ponto âmbar quando há pendência), o **+ equipamento** e as abas Escopo · Opcionais ·
+  Técnica ficam presos no alto. Trocar de equipamento ou de aba com a tela rolada volta ao começo do
+  conteúdo; no alto, nada pula. A moeda do custo fica no alto do escopo.
+- **Rodapé que percorre os equipamentos**: "Continuar: Técnica do equip. 1", "Continuar: Equip. 2"
+  e, no fim, **Salvar e continuar → Preço** (só este grava). A aba Opcionais entra no caminho quando
+  algum equipamento tem opcional; senão, fica como link ao lado do botão, com o "ir para Preço".
 
 ### O cronômetro (tempo de cada proposta)
 
