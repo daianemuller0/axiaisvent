@@ -1332,143 +1332,280 @@
     }
     @if (_abaItem == "tecnica")
     {
-<div class="panel" style="margin-bottom:14px">
-    <div class="toolbar" style="flex-wrap:wrap">
-        <h2 style="margin:0; font-size:15px">Proposta técnica</h2>
-        <span class="subtitle ajuda" style="margin:0">
-            a seleção e a curva de cada equipamento
-        </span>
-        <span style="flex:1"></span>
-        <button class="btn-primary" @onclick="GerarTecnica"><Icone Nome="baixar" /> Gerar proposta técnica</button>
-    </div>
-
+    @* a aba Técnica numa tela (item 08): à esquerda a tabela do documento, com
+       a seleção conferida por exceção, a parte elétrica e o alcance; à direita
+       os arquivos — a seleção, a área de soltar e as curvas em miniatura *@
     @if (_proposta.Itens.Count == 0)
     {
-        <div class="panel empty" style="padding:16px; margin-top:14px">
-            Escolha os equipamentos no escopo — é deles que sai a lista aqui embaixo.
-        </div>
+<div class="panel" style="margin-bottom:14px">
+    <div class="panel empty" style="padding:16px">
+        Escolha os equipamentos no escopo — é deles que sai a proposta técnica.
+    </div>
+</div>
     }
     else
     {
-        <p class="subtitle ajuda" style="margin:12px 0 10px">
-            Um bloco por equipamento do escopo (@_proposta.Itens.Count no momento). Os valores
-            saem do relatório de seleção como estão escritos nele, com a unidade ao lado —
-            confira e corrija o que precisar.
-        </p>
-
-        @for (var i = 0; i < _proposta.Itens.Count; i++)
+        var indice = PosicaoValida;
+        var item = _proposta.Itens[indice];
+        var modelo = ModeloDe(item);
+        var linhasDoVentilador = DadosDoVentilador.De(item, modelo, MotorDe(item), TextosDaProposta.Do(Idioma), CodigoDe(item));
+        var abertas = LinhasAbertasDaSelecao(item, indice);
+        var editando = _editandoSelecao.Contains(item);
+        var comArquivo = item.ArquivoDaSelecao.Trim().Length > 0;
+        var lidos = LidosDaSelecao(item);
+        var faltouFora = FaltouForaDaTabela(indice);
+        var eletrica = DadosEletricos.De(item, _custo, _proposta.Moeda, EletricaTextos);
+        var soOMetodo = SoOMetodoDePartida(item);
+        var blocoDaSelecao = false;
+<div class="panel tec-painel">
+    <div class="tec-cabeca">
+        <h2>Equipamento @(indice + 1) · @(modelo?.Rotulo ?? "sem modelo escolhido")</h2>
+        @if (modelo is null)
         {
-            var indice = i;
-            if (indice != PosicaoValida) { continue; }
-            var item = _proposta.Itens[indice];
-            var modelo = ModeloDe(item);
+            <button class="btn-link" @onclick='() => IrAoEscopo(indice, "f-modelo")'>escolher no Escopo</button>
+        }
+        <span class="subtitle ajuda">o que sai na proposta técnica deste equipamento</span>
+    </div>
 
-            <div class="panel" style="margin:0 0 14px; padding:14px">
-                <div class="toolbar" style="flex-wrap:wrap; margin-bottom:10px">
-                    <strong>Item @((indice + 1).ToString("D2"))</strong>
-                    <span class="subtitle">
-                        @(modelo is not null ? modelo.Rotulo : "sem modelo escolhido")
-                    </span>
-                </div>
+    <div class="tec-grade">
+        <div class="tec-esq">
+            @* ----- DATOS DEL VENTILADOR, como sai no documento ----- *@
+            <section class="tec-bloco tec-dados">
+                <h3 class="tec-titulo">@TextosDaProposta.Do(Idioma).DadosDoVentilador <span class="nota">como sai no documento</span></h3>
+                <table class="grid tec-tabela">
+                    <tbody>
+                        @foreach (var linha in linhasDoVentilador)
+                        {
+                            var chave = linha.Chave;
 
-                @* ----- seleção ----- *@
-                <div id="f-selecao" class="toolbar" style="flex-wrap:wrap">
-                    <strong style="min-width:150px; font-size:12.5px">Seleção</strong>
-                    <InputFile OnChange="@(e => SubirSelecao(e, indice))" accept=".txt,.docx" class="cell" />
-                    <span class="subtitle">.txt (Joy) ou .docx (VAX)</span>
-                    @if (item.ArquivoDaSelecao.Length > 0)
-                    {
-                        <span class="val-count">@item.ArquivoDaSelecao</span>
-                        <button class="btn-link" @onclick="() => TirarSelecao(indice)">Remover</button>
-                    }
-                </div>
+                            @* as 7 linhas da seleção, juntas no lugar da primeira: o
+                               resumo e, abertas, só as que faltam (ou todas no "editar") *@
+                            if (DadosDoVentilador.DaSelecao.Contains(chave))
+                            {
+                                if (blocoDaSelecao) { continue; }
+                                blocoDaSelecao = true;
 
-                @if (_faltouNaSelecao.TryGetValue(indice, out var faltou) && faltou.Count > 0)
-                {
-                    <p class="subtitle texto-alerta" style="margin:8px 0 0">
-                        Não achei no arquivo: @string.Join(", ", faltou) — preencher à mão.
-                    </p>
-                }
-
-                <div class="form3" style="margin-top:12px">
-                    @foreach (var (chave, rotulo) in SelecaoTecnica.Campos)
-                    {
-                        var campo = chave;
-                        var dado = item.Tecnicos.GetValueOrDefault(campo, new DadoTecnico("", ""));
-
-                        <label>@Campo(rotulo, item.Tecnicos.ContainsKey(campo) ? "da seleção" : null)
-                            <div class="toolbar" style="gap:6px; margin:0">
-                                <input class="cell" style="flex:1" value="@dado.Valor"
-                                       @onchange="e => MudarTecnico(item, campo, e.Value?.ToString() ?? string.Empty, dado.Unidade)" />
-                                <input class="cell" style="width:90px" placeholder="unid."
-                                       value="@dado.Unidade"
-                                       @onchange="e => MudarTecnico(item, campo, dado.Valor, e.Value?.ToString() ?? string.Empty)" />
-                            </div>
-                        </label>
-                    }
-                </div>
-
-                @* ----- o que vai na tabela do documento ----- *@
-                <div style="margin-top:14px; padding-top:12px;
-                            border-top:1px solid var(--border)">
-                    <div class="subtitle" style="margin-bottom:8px">
-                        <strong>DATOS DEL VENTILADOR</strong> — como a tabela vai sair no documento
-                    </div>
-
-                    <div class="panel" style="padding:0; overflow-x:auto; margin:0">
-                        <table class="grid">
-                            <tbody>
-                                @foreach (var linha in DadosDoVentilador.De(item, ModeloDe(item), MotorDe(item), TextosDaProposta.Do(Idioma), CodigoDe(item)))
-                                {
-                                    <tr>
-                                        <td class="nowrap" style="width:280px">@linha.Rotulo</td>
-                                        <td>
-                                            @if (linha.Falta)
+                                <tr class="tec-resumo @(comArquivo && lidos < DadosDoVentilador.DaSelecao.Length ? "incompleto" : "")">
+                                    <td colspan="3">
+                                        <div class="tec-resumo-topo">
+                                            <strong>Seleção</strong>
+                                            @if (comArquivo)
                                             {
-                                                <span class="subtitle">— em branco —</span>
+                                                <span class="tec-resumo-arquivo" title="@item.ArquivoDaSelecao">@item.ArquivoDaSelecao</span>
+                                                <span class="val-count @(lidos == DadosDoVentilador.DaSelecao.Length ? "tec-ok" : "tec-alerta")">@lidos de @DadosDoVentilador.DaSelecao.Length lidos</span>
                                             }
                                             else
                                             {
-                                                <strong>@linha.Valor</strong>
+                                                <span class="nota">sem arquivo · digite abaixo ou solte o relatório em Seleção</span>
                                             }
-                                        </td>
-                                        <td class="nowrap right" style="width:120px">
-                                            @if (linha.Origem.Length > 0)
-                                            {
-                                                <span class="val-count">@linha.Origem</span>
-                                            }
+                                            <span class="tec-espaco"></span>
+                                            <button class="btn-link" aria-expanded="@(editando ? "true" : "false")"
+                                                    @onclick="() => AlternarEdicaoDaSelecao(item)">@(editando ? "fechar" : "editar")</button>
+                                        </div>
+                                        @if (comArquivo && ResumoDaSelecao(item) is { Length: > 0 } resumo)
+                                        {
+                                            <div class="tec-resumo-valores">@resumo</div>
+                                        }
+                                        @if (SerieEPa(item) is { Length: > 0 } serieEPa)
+                                        {
+                                            <div class="nota">@serieEPa</div>
+                                        }
+                                        @if (faltouFora.Count > 0)
+                                        {
+                                            <div class="nota texto-alerta">O arquivo não trouxe: @string.Join(", ", faltouFora.Select(f => f.ToLowerInvariant())) — editar para digitar.</div>
+                                        }
+                                        @if (editando)
+                                        {
+                                            var pressaoTipo = item.Tecnicos.GetValueOrDefault("pressaoTipo", new DadoTecnico("", "")).Valor;
+                                            <div class="tec-extra">
+                                                <label>Série / modelo
+                                                    <input class="cell" value="@item.Tecnicos.GetValueOrDefault("serie", new DadoTecnico("", "")).Valor"
+                                                           @onchange='e => MudarTecnico(item, "serie", e.Value?.ToString() ?? string.Empty, "")' />
+                                                </label>
+                                                <label>Tipo de pá
+                                                    <input class="cell" value="@item.Tecnicos.GetValueOrDefault("pa", new DadoTecnico("", "")).Valor"
+                                                           @onchange='e => MudarTecnico(item, "pa", e.Value?.ToString() ?? string.Empty, "")' />
+                                                </label>
+                                                <label>Pressão
+                                                    <select class="cell" value="@pressaoTipo"
+                                                            @onchange='e => MudarTecnico(item, "pressaoTipo", e.Value?.ToString() ?? string.Empty, "")'>
+                                                        <option value="">não diz</option>
+                                                        <option value="@SelecaoTecnica.Total">total</option>
+                                                        <option value="@SelecaoTecnica.Estatica">estática</option>
+                                                        @if (pressaoTipo.Length > 0 && pressaoTipo != SelecaoTecnica.Total && pressaoTipo != SelecaoTecnica.Estatica)
+                                                        {
+                                                            <option value="@pressaoTipo">@pressaoTipo</option>
+                                                        }
+                                                    </select>
+                                                </label>
+                                            </div>
+                                        }
+                                    </td>
+                                </tr>
+
+                                @foreach (var sel in linhasDoVentilador.Where(l => DadosDoVentilador.DaSelecao.Contains(l.Chave) && abertas.Contains(l.Chave)))
+                                {
+                                    var chaveSel = sel.Chave;
+                                    var dado = item.Tecnicos.GetValueOrDefault(chaveSel, new DadoTecnico("", ""));
+                                    var falta = dado.Valor.Trim().Length == 0;
+                                    <tr class="tec-aberta @(falta ? "tec-falta" : "")">
+                                        <td class="tec-rotulo">@sel.Rotulo</td>
+                                        <td colspan="2">
+                                            <div class="tec-par">
+                                                <input class="cell" value="@dado.Valor" aria-label="@sel.Rotulo"
+                                                       placeholder="@(falta ? (comArquivo ? "não veio no arquivo" : "digitar") : "")"
+                                                       @onchange="e => MudarDadoDaSelecao(item, chaveSel, e.Value?.ToString() ?? string.Empty, dado.Unidade)" />
+                                                <input class="cell tec-unid" value="@dado.Unidade" aria-label="Unidade de @sel.Rotulo"
+                                                       placeholder="@(UnidadePadrao(chaveSel) is { Length: > 0 } u ? u : "unid.")"
+                                                       @onchange="e => MudarTecnico(item, chaveSel, dado.Valor, e.Value?.ToString() ?? string.Empty)" />
+                                            </div>
                                         </td>
                                     </tr>
                                 }
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+                                continue;
+                            }
 
-                @* ----- parte elétrica ----- *@
-                <div style="margin-top:14px; padding-top:12px;
-                            border-top:1px solid var(--border)">
-                    <div class="subtitle" style="margin-bottom:8px">
-                        <strong>@EletricaTextos.Secao.ToUpperInvariant()</strong>
-                        — sai depois da curva, em página própria
-                    </div>
+                            @* diâmetro, altitude e ruído: digitados aqui (item 09) *@
+                            if (chave == "diametro")
+                            {
+                                <tr class="tec-aberta @(item.DiametroMm.Trim().Length == 0 ? "tec-falta" : "")">
+                                    <td class="tec-rotulo"><label for="f-diametro">@linha.Rotulo</label></td>
+                                    <td colspan="2">
+                                        <div class="tec-campo">
+                                            <input id="f-diametro" class="cell num" inputmode="decimal" value="@item.DiametroMm"
+                                                   @onchange="e => MudarDiametro(item, e.Value?.ToString() ?? string.Empty)" />
+                                            <span class="tec-unidade">mm</span>
+                                            @if (_diametroLembrado.TryGetValue(item, out var deOndeDiametro))
+                                            {
+                                                <span class="nota tec-lembrado">@deOndeDiametro</span>
+                                            }
+                                        </div>
+                                    </td>
+                                </tr>
+                                continue;
+                            }
+                            if (chave == "altitude")
+                            {
+                                var outrosComOutra = _altitudeEditada == item ? OutrosComOutraAltitude(item) : new List<int>();
+                                <tr class="tec-aberta @(item.AltitudeMsnm.Trim().Length == 0 ? "tec-falta" : "")">
+                                    <td class="tec-rotulo"><label for="f-altitude">@linha.Rotulo</label></td>
+                                    <td colspan="2">
+                                        <div class="tec-campo">
+                                            <input id="f-altitude" class="cell num" inputmode="decimal" value="@item.AltitudeMsnm"
+                                                   @onchange="e => MudarAltitude(item, e.Value?.ToString() ?? string.Empty)" />
+                                            <span class="tec-unidade">m.s.n.m.</span>
+                                            @if (_altitudeLembrada.TryGetValue(item, out var deOndeAltitude))
+                                            {
+                                                <span class="nota tec-lembrado">@deOndeAltitude</span>
+                                            }
+                                            @if (outrosComOutra.Count > 0)
+                                            {
+                                                <button class="btn-link" @onclick="() => AplicarAltitudeAosOutros(item, indice)">
+                                                    @(outrosComOutra.Count == 1 ? $"aplicar também ao equip. {outrosComOutra[0] + 1}" : $"aplicar aos outros {outrosComOutra.Count}")
+                                                </button>
+                                            }
+                                        </div>
+                                        @if (item.AltitudeMsnm.Trim().Length == 0 && AltitudeDoCliente() is { } doCliente)
+                                        {
+                                            <div class="nota">
+                                                altitude da @doCliente.Numero: @doCliente.Valor ·
+                                                <button class="btn-link" @onclick="() => UsarAltitudeDoCliente(item, doCliente.Valor, doCliente.Numero)">usar</button>
+                                            </div>
+                                        }
+                                        @if (AltitudeAlta(item) && eletrica.Count > 0)
+                                        {
+                                            <div class="nota texto-alerta">acima dos 2.000 m dos dados elétricos — confira o motor com a engenharia</div>
+                                        }
+                                    </td>
+                                </tr>
+                                continue;
+                            }
+                            if (chave == "ruido")
+                            {
+                                <tr class="tec-aberta @(item.RuidoDb.Trim().Length == 0 ? "tec-falta" : "")">
+                                    <td class="tec-rotulo"><label for="f-ruido">@linha.Rotulo</label></td>
+                                    <td colspan="2">
+                                        <div class="tec-campo">
+                                            <input id="f-ruido" class="cell num" inputmode="decimal" value="@item.RuidoDb"
+                                                   @onchange="e => MudarRuido(item, e.Value?.ToString() ?? string.Empty)" />
+                                            <span class="tec-unidade">dB(A) a 1 m</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                                continue;
+                            }
 
-                    @if (DadosEletricos.De(item, _custo, _proposta.Moeda, EletricaTextos)
-                         is { Count: > 0 } eletrica)
+                            @* o resto vem do escopo (ou é fixo do modelo): só leitura, com a origem *@
+                            var irPara = chave switch
+                            {
+                                "modelo" => "f-modelo",
+                                "aplicacao" => "f-aplicacao",
+                                "montagem" => "f-montagem",
+                                "motor" when item.ComMotor => "f-motor",
+                                _ => "",
+                            };
+                            <tr>
+                                <td class="tec-rotulo">@linha.Rotulo</td>
+                                <td class="tec-valor">
+                                    @if (!linha.Falta)
+                                    {
+                                        <strong>@linha.Valor</strong>
+                                    }
+                                    else if (irPara.Length > 0)
+                                    {
+                                        <button class="btn-link" title="Em branco no documento" @onclick="() => IrAoEscopo(indice, irPara)">preencher no Escopo</button>
+                                    }
+                                    else if (chave == "motor")
+                                    {
+                                        <span class="subtitle">sem motor no escopo</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="subtitle">em branco</span>
+                                    }
+                                </td>
+                                <td class="tec-origem">
+                                    @if (linha.Origem.Length > 0)
+                                    {
+                                        <span class="val-count">@linha.Origem</span>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+
+                @if (AvisoDePotencia(item) is { } potenciaAcima)
+                {
+                    <div class="aviso aviso-alerta tec-aviso">
+                        <Icone Nome="alerta" />
+                        <span>@potenciaAcima</span>
+                        <button class="btn-link" @onclick='() => IrAoEscopo(indice, "f-motor")'>ver o motor</button>
+                    </div>
+                }
+            </section>
+
+            @* ----- parte elétrica: texto fixo do modelo, recolhido ----- *@
+            <details class="tec-bloco tec-recolhido tec-eletrica" open="@(soOMetodo.Length > 0)">
+                <summary>
+                    <strong>@EletricaTextos.Secao.ToUpperInvariant()</strong>
+                    <span class="nota">@(eletrica.Count > 0 ? ResumoEletrico(eletrica) : "não sai neste equipamento")</span>
+                </summary>
+                <div class="tec-recolhido-corpo">
+                    <p class="nota ajuda" style="margin:0 0 8px">sai depois da curva, em página própria</p>
+                    @if (eletrica.Count > 0)
                     {
                         @foreach (var quadro in eletrica)
                         {
-                            <div class="panel" style="padding:0; overflow-x:auto; margin:0 0 10px">
-                                <table class="grid">
-                                    <thead><tr><th>@quadro.Titulo</th></tr></thead>
-                                    <tbody>
-                                        @foreach (var linha in quadro.Linhas)
-                                        {
-                                            <tr><td>@linha</td></tr>
-                                        }
-                                    </tbody>
-                                </table>
-                            </div>
+                            <table class="grid tec-quadro">
+                                <thead><tr><th>@quadro.Titulo</th></tr></thead>
+                                <tbody>
+                                    @foreach (var linhaEletrica in quadro.Linhas)
+                                    {
+                                        <tr><td>@linhaEletrica</td></tr>
+                                    }
+                                </tbody>
+                            </table>
                         }
                     }
                     else
@@ -1476,145 +1613,183 @@
                         <p class="subtitle" style="margin:0">@SemParteEletrica(item)</p>
                     }
 
-                    @if (SoOMetodoDePartida(item) is { Length: > 0 } semQuadro)
+                    @if (soOMetodo.Length > 0)
                     {
-                        <p class="subtitle texto-alerta" style="margin:8px 0 0">@semQuadro</p>
+                        <p class="nota texto-alerta" style="margin:8px 0 0">@soOMetodo</p>
+                    }
+                </div>
+            </details>
+
+            @* ----- alcance de fornecimento ----- *@
+            @{
+                var rascunhoEscopo = EscopoDaHowden.Rascunho(item, _custo, _proposta.Moeda, EscopoTextos);
+                var escopoDoItem = item.EscopoIncluso.Trim().Length > 0 ? item.EscopoIncluso : rascunhoEscopo;
+                var excluidas = item.EscopoExcluido.Split('\n', StringSplitOptions.RemoveEmptyEntries).Length;
+            }
+            <section class="tec-bloco tec-alcance">
+                <div class="tec-titulo-linha">
+                    <h3 class="tec-titulo">@EscopoTextos.Incluso</h3>
+                    <span class="nota ajuda">uma linha por item — é o que sai na lista</span>
+                    <span class="tec-espaco"></span>
+                    @if (item.EscopoIncluso.Trim().Length > 0)
+                    {
+                        <button class="btn-link" title="Voltar ao rascunho do sistema"
+                                @onclick="() => VoltarEscopo(indice)"><Icone Nome="desfazer" Classe="ico-p" /> voltar ao rascunho</button>
                     }
                 </div>
 
-                @* ----- curvas ----- *@
-                <div id="f-curva" class="toolbar" style="flex-wrap:wrap; margin-top:14px; padding-top:12px;
-                                            border-top:1px solid var(--border)">
-                    <strong style="min-width:150px; font-size:12.5px">
-                        Curvas de performance
-                        @if (item.Curvas.Count > 0)
-                        {
-                            <span class="val-count" style="margin-left:6px">@item.Curvas.Count</span>
-                        }
-                    </strong>
-                    <InputFile OnChange="@(e => SubirCurva(e, indice))"
-                               accept=".pdf,.png,.jpg,.jpeg,.txt" class="cell" />
-                    <span class="subtitle">PDF, imagem ou TXT — dá para juntar mais de uma</span>
-                </div>
+                <textarea class="cell tec-texto" rows="@(escopoDoItem.Split('\n').Length + 1)"
+                          aria-label="@EscopoTextos.Incluso"
+                          value="@escopoDoItem"
+                          @onchange="e => MudarEscopoIncluso(indice, e.Value?.ToString() ?? string.Empty)"></textarea>
 
-                @* o que a tela mostra é a IMAGEM, que é o que vai para o
-                   documento — não o PDF que foi anexado *@
-                @for (var c = 0; c < item.Curvas.Count; c++)
-                {
-                    var posicao = c;
-                    var curva = item.Curvas[posicao];
-
-                    <div style="margin-top:10px; text-align:center">
-                        <div class="toolbar" style="justify-content:center">
-                            <span class="val-count">@curva.Nome</span>
-                            <span class="subtitle">@TamanhoDaCurva(curva)</span>
-                            <button class="btn-link" @onclick="() => TirarCurva(indice, posicao)">Remover</button>
-                        </div>
-                        <img src="/axiais/anexo/@_proposta.Id/@curva.Imagem"
-                             alt="Curva @(posicao + 1) do item @(indice + 1)"
-                             style="max-width:100%; max-height:420px; border:1px solid var(--border); border-radius:6px" />
-                    </div>
-                }
-
-                @if (item.Curvas.Count > 0)
-                {
-                    <div class="subtitle" style="margin-top:4px; text-align:center">
-                        @(item.Curvas.Count == 1
-                            ? "é esta imagem que vai para a proposta técnica"
-                            : "são estas imagens que vão para a proposta técnica")
-                    </div>
-                }
-
-                @* ----- alcance de fornecimento ----- *@
-                @{
-                    var rascunhoEscopo = EscopoDaHowden.Rascunho(item, _custo, _proposta.Moeda,
-                        EscopoTextos);
-                    var escopoDoItem = item.EscopoIncluso.Trim().Length > 0
-                        ? item.EscopoIncluso
-                        : rascunhoEscopo;
-                }
-
-                <div style="margin-top:14px; padding-top:12px;
-                            border-top:1px solid var(--border)">
-                    <div class="toolbar" style="flex-wrap:wrap; margin-bottom:8px">
-                        <strong style="font-size:12.5px">@EscopoTextos.Incluso</strong>
-                        <span class="subtitle ajuda">uma linha por item — é o que sai na lista</span>
-                        <span style="flex:1"></span>
-                        @if (item.EscopoIncluso.Trim().Length > 0)
-                        {
-                            <button class="btn-ghost" title="Voltar ao rascunho do sistema"
-                                    @onclick="() => VoltarEscopo(indice)">↺ rascunho</button>
-                        }
-                    </div>
-
-                    <textarea class="cell" rows="@(escopoDoItem.Split('\n').Length + 1)"
-                              style="width:100%; font-family:inherit"
-                              value="@escopoDoItem"
-                              @onchange="e => MudarEscopoIncluso(indice, e.Value?.ToString() ?? string.Empty)"></textarea>
-
-                    @if (item.EscopoExtra.Count > 0)
-                    {
-                        <div class="toolbar" style="flex-wrap:wrap; gap:6px; margin-top:8px">
-                            <span class="subtitle" style="margin:0">juntadas à mão:</span>
-                            @foreach (var chave in item.EscopoExtra.ToList())
-                            {
-                                var daLista = chave;
-                                <button class="btn-primary" style="font-size:11.5px"
-                                        title="Remover da lista" aria-label="Remover da lista: @EscopoTextos.Catalogo.GetValueOrDefault(daLista, daLista)"
-                                        @onclick="() => TirarDoEscopo(indice, daLista)">
-                                    @EscopoTextos.Catalogo.GetValueOrDefault(daLista, daLista) <Icone Nome="fechar" Classe="ico-p" />
-                                </button>
-                            }
-                        </div>
-                    }
-
+                <div class="tec-juntar">
                     @if (ForaDoCatalogo(item) is { Count: > 0 } faltamNoEscopo)
                     {
-                        <div class="subtitle" style="margin-top:8px">
-                            O cadastro não escolhe estes — clique para juntar à lista:
-                        </div>
-                        <div class="toolbar" style="flex-wrap:wrap; gap:6px; margin-top:6px">
-                            @foreach (var chave in faltamNoEscopo)
+                        <select class="cell" @key="_juntarAoAlcance" aria-label="Juntar uma peça do catálogo ao alcance"
+                                @onchange="e => JuntarPeloSeletor(indice, e.Value?.ToString() ?? string.Empty)">
+                            <option value="">+ juntar ao alcance…</option>
+                            @foreach (var peca in faltamNoEscopo)
                             {
-                                var daLista = chave;
-                                <button class="btn-ghost" style="font-size:11.5px"
-                                        @onclick="() => JuntarAoEscopo(indice, daLista)">
-                                    + @EscopoTextos.Catalogo[daLista]
-                                </button>
+                                <option value="@peca">@EscopoTextos.Catalogo[peca]</option>
                             }
-                        </div>
+                        </select>
                     }
-
-                    <div class="toolbar" style="flex-wrap:wrap; margin:16px 0 8px">
-                        <strong style="font-size:12.5px">@EscopoTextos.Excluido</strong>
-                        <span class="subtitle">
-                            o que o cliente pediu e não vai — em branco, a seção não sai
+                    @foreach (var juntada in item.EscopoExtra.ToList())
+                    {
+                        var daLista = juntada;
+                        var nomeDaPeca = EscopoTextos.Catalogo.GetValueOrDefault(daLista, daLista);
+                        <span class="tec-juntada">
+                            @nomeDaPeca
+                            <button class="btn-link btn-icone" title="Tirar do alcance" aria-label="Tirar do alcance: @nomeDaPeca"
+                                    @onclick="() => TirarDoEscopo(indice, daLista)"><Icone Nome="fechar" Classe="ico-p" /></button>
                         </span>
-                    </div>
-
-                    <textarea class="cell" rows="3" style="width:100%; font-family:inherit"
-                              placeholder="uma linha por item"
-                              value="@item.EscopoExcluido"
-                              @onchange="e => MudarEscopoExcluido(indice, e.Value?.ToString() ?? string.Empty)"></textarea>
-
-                    <p class="subtitle" style="margin:8px 0 0">
-                        A documentação, os comentários e as normas são iguais em toda proposta e
-                        saem sozinhos; o texto do ventilador sai pela série do equipamento
-                        (@(SerieDoItem(item) is { Length: > 0 } serie ? serie : "sem modelo escolhido")).
-                    </p>
+                    }
                 </div>
-            </div>
-        }
 
-        @if (SemCurvas is { Count: > 0 } semCurva)
-        {
-            <div class="aviso aviso-alerta" style="font-size:12.5px">
-                <strong>Falta a curva de:</strong> @string.Join(", ", semCurva)
+                <details class="tec-recolhido tec-excluido" open="@(excluidas > 0)">
+                    <summary>
+                        <strong>@EscopoTextos.Excluido</strong>
+                        <span class="nota">@(excluidas > 0 ? Plural(excluidas, "linha", "linhas") : "em branco, a seção não sai")</span>
+                    </summary>
+                    <div class="tec-recolhido-corpo">
+                        <textarea class="cell tec-texto" rows="3" placeholder="o que o cliente pediu e não vai — uma linha por item"
+                                  aria-label="@EscopoTextos.Excluido"
+                                  value="@item.EscopoExcluido"
+                                  @onchange="e => MudarEscopoExcluido(indice, e.Value?.ToString() ?? string.Empty)"></textarea>
+                    </div>
+                </details>
+
+                <p class="nota ajuda" style="margin:8px 0 0">
+                    A documentação, os comentários e as normas são iguais em toda proposta e saem
+                    sozinhos; o texto do ventilador sai pela série do equipamento
+                    (@(SerieDoItem(item) is { Length: > 0 } serie ? serie : "sem modelo escolhido")).
+                </p>
+            </section>
+        </div>
+
+        <div class="tec-dir">
+            @* ----- seleção: o arquivo e a área de soltar (item 19, parte 3) ----- *@
+            <section id="f-selecao" class="tec-bloco tec-arquivos">
+                <h3 class="tec-titulo">Seleção</h3>
+                @if (comArquivo)
+                {
+                    <div class="tec-arquivo">
+                        <Icone Nome="lista" />
+                        <span class="tec-arquivo-nome" title="@item.ArquivoDaSelecao">@item.ArquivoDaSelecao</span>
+                        <button class="btn-link" @onclick="() => TirarSelecao(indice)">Remover</button>
+                    </div>
+                }
+                else
+                {
+                    <p class="tec-vazio texto-alerta"><Icone Nome="alerta" /> Nenhuma seleção neste equipamento.</p>
+                }
+
+                @* tudo o que cair aqui vai para o equipamento aberto: nenhum
+                   nasce, o aberto não muda e a folha de dados é recusada *@
+                <label class="dropzone baixa">
+                    <Icone Nome="subir" />
+                    <span class="tec-solte">
+                        <strong>@(_lendo ? "Lendo os arquivos…" : "Solte aqui a seleção e as curvas")</strong>
+                        <span>ou clique · .txt .docx .pdf .png · vão para o equip. @(indice + 1)</span>
+                    </span>
+                    <InputFile OnChange="@(e => SoltarNaTecnica(e, indice))" multiple accept=".txt,.docx,.pdf,.png,.jpg,.jpeg" />
+                </label>
+                @if (_ignoradosNaTecnica is { } ignorados && ReferenceEquals(ignorados.Item, item))
+                {
+                    <div class="tec-ignorados" role="status">
+                        <div class="tec-ignorados-topo">
+                            <strong>@Plural(ignorados.Arquivos.Count, "arquivo ficou de fora", "arquivos ficaram de fora")</strong>
+                            <span class="tec-espaco"></span>
+                            <button class="btn-link btn-icone" title="Fechar" aria-label="Fechar a lista dos arquivos de fora"
+                                    @onclick="() => _ignoradosNaTecnica = null"><Icone Nome="fechar" Classe="ico-p" /></button>
+                        </div>
+                        @foreach (var (arquivo, motivo) in ignorados.Arquivos)
+                        {
+                            <div class="tec-ignorado"><span class="tec-arquivo-nome" title="@arquivo">@arquivo</span> <span class="nota">@motivo</span></div>
+                        }
+                    </div>
+                }
+            </section>
+
+            @* ----- curvas em miniatura: o clique abre a imagem inteira num
+               <dialog> da própria página (no WebView2 uma aba nova seria uma
+               janela solta, sem menu) ----- *@
+            <section id="f-curva" class="tec-bloco tec-curvas">
+                <h3 class="tec-titulo">
+                    Curvas de performance
+                    @if (item.Curvas.Count > 0)
+                    {
+                        <span class="val-count">@item.Curvas.Count</span>
+                    }
+                </h3>
+                @if (item.Curvas.Count == 0)
+                {
+                    <p class="tec-vazio texto-alerta"><Icone Nome="alerta" /> Falta a curva: solte o PDF ou a imagem na área acima.</p>
+                }
+                else
+                {
+                    @for (var c = 0; c < item.Curvas.Count; c++)
+                    {
+                        var posicao = c;
+                        var curva = item.Curvas[posicao];
+                        var endereco = $"/axiais/anexo/{_proposta.Id}/{curva.Imagem}";
+                        <figure class="curva-mini">
+                            <button type="button" class="curva-mini-img" data-curva-inteira="@endereco" data-nome="@curva.Nome"
+                                    title="Ver a curva inteira" aria-label="Ver a curva @(posicao + 1) inteira">
+                                <img src="@endereco" alt="Curva @(posicao + 1) do item @(indice + 1)" loading="lazy" />
+                            </button>
+                            <figcaption>
+                                <span class="curva-mini-nome" title="@curva.Nome">@curva.Nome</span>
+                                <span class="nota">@TamanhoDaCurva(curva)</span>
+                                <span class="tec-espaco"></span>
+                                <button class="btn-link" @onclick="() => TirarCurva(indice, posicao)">Remover</button>
+                            </figcaption>
+                        </figure>
+                    }
+                    <p class="nota ajuda" style="margin:0">
+                        @(item.Curvas.Count == 1 ? "é esta imagem que vai para a proposta técnica" : "são estas imagens que vão para a proposta técnica")
+                    </p>
+                }
+            </section>
+        </div>
+    </div>
+
+    <dialog id="dialogo-curva" class="curva-dialogo" aria-label="Curva de performance">
+        <div class="curva-dialogo-corpo">
+            <div class="curva-dialogo-topo">
+                <strong class="curva-dialogo-nome"></strong>
+                <span class="tec-espaco"></span>
+                <span class="nota">Esc fecha</span>
+                <button type="button" class="btn-link btn-icone" data-fechar-dialogo="1" title="Fechar" aria-label="Fechar">
+                    <Icone Nome="fechar" />
+                </button>
             </div>
-        }
-    }
+            <img alt="" />
+        </div>
+    </dialog>
 </div>
-
+    }
     }
 </div>
 }
@@ -2975,6 +3150,7 @@
             DepoisDoPrimeiroModelo(item);
             DadosTecnicosDoPrimeiroModelo(item);
         }
+        else DadosTecnicosDoModeloTrocado(item);
 
         if (tinha)
         {
@@ -3708,60 +3884,6 @@
     // ---------- seleção do ventilador ----------
 
     /// <summary>
-    /// Lê o relatório de seleção e põe os dados no equipamento aberto.
-    ///
-    /// Vale por equipamento, e não pela proposta: cada ventilador tem a sua
-    /// seleção, e é por isso que o botão fica dentro da aba dele.
-    /// </summary>
-    private async Task SubirSelecao(InputFileChangeEventArgs e, int indice)
-    {
-        try
-        {
-            var extensao = Path.GetExtension(e.File.Name).ToLowerInvariant();
-
-            if (extensao == ".doc")
-            {
-                Aviso("O Word antigo (.doc) não abre aqui — salve como .docx e suba de novo.",
-                    erro: true);
-                return;
-            }
-
-            await using var fluxo = e.File.OpenReadStream(10 * 1024 * 1024);
-            using var memoria = new MemoryStream();
-            await fluxo.CopyToAsync(memoria);
-            var bytes = memoria.ToArray();
-
-            // a seleção do VAX vem em Word, e a do Joy em texto puro; do Word
-            // o que interessa é o texto, que é o mesmo relatório
-            var texto = extensao == ".docx"
-                ? TextoDoWord.Ler(new MemoryStream(bytes))
-                : new StreamReader(new MemoryStream(bytes)).ReadToEnd();
-
-            var resultado = SelecaoTecnica.Ler(texto);
-
-            if (resultado.Dados.Count == 0)
-            {
-                Aviso("Não reconheci esse arquivo como um relatório de seleção.", erro: true);
-                return;
-            }
-
-            var curvas = await AplicarSelecao(resultado, extensao, bytes, e.File.Name, indice);
-
-            Aviso($"Seleção lida: {Plural(resultado.Dados.Count, "dado", "dados")} do equipamento {indice + 1}"
-                + curvas switch
-                {
-                    0 => ".",
-                    1 => ", e a curva veio junto.",
-                    _ => $", e as {curvas} curvas vieram juntas.",
-                });
-        }
-        catch (Exception ex)
-        {
-            Aviso($"Não consegui ler a seleção: {ex.Message}", erro: true);
-        }
-    }
-
-    /// <summary>
     /// Põe a seleção lida no equipamento e devolve quantas curvas vieram
     /// junto (no VAX elas vêm dentro do Word).
     /// </summary>
@@ -3846,30 +3968,14 @@
     }
 
     /// <summary>
-    /// Guarda a curva de performance do equipamento.
+    /// Guarda a curva nos anexos, com a imagem que vai para o documento.
     ///
     /// O arquivo vai para a pasta de anexos, e a proposta guarda só o nome —
     /// ver <see cref="Anexos"/>. Como o anexo é gravado na hora, a proposta
     /// precisa de um id antes: sem ele, a curva não teria pasta onde morar.
+    /// (A seleção e a curva entram pela área de soltar da aba Técnica, que usa
+    /// a mesma importação da etapa Começar — ver ImportarArquivos.)
     /// </summary>
-    private async Task SubirCurva(InputFileChangeEventArgs e, int indice)
-    {
-        try
-        {
-            await using var fluxo = e.File.OpenReadStream(20 * 1024 * 1024);
-            using var memoria = new MemoryStream();
-            await fluxo.CopyToAsync(memoria);
-
-            await AnexarCurva(memoria.ToArray(), e.File.Name, indice);
-            Aviso($"Curva anexada ao equipamento {indice + 1}.");
-        }
-        catch (Exception ex)
-        {
-            Aviso($"Não consegui anexar a curva: {ex.Message}", erro: true);
-        }
-    }
-
-    /// <summary>Guarda a curva nos anexos, com a imagem que vai para o documento.</summary>
     private async Task AnexarCurva(byte[] bytes, string nome, int indice)
     {
         GarantirGravada();
@@ -3897,6 +4003,7 @@
             curva.Imagem = curva.Arquivo;
         }
 
+        GuardarTamanho(curva, bytes.Length);
         _proposta.Itens[indice].Curvas.Add(curva);
     }
 
@@ -3932,7 +4039,8 @@
 
     private string TamanhoDaCurva(CurvaAnexada curva)
     {
-        var bytes = Anexos.Tamanho(_proposta.Id, curva.Arquivo);
+        // lido uma vez por arquivo (PropostaPage.Tecnica.cs): a pasta pode ser de rede
+        var bytes = TamanhoEmBytes(curva);
         if (bytes <= 0) return "arquivo não encontrado";
 
         return bytes < 1024 * 1024
