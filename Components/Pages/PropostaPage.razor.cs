@@ -4,6 +4,7 @@ using HowdenAxiais.Poc.Data;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Forms;
+using Microsoft.AspNetCore.Components.Routing;
 using Microsoft.JSInterop;
 
 namespace HowdenAxiais.Poc.Components.Pages;
@@ -42,7 +43,6 @@ public partial class PropostaPage : IAsyncDisposable
         _proposta = NovaComPadroes();
         _padraoDaNova = Foto();
         _baseSalva = _padraoDaNova;
-        _proximoNumero = Repo.ProximoNumero(_proposta.Ano);
     }
 
     // =====================================================================
@@ -83,8 +83,13 @@ public partial class PropostaPage : IAsyncDisposable
 
     private void IrParaEtapa(int n)
     {
+        var antes = _etapa;
         _etapa = Math.Clamp(n, 1, Etapas.Length);
         _rolarTopo = true;
+
+        // a etapa Começar mostra as gravadas: a lista vem com o que foi gravado
+        // desde a última vez, e não como estava ao abrir a tela
+        if (_etapa == 1 && antes != 1) AtualizarGravadas();
     }
 
     private void AbrirEquipamento(int indice)
@@ -207,6 +212,17 @@ public partial class PropostaPage : IAsyncDisposable
     /// <summary>Há o que gravar: o que está na tela é diferente do que está no banco.</summary>
     private bool TemAlteracao => Foto() != _baseSalva;
 
+    /// <summary>"2 itens · 3 un.": as linhas da proposta e, somadas, as unidades.</summary>
+    private string ItensEUnidades
+    {
+        get
+        {
+            var itens = _proposta.Itens.Count;
+            if (itens == 0) return "—";
+            return $"{itens} {(itens == 1 ? "item" : "itens")} · {CustoDaProposta.Quantidade(_proposta)} un.";
+        }
+    }
+
     private static bool MargemForaDoPadrao(CalculoPricing.Resultado p) =>
         Math.Abs(p.Margem - CalculoPricing.MargemAlvoPadrao) > 0.0005m;
 
@@ -231,22 +247,28 @@ public partial class PropostaPage : IAsyncDisposable
     [JSInvokable]
     public Task SalvarPeloTeclado() => InvokeAsync(() =>
     {
-        Salvar();
+        Salvar(explicito: true);
         StateHasChanged();
     });
 
-    /// <summary>Liga o Ctrl+S e lê a preferência de ajuda. Sem os dois, a tela funciona igual.</summary>
+    /// <summary>
+    /// Liga o Ctrl+S, a guarda dos links do menu e lê a preferência de ajuda.
+    /// Sem eles, a tela funciona igual.
+    /// </summary>
     private async Task LigarAtalhos()
     {
         try
         {
             _ref ??= DotNetObjectReference.Create(this);
             await JS.InvokeVoidAsync("appAtalhos.ligar", _ref);
+            await JS.InvokeVoidAsync("appGuarda.ligar", _ref);
 
             var ajuda = await JS.InvokeAsync<string?>("appPreferencia.ler", "ajuda");
             if (ajuda == "mostrar")
             {
                 _compacto = false;
+                // não foi a pessoa que mexeu: o cronômetro não conta este desenho
+                _desenhoDoSistema = true;
                 StateHasChanged();
             }
         }
@@ -258,9 +280,12 @@ public partial class PropostaPage : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        _guardaDeSaida?.Dispose();
+
         try
         {
             await JS.InvokeVoidAsync("appAtalhos.desligar");
+            await JS.InvokeVoidAsync("appGuarda.desligar");
         }
         catch (Exception)
         {
@@ -268,6 +293,171 @@ public partial class PropostaPage : IAsyncDisposable
         }
 
         _ref?.Dispose();
+    }
+
+    // =====================================================================
+    // alteração não salva: nada se perde sem perguntar
+    // =====================================================================
+
+    /// <summary>
+    /// O que a pessoa pediu e espera a resposta da barra "Há alterações não
+    /// salvas…": começar outra, abrir, copiar, sair da tela. Nulo: sem barra.
+    /// </summary>
+    private Action? _depoisDeConfirmar;
+
+    /// <summary>Para onde a pessoa ia quando a guarda segurou a saída da tela.</summary>
+    private string? _saindoPara;
+
+    /// <summary>A saída já foi respondida (Salvar ou Descartar): a guarda deixa passar.</summary>
+    private bool _saidaLiberada;
+
+    private IDisposable? _guardaDeSaida;
+
+    /// <summary>
+    /// Há o que perder: o que está na tela não foi gravado, e não é a proposta
+    /// em branco como nasceu (essa não tem nada a perder).
+    /// </summary>
+    private bool PrecisaConfirmar
+    {
+        get
+        {
+            var atual = Foto();
+            return atual != _baseSalva && atual != _padraoDaNova;
+        }
+    }
+
+    /// <summary>
+    /// Faz a ação já, ou — com alteração não salva — guarda a ação e mostra a
+    /// barra. Antes, '+ Nova', abrir ou copiar outra jogavam fora o que não
+    /// tinha sido gravado, sem aviso. Nunca grava sozinho: quem decide é a pessoa.
+    /// </summary>
+    private void Proteger(Action acao)
+    {
+        if (!PrecisaConfirmar)
+        {
+            acao();
+            return;
+        }
+
+        _depoisDeConfirmar = acao;
+        _saindoPara = null;
+    }
+
+    private string TextoDaGuarda
+    {
+        get
+        {
+            if (_proposta.Id.Length == 0 || _proposta.Numero.Trim().Length == 0)
+                return "Há alterações não salvas nesta proposta nova.";
+
+            var enviada = _proposta.Enviada && DateTime.TryParse(_proposta.EnviadaEm, out var quando)
+                ? $", já enviada em {quando:dd/MM}"
+                : "";
+            return $"Há alterações não salvas em {_proposta.Numero}{enviada}.";
+        }
+    }
+
+    private void FecharGuarda()
+    {
+        _depoisDeConfirmar = null;
+        _saindoPara = null;
+    }
+
+    /// <summary>Salvar, na barra: grava e só então faz o que foi pedido.</summary>
+    private void GuardaSalvar()
+    {
+        var acao = _depoisDeConfirmar;
+        FecharGuarda();
+
+        // não gravou (ex.: a revisão já existe): o erro fica à vista e nada mais acontece
+        if (!Salvar(explicito: true)) return;
+
+        var gravou = _msg;
+        acao?.Invoke();
+
+        // "gravada" e o que veio depois ("Proposta nova…") no mesmo aviso
+        if (gravou is not null && _msg is not null && _msg != gravou && !_erro)
+            Aviso($"{gravou} {_msg}");
+    }
+
+    /// <summary>
+    /// Descartar, na barra: a proposta volta ao que está gravado, o rascunho do
+    /// navegador some (senão ela voltaria ao abrir a tela) e a ação segue.
+    /// </summary>
+    private async Task GuardaDescartar()
+    {
+        var acao = _depoisDeConfirmar;
+        var saindo = _saindoPara is not null;
+        FecharGuarda();
+
+        try
+        {
+            var chave = _proposta.Id.Length > 0 ? _proposta.Id : "novo";
+            await JS.InvokeVoidAsync("appRascunho.limpar", chave);
+            if (_chaveRascunho.Length > 0 && _chaveRascunho != chave)
+                await JS.InvokeVoidAsync("appRascunho.limpar", _chaveRascunho);
+        }
+        catch (Exception)
+        {
+            // sem o navegador, o rascunho fica; ele só oferece de volta o que não foi gravado
+        }
+
+        // uma gravada volta ao que está no banco: a cópia (Duplicar) sai dela,
+        // e não do que acabou de ser descartado
+        if (_proposta.Id.Length > 0 && JsonSerializer.Deserialize<Proposta>(_baseSalva) is { } gravada)
+        {
+            _proposta = gravada;
+            _revisaoAberta = gravada.Revisao;
+            AjustarEscolhasLivres();
+        }
+
+        // saindo da tela, nenhum desenho daqui em diante escreve o rascunho de novo
+        if (saindo) _rascunhoPronto = false;
+
+        acao?.Invoke();
+    }
+
+    /// <summary>
+    /// Saída da tela pelo próprio servidor (ex.: ☰ Propostas). Os links do menu
+    /// do app não passam por aqui — a navegação deles é do navegador — e chegam
+    /// por <see cref="PedirParaSair"/>.
+    /// </summary>
+    private ValueTask AoSairDaTela(LocationChangingContext contexto)
+    {
+        if (_saidaLiberada || !PrecisaConfirmar) return ValueTask.CompletedTask;
+
+        contexto.PreventNavigation();
+        SegurarSaida(contexto.TargetLocation);
+        return new ValueTask(InvokeAsync(StateHasChanged));
+    }
+
+    /// <summary>
+    /// Um link do menu do app foi clicado (ver appGuarda no app.js). Sem nada a
+    /// perder, sai na hora; com alteração não salva, mostra a barra.
+    /// </summary>
+    [JSInvokable]
+    public Task PedirParaSair(string destino) => InvokeAsync(() =>
+    {
+        if (PrecisaConfirmar)
+        {
+            SegurarSaida(destino);
+            StateHasChanged();
+            return;
+        }
+
+        Sair(destino);
+    });
+
+    private void SegurarSaida(string destino)
+    {
+        _saindoPara = destino;
+        _depoisDeConfirmar = () => Sair(destino);
+    }
+
+    private void Sair(string destino)
+    {
+        _saidaLiberada = true;
+        Navegacao.NavigateTo(destino);
     }
 
     /// <summary>Gerando os três de uma vez: o tempo vai uma vez só, como "gerar-tudo".</summary>
@@ -342,29 +532,31 @@ public partial class PropostaPage : IAsyncDisposable
             .Take(8);
     }
 
-    private void NovaEmBranco()
+    // as quatro trocam a proposta da tela: com alteração não salva, a barra pergunta antes
+
+    private void NovaEmBranco() => Proteger(() =>
     {
         Nova();
         IrParaEtapa(1);
-    }
+    });
 
-    private void NovaEContinuar()
+    private void NovaEContinuar() => Proteger(() =>
     {
         Nova();
         IrParaEtapa(2);
-    }
+    });
 
-    private void AbrirGravada(string id)
+    private void AbrirGravada(string id) => Proteger(() =>
     {
         Abrir(id);
         if (_proposta.Id == id) IrParaEtapa(2);
-    }
+    });
 
-    private void DuplicarGravada(string id)
+    private void DuplicarGravada(string id) => Proteger(() =>
     {
         Abrir(id);
-        if (_proposta.Id == id) Duplicar();
-    }
+        if (_proposta.Id == id) DuplicarAgora();
+    });
 
     /// <summary>
     /// Uma proposta nova a partir da aberta: cliente, condições, equipamentos,
@@ -381,6 +573,11 @@ public partial class PropostaPage : IAsyncDisposable
             return;
         }
 
+        Proteger(DuplicarAgora);
+    }
+
+    private void DuplicarAgora()
+    {
         var origem = _proposta.Numero;
         var copia = JsonSerializer.Deserialize<Proposta>(Foto());
         if (copia is null) return;
@@ -421,6 +618,7 @@ public partial class PropostaPage : IAsyncDisposable
         _apagandoItem = null;
         AjustarEscolhasLivres();
         ZerarCronometro();
+        _origem = "copia";
         IrParaEtapa(2);
 
         Aviso($"Cópia da {origem}: confira referência, projeto e data de fechamento. A seleção e a " +
@@ -680,6 +878,19 @@ public partial class PropostaPage : IAsyncDisposable
     /// <summary>A taxa veio da aba Conversão (e não foi digitada aqui).</summary>
     private bool _taxaDoDia;
 
+    /// <summary>Quando a equipe gravou na aba Conversão a taxa que entrou aqui (ISO).</summary>
+    private string _taxaAtualizadaEm = "";
+
+    /// <summary>A partir de quantos dias a taxa da aba Conversão pede conferência.</summary>
+    private const int DiasDaTaxa = 7;
+
+    private DateTime? TaxaAtualizadaEm =>
+        DateTime.TryParse(_taxaAtualizadaEm, System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.None, out var data) ? data : null;
+
+    /// <summary>A taxa trazida tem mais de 7 dias: o câmbio pode ter andado desde então.</summary>
+    private bool TaxaVelha => TaxaAtualizadaEm is { } data && (DateTime.Now - data).TotalDays > DiasDaTaxa;
+
     private void EscolherMoedaVenda(Moeda moeda)
     {
         _proposta.MoedaVendaCodigo = moeda.Codigo();
@@ -694,7 +905,8 @@ public partial class PropostaPage : IAsyncDisposable
     private void PreencherTaxaDoDia()
     {
         if (!Cambio.Converte(_proposta) || _proposta.TaxaCambio.Trim().Length > 0) return;
-        if (ConversaoRepository.Taxa(Conversao.Ler().ClpPorUsd) is not { } clpPorUsd) return;
+        var taxas = Conversao.Ler();
+        if (ConversaoRepository.Taxa(taxas.ClpPorUsd) is not { } clpPorUsd) return;
 
         var custo = _proposta.Moeda;
         var venda = _proposta.MoedaVenda;
@@ -705,6 +917,7 @@ public partial class PropostaPage : IAsyncDisposable
 
         _proposta.TaxaCambio = clpPorUsd.ToString("0.####", Br);
         _taxaDoDia = true;
+        _taxaAtualizadaEm = taxas.AtualizadaEm;
     }
 
     // =====================================================================
@@ -714,10 +927,45 @@ public partial class PropostaPage : IAsyncDisposable
     /// <summary>Uma pausa maior que isto (café, telefone) não conta como trabalho na proposta.</summary>
     private const double PausaQueNaoConta = 180;
 
+    /// <summary>
+    /// Desenhos mais próximos que isto são a mesma ação: o Gerar tudo, a
+    /// importação e o que volta do navegador desenham a tela várias vezes por
+    /// um clique só, e cada desenho contava como uma interação.
+    /// </summary>
+    private const double MesmaInteracao = 0.4;
+
     private DateTime _cronInicio = DateTime.Now;
     private DateTime? _cronUltimo;
     private double _cronSegundos;
     private int _cronInteracoes;
+
+    /// <summary>
+    /// Os segundos em cada etapa (a Equipamentos, por aba: "3-escopo",
+    /// "3-opcionais", "3-tecnica"). É o que diz ONDE a proposta demora — o
+    /// total sozinho não mostra se uma mudança de tela encurtou a etapa dela.
+    /// </summary>
+    private Dictionary<string, double> _segundosPorEtapa = new();
+
+    /// <summary>A etapa que estava na tela no desenho anterior: o tempo até o próximo é dela.</summary>
+    private string _chaveDoUltimo = "";
+
+    /// <summary>Quantas vezes cada atalho da tela foi usado (ver <see cref="Contar"/>).</summary>
+    private Dictionary<string, int> _contadores = new();
+
+    /// <summary>
+    /// O próximo desenho não foi a pessoa: foi um timer, o aviso que some
+    /// sozinho, a preferência lida do navegador. Quem chama StateHasChanged por
+    /// conta própria liga isto antes, e o cronômetro deixa esse desenho passar
+    /// sem somar tempo nem interação.
+    /// </summary>
+    private bool _desenhoDoSistema;
+
+    /// <summary>
+    /// De onde a proposta partiu: "nova", "importada", "copia", "aberta" ou
+    /// "revisao". A meta é medida na proposta nova ou importada; uma cópia ou
+    /// uma revisão é muito mais rápida e puxaria a mediana para baixo.
+    /// </summary>
+    private string _origem = "nova";
 
     private string TempoNaTela
     {
@@ -728,19 +976,50 @@ public partial class PropostaPage : IAsyncDisposable
         }
     }
 
-    /// <summary>Cada desenho depois de um clique, campo ou arquivo é uma interação.</summary>
+    /// <summary>A etapa à vista, como é gravada: "1" a "5", e a 3 com a aba ("3-escopo").</summary>
+    private string ChaveDaEtapa() => _etapa == 3 ? "3-" + _abaItem : _etapa.ToString();
+
+    /// <summary>
+    /// Soma um uso de um atalho da tela ("modelo:botao1", "escopo:desfeito"…).
+    /// Vai junto com o tempo, na próxima geração de documento.
+    /// </summary>
+    private void Contar(string chave) =>
+        _contadores[chave] = _contadores.GetValueOrDefault(chave) + 1;
+
+    /// <summary>
+    /// Chamado a cada desenho. O tempo desde o desenho anterior vai para a
+    /// etapa que estava na tela; a interação só conta quando o desenho vem
+    /// 400 ms ou mais depois do anterior (ver <see cref="MesmaInteracao"/>).
+    /// </summary>
     private void TickCronometro()
     {
+        if (_desenhoDoSistema)
+        {
+            _desenhoDoSistema = false;
+            return;
+        }
+
         var agora = DateTime.Now;
 
         if (_cronUltimo is { } ultimo)
         {
             var passou = (agora - ultimo).TotalSeconds;
-            if (passou < PausaQueNaoConta) _cronSegundos += passou;
+            if (passou < PausaQueNaoConta)
+            {
+                _cronSegundos += passou;
+                if (_chaveDoUltimo.Length > 0)
+                    _segundosPorEtapa[_chaveDoUltimo] = _segundosPorEtapa.GetValueOrDefault(_chaveDoUltimo) + passou;
+            }
+
+            if (passou >= MesmaInteracao) _cronInteracoes++;
+        }
+        else
+        {
+            _cronInteracoes++;
         }
 
         _cronUltimo = agora;
-        _cronInteracoes++;
+        _chaveDoUltimo = ChaveDaEtapa();
     }
 
     private void ZerarCronometro()
@@ -749,12 +1028,19 @@ public partial class PropostaPage : IAsyncDisposable
         _cronUltimo = null;
         _cronSegundos = 0;
         _cronInteracoes = 0;
+        _segundosPorEtapa = new();
+        _chaveDoUltimo = "";
+        _contadores = new();
     }
 
     private void RegistrarTempo(string evento)
     {
         try
         {
+            var porEtapa = _segundosPorEtapa
+                .Where(e => e.Value >= 0.5)
+                .ToDictionary(e => e.Key, e => (int)Math.Round(e.Value));
+
             Tempos.Registrar(new TempoProposta
             {
                 PropostaId = _proposta.Id,
@@ -766,6 +1052,10 @@ public partial class PropostaPage : IAsyncDisposable
                 SegundosAtivos = (int)Math.Round(_cronSegundos),
                 Interacoes = _cronInteracoes,
                 Evento = evento,
+                PorEtapa = JsonSerializer.Serialize(porEtapa),
+                Contadores = JsonSerializer.Serialize(_contadores),
+                Origem = _origem,
+                Equipamentos = _proposta.Itens.Count,
             });
         }
         catch (Exception)
@@ -814,6 +1104,7 @@ public partial class PropostaPage : IAsyncDisposable
             foreach (var (nome, _, bytes) in lidos.Where(l => l.Ext is ".xlsx" or ".xlsm"))
             {
                 var equipamentos = LerFolha(bytes);
+                _origem = "importada";
                 _importados.Add((nome, equipamentos > 0
                     ? $"folha de dados: {equipamentos} equipamento(s)"
                     : "folha de dados, sem quantidade na linha 31"));

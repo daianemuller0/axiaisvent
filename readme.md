@@ -206,12 +206,39 @@ termina em **Salvar e continuar**.
 - **Modo compacto**: os textos de ajuda ficam escondidos; o botão **? Mostrar ajuda** traz de volta
   (a escolha fica lembrada no navegador). Campos que quase nunca mudam ficam em **Mais campos**.
 
+### Nota de versão — Onda 0: medir antes de mexer, gravar só o que mudou
+
+- **Medição por etapa**: o cronômetro passa a gravar também o tempo em cada etapa (a Equipamentos
+  por aba), a origem da proposta (nova, importada, cópia, aberta ou revisão), o número de
+  equipamentos e quantas vezes cada atalho da tela foi usado. Desenhos a menos de 400 ms um do outro
+  contam como uma interação só.
+- **Gravar só o que mudou**: Salvar, Salvar e continuar e Gerar tudo não escrevem outro arquivo na
+  pasta de rede quando nada mudou (o 💾 Salvar e o Ctrl+S avisam "Nada mudou desde a última
+  gravação"). Depois de gravar, só a lista de propostas é relida — e ela já traz o que os colegas
+  gravaram.
+- **Documento sempre com número**: comercial, técnica, pricing e custo previsto avulsos gravam a
+  proposta antes (nada mais de `P_SEM-NUMERO`). O número da proposta nova sai do que está na pasta
+  na hora de gravar, e não do que a tela leu ao abrir.
+- **Nada se perde sem aviso**: **+ Nova**, abrir, copiar, Duplicar e sair pelo menu do app, com
+  alteração não salva, mostram a barra *Há alterações não salvas em PRP-…* com **Salvar**,
+  **Descartar** e **Cancelar**. Nada é gravado sem clique.
+- **Rótulos que enganavam**: a coluna dos opcionais é o *Preço ao cliente* na moeda de venda; a taxa
+  diz de que data é na aba Conversão (âmbar depois de 7 dias); o painel mostra *2 itens · 3 un.* e só
+  mostra o preço com impostos quando ele é diferente; fora do Brasil, o J6 do pricing vira uma nota
+  sob o país; o segundo país se chama *País de destino*.
+
 ### O cronômetro (tempo de cada proposta)
 
 A tela mede o tempo de trabalho em cada proposta — pausas de mais de 3 minutos não contam — e grava,
-a cada documento gerado, o tempo e o número de interações (entidade `tempos_proposta`). Em
-**Configurações › Tempo das propostas** (ADM) ficam o tempo médio, a mediana e a lista, contando a
-primeira geração de cada revisão. É o número para comparar com o processo antigo.
+a cada documento gerado, o tempo, o número de interações, o tempo por etapa, a origem, o número de
+equipamentos e os atalhos usados (entidade `tempos_proposta`; as linhas antigas, sem essas colunas,
+continuam sendo lidas). Em **Configurações › Tempo das propostas** (ADM) ficam o filtro por origem e
+por número de equipamentos (o padrão é a proposta típica da meta: nova ou importada, com 2
+equipamentos), a mediana, a lista, a comparação **antes e depois de cada mudança da tela** (a lista
+de marcos fica no próprio componente `VistaTempos`), o tempo por etapa, o retrabalho (gerar de novo a
+mesma revisão; segundo Gerar tudo em menos de 24 h) e os atalhos usados. Com menos de 10 propostas
+de um dos lados, a tela diz "poucos dados". Conta a primeira geração de cada revisão. É o número
+para comparar com o processo antigo.
 
 ### Anexos sempre na pasta certa
 
@@ -224,7 +251,8 @@ deixava as curvas para trás. E uma **revisão nova** leva os anexos da anterior
 
 A proposta em andamento é copiada para o navegador (localStorage) a cada alteração e volta quando a
 página abre — inclusive depois de recarregar (F5) ou de o servidor reiniciar. O rascunho vale
-enquanto a proposta não for gravada: **Salvar** (ou **+ Nova**) o apaga. Abrindo uma proposta gravada,
+enquanto a proposta não for gravada: **Salvar** o apaga, e **Descartar** (na barra de alteração não
+salva) também. Abrindo uma proposta gravada,
 só é recuperado o que for diferente do que está gravado. Cada proposta tem o seu rascunho; sem id na
 rota, volta a que estava sendo editada por último. O rascunho é do navegador e da máquina da pessoa
 (não vai para a pasta de rede) e, como os campos de texto só confirmam ao sair deles, o que ainda está

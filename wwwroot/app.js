@@ -75,6 +75,41 @@ window.appAtalhos = {
     },
 };
 
+// Guarda da proposta: um link do menu do app não sai direto da tela. O clique
+// é segurado e repassado ao servidor, que sabe se há alteração não gravada:
+// sem nada a perder, ele mesmo navega; com alteração, a tela mostra a barra
+// Salvar / Descartar / Cancelar. A navegação dos links é do navegador (o menu
+// não é interativo), por isso a guarda do servidor sozinha não a veria. Sem
+// conexão com o servidor, o link segue normal — o rascunho do navegador ainda
+// guarda o que foi digitado.
+window.appGuarda = {
+    ligar: (dotnet) => {
+        window.appGuarda.desligar();
+        const aoClicar = (e) => {
+            if (e.defaultPrevented || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+            // a tela da proposta saiu da página sem desligar: não segura mais nada
+            if (!document.querySelector('.prop-etapas')) { window.appGuarda.desligar(); return; }
+            const a = e.target instanceof Element ? e.target.closest('a[href]') : null;
+            if (!a || a.hasAttribute('download') || (a.getAttribute('target') || '_self') !== '_self') return;
+            const destino = new URL(a.href, document.baseURI);
+            if (destino.origin !== location.origin) return;
+            // o link da própria proposta não troca de tela: nada se perde
+            if (destino.pathname.replace(/\/+$/, '').toLowerCase() === '/axiais/proposta') return;
+            e.preventDefault();
+            dotnet.invokeMethodAsync('PedirParaSair', destino.href)
+                .catch(() => { location.href = destino.href; });
+        };
+        window.appGuarda._aoClicar = aoClicar;
+        document.addEventListener('click', aoClicar, true);
+    },
+    desligar: () => {
+        if (window.appGuarda._aoClicar) {
+            document.removeEventListener('click', window.appGuarda._aoClicar, true);
+            window.appGuarda._aoClicar = null;
+        }
+    },
+};
+
 // Troca de etapa: a etapa nova começa do alto.
 window.appTopo = () => window.scrollTo(0, 0);
 

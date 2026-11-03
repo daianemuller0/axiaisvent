@@ -951,7 +951,14 @@ public sealed class PropostaRepository
     {
         if (string.IsNullOrWhiteSpace(p.Id)) p.Id = Guid.NewGuid().ToString("n");
         if (string.IsNullOrWhiteSpace(p.CriadaEm)) p.CriadaEm = DateTime.Now.ToString("yyyy-MM-dd HH:mm");
-        if (string.IsNullOrWhiteSpace(p.Numero)) p.Numero = ProximoNumero(p.Ano);
+        if (string.IsNullOrWhiteSpace(p.Numero))
+        {
+            // o número sai do que está na pasta AGORA, e não do que esta sessão
+            // leu há uma hora: o cache não vê o que os colegas gravaram, e o
+            // número repetido entre duas máquinas vinha daí
+            _store.Atualizar(Entidade);
+            p.Numero = ProximoNumero(p.Ano);
+        }
 
         var valores = new object?[]
         {

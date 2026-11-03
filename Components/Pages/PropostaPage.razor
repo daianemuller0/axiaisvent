@@ -88,7 +88,18 @@
     </div>
 </div>
 
-@if (_msg is not null)
+@if (_depoisDeConfirmar is not null)
+{
+    @* no lugar do aviso, como a confirmação de apagar: a ação pedida espera a resposta *@
+    <div class="aviso aviso-alerta guarda-barra" role="alertdialog" aria-label="Alterações não salvas">
+        <span>@TextoDaGuarda</span>
+        <span style="flex:1"></span>
+        <button class="btn-primary" @onclick="GuardaSalvar">💾 Salvar</button>
+        <button class="btn-ghost" @onclick="GuardaDescartar">Descartar</button>
+        <button class="btn-link" @onclick="FecharGuarda">Cancelar</button>
+    </div>
+}
+else if (_msg is not null)
 {
     <div class="@(_erro ? "aviso aviso-erro" : "aviso aviso-ok")" style="margin-bottom:14px">@_msg</div>
 }
@@ -245,13 +256,20 @@
                 {
                     <option value="@x">@x</option>
                 }
-            </select></label>
-        @* o estado é a chave do ICMS no pricing (J6), então só vale o que a
-           planilha aceita — digitar "São Paulo" não acharia a alíquota. Fora do
-           Brasil ele nem é escolha: o país já decide *@
-        <label>@Campo("Estado / UF", "pricing J6")
-            @if (EhBrasil)
+            </select>
+            @if (!EhBrasil)
             {
+                @* fora do Brasil o estado nem é escolha: o país vai para o J6 do
+                   pricing. Um campo travado mostrando "Chile" em "Estado / UF"
+                   parecia erro; a nota diz o que acontece *@
+                <span class="nota">pricing J6: @EstadoDoPricing · fora do Brasil, sem ICMS, PIS nem COFINS</span>
+            }
+        </label>
+        @* o estado é a chave do ICMS no pricing (J6), então só vale o que a
+           planilha aceita — digitar "São Paulo" não acharia a alíquota *@
+        @if (EhBrasil)
+        {
+            <label>@Campo("Estado / UF", "pricing J6")
                 <select class="cell" @bind="_proposta.Estado">
                     <option value="">— escolher —</option>
                     @foreach (var uf in ListasDaProposta.Estados.Where(u => u.Length == 2))
@@ -259,13 +277,8 @@
                         <option value="@uf">@uf</option>
                     }
                 </select>
-            }
-            else
-            {
-                <input class="cell" disabled value="@EstadoDoPricing" />
-                <span class="subtitle">vem do país — sem ICMS, PIS nem COFINS</span>
-            }
-        </label>
+            </label>
+        }
         <label>@Campo("Referência do cliente")
             <input class="cell" placeholder="O número que o cliente deu" @bind="_proposta.ReferenciaCliente" /></label>
         <label>@Campo("Projeto")
@@ -326,7 +339,7 @@
                     <option value="@x">@x</option>
                 }
             </select></label>
-        <label>@Campo("País")
+        <label>@Campo("País de destino")
             <select class="cell" @bind="_proposta.PaisDestino">
                 @foreach (var x in ListasDaProposta.Paises)
                 {
@@ -1110,7 +1123,7 @@
     {
 <div class="panel" style="margin-bottom:14px">
     <div class="toolbar" style="flex-wrap:wrap">
-        <h2 style="margin:0; font-size:15px">Itens adicionais</h2>
+        <h2 style="margin:0; font-size:15px">Opcionais</h2>
         <span class="subtitle ajuda" style="margin:0">
             o que o cliente pode comprar ou não — fora do preço fechado
         </span>
@@ -1237,7 +1250,8 @@
                                         <th class="nowrap">Opcional</th>
                                         <th class="nowrap right">Qtd.</th>
                                         <th class="nowrap right">Custo unit. @_proposta.Moeda.Rotulo()</th>
-                                        <th class="nowrap right">Custo @_proposta.Moeda.Rotulo()</th>
+                                        @* o valor da coluna é o preço AO CLIENTE (custo × fator), na moeda de venda *@
+                                        <th class="nowrap right">Preço ao cliente (@_proposta.MoedaVenda.Rotulo())</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1784,7 +1798,10 @@
                            @onchange="e => MudarTaxa(e.Value?.ToString() ?? string.Empty)" />
                     @if (_taxaDoDia)
                     {
-                        <span class="subtitle" style="margin:0 0 0 6px">taxa do dia, da aba Conversão</span>
+                        @* é a última taxa gravada na aba Conversão, não a do dia: a data diz de quando *@
+                        <span class="@(TaxaVelha ? "taxa-origem velha" : "taxa-origem")">
+                            taxa da aba Conversão@(TaxaAtualizadaEm is { } atualizada ? $", atualizada em {atualizada:dd/MM/yyyy}" : "")@(TaxaVelha ? " — confira se ainda vale" : "")
+                        </span>
                     }
                 </span>
                 <span>
@@ -2140,6 +2157,9 @@
 
 </div>
 <aside class="prop-side">
+    @{
+        var comImpostos = pricingAtual.PrecoComImpostos != pricingAtual.VendaLiquida;
+    }
     <div class="side-total">
         <div class="kpi-label" style="color:#cfe3f7">
             Venda líquida@(Cambio.Converte(_proposta) ? $" em {_proposta.MoedaVenda.Rotulo()}" : "")
@@ -2147,6 +2167,10 @@
         <div class="side-total-value">
             @(Total > 0m ? DinheiroVenda(Cambio.ParaVenda(_proposta, pricingAtual.VendaLiquida)) : "—")
         </div>
+        @if (Total > 0m && !comImpostos)
+        {
+            <div class="side-total-nota">sem impostos (exportação)</div>
+        }
     </div>
     <div class="panel" style="padding:8px 14px">
         <div class="side-item"><span>Custo total</span><strong>@(Total > 0m ? Dinheiro(Total) : "—")</strong></div>
@@ -2156,11 +2180,19 @@
                 @(Total > 0m ? Pct(pricingAtual.Margem) : "—")
             </strong>
         </div>
+        @* igual à venda líquida (exportação), a linha só repetia o número de cima *@
+        @if (Total > 0m && comImpostos)
+        {
+            <div class="side-item">
+                <span>Preço com impostos</span>
+                <strong>@DinheiroVenda(Cambio.ParaVenda(_proposta, pricingAtual.PrecoComImpostos))</strong>
+            </div>
+        }
+        @* "Equipamentos 3" somava unidades: 2 linhas com 1 e 2 unidades pareciam 3 equipamentos *@
         <div class="side-item">
-            <span>Preço com impostos</span>
-            <strong>@(Total > 0m ? DinheiroVenda(Cambio.ParaVenda(_proposta, pricingAtual.PrecoComImpostos)) : "—")</strong>
+            <span>Equipamentos</span>
+            <strong>@ItensEUnidades</strong>
         </div>
-        <div class="side-item"><span>Equipamentos</span><strong>@CustoDaProposta.Quantidade(_proposta)</strong></div>
     </div>
     @if (Total > 0m && PrecisaAprovacao(pricingAtual))
     {
@@ -2198,7 +2230,7 @@
         }
         <span title="Tempo de trabalho nesta proposta">⏱ @TempoNaTela</span>
     </div>
-    <button class="btn-primary btn-block" @onclick="() => Salvar()">
+    <button class="btn-primary btn-block" @onclick="() => Salvar(explicito: true)">
         💾 Salvar <span style="opacity:.75; font-weight:400">(Ctrl+S)</span>
     </button>
     <button class="btn-accent btn-block" @onclick="GerarTudo">⬇ Gerar tudo</button>
@@ -2244,6 +2276,10 @@
     {
         if (firstRender)
         {
+            // a saída pelo próprio servidor (☰ Propostas) passa pela guarda de
+            // alteração não salva; os links do menu, pelo appGuarda
+            _guardaDeSaida = Navegacao.RegisterLocationChangingHandler(AoSairDaTela);
+
             await LigarAtalhos();
 
             try
@@ -2310,11 +2346,14 @@
         _proposta = recuperada;
         _ultimoRascunho = texto;
         _chaveRascunho = chave;
+        if (recuperada.Id.Length > 0) _origem = "aberta";
         AjustarEscolhasLivres();
 
         _etapa = 2;
         Aviso("Recuperei o que você estava preenchendo e ainda não tinha gravado. " +
               "Grave com 💾 Salvar — ou descarte com + Nova.");
+        // quem desenhou foi a tela, ao abrir: o cronômetro não conta
+        _desenhoDoSistema = true;
         StateHasChanged();
     }
 
@@ -2444,6 +2483,7 @@
             _abaItem = "escopo";
             _sugestaoCliente = null;
             ZerarCronometro();
+            _origem = "aberta";
             _etapa = 2;
             Aviso($"Proposta {achada.Numero} aberta.");
         }
@@ -2467,12 +2507,24 @@
         MarketSegment = ListasDaProposta.Segmentos[0],
     };
 
-    private void Recarregar()
+    /// <summary>
+    /// Relê só a lista de propostas gravadas e o que sai dela: os clientes
+    /// conhecidos e o próximo número. Depois de gravar é só isso que muda —
+    /// remontar cadastros, a conta e as listas a cada gravação era trabalho
+    /// jogado fora. A gravação acabou de invalidar "propostas", então a leitura
+    /// vai ao disco e traz também o que os colegas gravaram na pasta.
+    /// </summary>
+    private void AtualizarGravadas()
     {
         _gravadas = Repo.Todas();
         MontarClientes();
-        _padroes = EscoposPadrao.Todos();
         _proximoNumero = Repo.ProximoNumero(_proposta.Ano);
+    }
+
+    private void Recarregar()
+    {
+        AtualizarGravadas();
+        _padroes = EscoposPadrao.Todos();
         _condicoes = Pagamentos.Todas();
         _equipamentos = Equipamentos.Todos();
         _motores = Motores.Todos();
@@ -3156,6 +3208,10 @@
                 return false;
             }
 
+            // o documento leva o número: a proposta nova é gravada antes (e,
+            // sem mudança, o Salvar não escreve nada)
+            if (!Salvar()) return false;
+
             var bytes = PropostaWord.Gerar(_proposta, _custo, modelo);
 
             await JS.InvokeVoidAsync("appDownload",
@@ -3191,6 +3247,9 @@
                 Aviso($"O modelo da proposta não está em {PropostaWord.CaminhoDoModelo}.", erro: true);
                 return false;
             }
+
+            // gravar antes: o número no documento e as curvas na pasta da revisão certa
+            if (!Salvar()) return false;
 
             var bytes = PropostaTecnicaWord.Gerar(_proposta, _custo, modelo, LerCurva);
 
@@ -3264,6 +3323,8 @@
 
         try
         {
+            if (!Salvar()) return;
+
             var bytes = CustoPrevistoExcel.Gerar(_proposta, _custo, projeto, pedido, DateTime.Now);
             var nome = CustoPrevistoExcel.NomeDoArquivo(projeto);
 
@@ -3299,6 +3360,8 @@
 
         try
         {
+            if (!Salvar()) return false;
+
             var bytes = PricingExcel.Gerar(_proposta, Total, Pricing(), modelo);
 
             await JS.InvokeVoidAsync("appDownload",
@@ -3720,9 +3783,23 @@
     private bool NovaRevisaoPendente =>
         _proposta.Id.Length > 0 && _proposta.Revisao.Trim() != _revisaoAberta.Trim();
 
-    /// <summary>Grava a proposta. Falso quando não gravou (a revisão já existia).</summary>
-    private bool Salvar()
+    /// <summary>
+    /// Grava a proposta. Falso quando não gravou (a revisão já existia).
+    ///
+    /// Sem nada mudado desde a última gravação, não escreve: cada gravação é um
+    /// arquivo novo na pasta de rede, e passar por uma etapa, gerar de novo ou
+    /// um documento avulso logo depois do Gerar tudo não são motivo para outro.
+    /// <paramref name="explicito"/> é o 💾 Salvar e o Ctrl+S: só aí a tela diz
+    /// que não havia o que gravar.
+    /// </summary>
+    private bool Salvar(bool explicito = false)
     {
+        if (_proposta.Id.Length > 0 && !NovaRevisaoPendente && !TemAlteracao)
+        {
+            if (explicito) Aviso("Nada mudou desde a última gravação.");
+            return true;
+        }
+
         var novaRevisao = NovaRevisaoPendente;
         var idAnterior = _proposta.Id;
 
@@ -3745,6 +3822,9 @@
             _proposta.Id = "";
             _proposta.CriadaEm = "";
             _proposta.EnviadaEm = "";
+
+            // o tempo daqui em diante é o de montar uma revisão, não uma proposta
+            _origem = "revisao";
         }
 
         Repo.Salvar(_proposta);
@@ -3765,7 +3845,7 @@
 
         _revisaoAberta = _proposta.Revisao;
         _baseSalva = Foto();
-        Recarregar();
+        AtualizarGravadas();
 
         Aviso(novaRevisao
             ? $"Revisão {_proposta.Revisao.Trim()} gravada como uma proposta nova — a revisão anterior continua como estava."
@@ -3786,12 +3866,14 @@
         _abaItem = "escopo";
         _taxaDoDia = false;
         ZerarCronometro();
+        _origem = "nova";
         AjustarEscolhasLivres();
         _aberto = 0;
         _apagando = false;
         _apagandoItem = null;
         _daPlanilha = new();
         _avisos = new();
+        AtualizarGravadas();
         Aviso("Proposta nova — o número é gerado ao gravar.");
     }
 
@@ -3822,6 +3904,7 @@
         _sugestaoCliente = null;
         _faltouNaSelecao.Clear();
         ZerarCronometro();
+        _origem = "aberta";
         Aviso($"Proposta {achada.Numero} aberta.");
     }
 
@@ -3841,7 +3924,7 @@
         Repo.Salvar(_proposta);
         _baseSalva = Foto();
 
-        Recarregar();
+        AtualizarGravadas();
         Aviso($"Proposta {_proposta.Numero} marcada como enviada em {DataCurta(_proposta.EnviadaEm)}.");
     }
 
@@ -3857,7 +3940,7 @@
         Repo.Salvar(_proposta);
         _baseSalva = Foto();
 
-        Recarregar();
+        AtualizarGravadas();
         Aviso($"Proposta {_proposta.Numero} voltou para \"em elaboração\".");
     }
 
