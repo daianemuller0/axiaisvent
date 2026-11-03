@@ -71,8 +71,8 @@ public partial class PropostaPage : IAsyncDisposable
 
     /// <summary>
     /// Os textos de ajuda escondidos. Começa assim: no dia a dia eles só
-    /// aumentam o que o olho precisa varrer — quem quer, liga no "? Mostrar
-    /// ajuda", e a escolha fica lembrada no navegador.
+    /// aumentam o que o olho precisa varrer — quem quer, liga no "Mostrar
+    /// ajuda" (menu Mais), e a escolha fica lembrada no navegador.
     /// </summary>
     private bool _compacto = true;
 
@@ -131,6 +131,194 @@ public partial class PropostaPage : IAsyncDisposable
         {
             // sem guardar a escolha, ela vale só até fechar a tela
         }
+    }
+
+    // =====================================================================
+    // moldura: topo, menus e o aviso de três níveis
+    // =====================================================================
+
+    /// <summary>"Cliente · Projeto" do subtítulo, numa linha só.</summary>
+    private string ClienteEProjeto
+    {
+        get
+        {
+            var partes = new[] { _proposta.Cliente, _proposta.Projeto }
+                .Select(x => x.Trim())
+                .Where(x => x.Length > 0)
+                .ToList();
+            return partes.Count > 0 ? string.Join(" · ", partes) : "sem cliente ainda";
+        }
+    }
+
+    /// <summary>"03/11": a data do chip de enviada (o ano está no número da proposta).</summary>
+    private static string DiaEMes(string texto) =>
+        DateTime.TryParse(texto, out var data) ? data.ToString("dd/MM") : texto;
+
+    /// <summary>O menu Mais do topo está aberto.</summary>
+    private bool _menuAberto;
+
+    /// <summary>Qual botão "Gerar tudo" está com a seta aberta ("lado", e depois a etapa Documentos).</summary>
+    private string? _gerarAberto;
+
+    /// <summary>Um menu acabou de abrir: depois de desenhar, o foco vai para o primeiro item.</summary>
+    private string? _menuParaLigar;
+
+    /// <summary>Um item de menu foi escolhido: o foco volta ao botão que abriu o menu.</summary>
+    private string? _focarDepois;
+
+    private void AlternarMenu()
+    {
+        _gerarAberto = null;
+        _menuAberto = !_menuAberto;
+        _menuParaLigar = _menuAberto ? "menu-mais" : null;
+    }
+
+    private void AlternarGerar(string onde)
+    {
+        _menuAberto = false;
+        _gerarAberto = _gerarAberto == onde ? null : onde;
+        _menuParaLigar = _gerarAberto is null ? null : $"menu-gerar-{onde}";
+    }
+
+    /// <summary>Clicou fora, Esc ou Tab (ver appMenuPop no app.js): os menus fecham.</summary>
+    [JSInvokable]
+    public Task FecharMenus() => InvokeAsync(() =>
+    {
+        if (!_menuAberto && _gerarAberto is null) return;
+        _menuAberto = false;
+        _gerarAberto = null;
+        StateHasChanged();
+    });
+
+    /// <summary>Um item do menu Mais: fecha o menu e faz.</summary>
+    private void DoMenu(Action fazer)
+    {
+        _menuAberto = false;
+        _gerarAberto = null;
+        _focarDepois = "botao-mais";
+        fazer();
+    }
+
+    private async Task DoMenu(Func<Task> fazer)
+    {
+        _menuAberto = false;
+        _gerarAberto = null;
+        _focarDepois = "botao-mais";
+        await fazer();
+    }
+
+    /// <summary>Um documento avulso pela seta do Gerar tudo.</summary>
+    private async Task DoMenuGerar(string onde, Func<Task<bool>> gerar)
+    {
+        _menuAberto = false;
+        _gerarAberto = null;
+        _focarDepois = $"seta-gerar-{onde}";
+        await gerar();
+    }
+
+    /// <summary>Liga o teclado do menu que abriu e devolve o foco depois de escolher.</summary>
+    private async Task LigarMenus()
+    {
+        try
+        {
+            if (_menuParaLigar is { } menu)
+            {
+                _menuParaLigar = null;
+                if (_ref is not null) await JS.InvokeVoidAsync("appMenuPop.abrir", menu, _ref);
+            }
+
+            if (_focarDepois is { } botao)
+            {
+                _focarDepois = null;
+                await JS.InvokeVoidAsync("appMenuPop.focar", botao);
+            }
+        }
+        catch (Exception)
+        {
+            // sem o teclado do menu, o clique continua funcionando
+        }
+    }
+
+    /// <summary>Pode ficar até alguém fechar: consequência, erro ou aviso com ação.</summary>
+    private bool _avisoFica;
+
+    /// <summary>O botão do aviso (ex.: "Marcar como enviada" depois do Gerar tudo).</summary>
+    private (string Rotulo, Action Fazer)? _avisoAcao;
+
+    /// <summary>O relógio do aviso de sucesso que some sozinho.</summary>
+    private CancellationTokenSource? _avisoRelogio;
+
+    /// <summary>Quanto tempo o aviso de sucesso fica na tela.</summary>
+    private static readonly TimeSpan AvisoSome = TimeSpan.FromSeconds(6);
+
+    /// <summary>
+    /// O aviso do pé da coluna, em três níveis.
+    /// <list type="bullet">
+    /// <item>Sucesso (o padrão): some em 6 s — "Proposta gravada" não precisa
+    /// de ninguém para fechar.</item>
+    /// <item>Consequência (<paramref name="fica"/>): fica até alguém fechar ou
+    /// até o próximo aviso — "Modelo trocado: o preço à mão do anterior foi
+    /// descartado" diz algo que mudou sem a pessoa pedir. Todo aviso com
+    /// <paramref name="acao"/> também fica.</item>
+    /// <item>Erro (<paramref name="erro"/>): fica até alguém fechar. O Gerar
+    /// tudo lê o _msg logo depois de cada gerador, e o erro nunca some antes.</item>
+    /// </list>
+    /// Um "desfazer" nunca mora só aqui: ele aparece também na linha afetada.
+    /// </summary>
+    private void Aviso(string texto, bool erro = false, bool fica = false,
+        (string Rotulo, Action Fazer)? acao = null)
+    {
+        _avisoRelogio?.Cancel();
+        _avisoRelogio = null;
+
+        _msg = texto;
+        _erro = erro;
+        _avisoAcao = acao;
+        _avisoFica = erro || fica || acao is not null;
+
+        if (_avisoFica) return;
+
+        var relogio = new CancellationTokenSource();
+        _avisoRelogio = relogio;
+        _ = SumirDepois(texto, relogio.Token);
+    }
+
+    private async Task SumirDepois(string texto, CancellationToken cancelar)
+    {
+        try
+        {
+            await Task.Delay(AvisoSome, cancelar);
+            await InvokeAsync(() =>
+            {
+                // outro aviso entrou no lugar (ou alguém fechou): não é este que some
+                if (cancelar.IsCancellationRequested || _msg != texto) return;
+
+                _msg = null;
+                _avisoAcao = null;
+                // quem desenhou foi o relógio, não a pessoa: o cronômetro não conta
+                _desenhoDoSistema = true;
+                StateHasChanged();
+            });
+        }
+        catch (Exception)
+        {
+            // cancelado, ou a tela já fechou: o aviso fica como está
+        }
+    }
+
+    private void FecharAviso()
+    {
+        _avisoRelogio?.Cancel();
+        _avisoRelogio = null;
+        _msg = null;
+        _avisoAcao = null;
+    }
+
+    private void FazerAcaoDoAviso()
+    {
+        var acao = _avisoAcao;
+        FecharAviso();
+        acao?.Fazer();
     }
 
     // =====================================================================
@@ -195,7 +383,7 @@ public partial class PropostaPage : IAsyncDisposable
 
             var semCusto = LinhasDePreco(item).Count(l => Efetivo(item, l.Chave, l.Puxado) is null);
             if (semCusto > 0)
-                lista.Add(new Pendencia($"{nome}: {semCusto} linha(s) sem custo", 3, i, "escopo"));
+                lista.Add(new Pendencia($"{nome}: {Plural(semCusto, "linha sem custo", "linhas sem custo")}", 3, i, "escopo"));
 
             if (item.Tecnicos.Count == 0)
                 lista.Add(new Pendencia($"{nome}: dados da seleção", 3, i, "tecnica"));
@@ -207,6 +395,30 @@ public partial class PropostaPage : IAsyncDisposable
         Falta(Cambio.FaltaTaxa(_proposta), "Taxa de câmbio", 4);
 
         return lista;
+    }
+
+    private enum Selo { Neutro, Pendente, Ok }
+
+    /// <summary>
+    /// O selo de uma etapa na barra. Antes o visto aparecia em etapa vazia (o
+    /// Preço com custo zero tinha visto); agora ele só vem com conteúdo — o
+    /// cliente na etapa 2, um equipamento na 3, custo na 4 e, na 5, um
+    /// equipamento e nada pendente em lugar nenhum. Sem conteúdo, a etapa fica
+    /// sem selo: ainda não começou, não está "pendente".
+    /// </summary>
+    private Selo SeloDaEtapa(int etapa, int faltamNela, int faltamNoTotal)
+    {
+        var temConteudo = etapa switch
+        {
+            2 => _proposta.Cliente.Trim().Length > 0,
+            3 or 5 => _proposta.Itens.Count > 0,
+            4 => Total > 0m,
+            _ => false,
+        };
+
+        if (!temConteudo) return Selo.Neutro;
+        if (etapa == 5) return faltamNoTotal == 0 ? Selo.Ok : Selo.Neutro;
+        return faltamNela > 0 ? Selo.Pendente : Selo.Ok;
     }
 
     /// <summary>Há o que gravar: o que está na tela é diferente do que está no banco.</summary>
@@ -281,6 +493,7 @@ public partial class PropostaPage : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         _guardaDeSaida?.Dispose();
+        _avisoRelogio?.Cancel();
 
         try
         {
@@ -341,6 +554,7 @@ public partial class PropostaPage : IAsyncDisposable
 
         _depoisDeConfirmar = acao;
         _saindoPara = null;
+        LimparSucesso();
     }
 
     private string TextoDaGuarda
@@ -418,7 +632,7 @@ public partial class PropostaPage : IAsyncDisposable
     }
 
     /// <summary>
-    /// Saída da tela pelo próprio servidor (ex.: ☰ Propostas). Os links do menu
+    /// Saída da tela pelo próprio servidor (ex.: o botão Propostas). Os links do menu
     /// do app não passam por aqui — a navegação deles é do navegador — e chegam
     /// por <see cref="PedirParaSair"/>.
     /// </summary>
@@ -452,6 +666,16 @@ public partial class PropostaPage : IAsyncDisposable
     {
         _saindoPara = destino;
         _depoisDeConfirmar = () => Sair(destino);
+        LimparSucesso();
+    }
+
+    /// <summary>
+    /// A barra de alteração não salva entrou: um "gravada" ou "Nada mudou" de
+    /// segundos atrás, embaixo, contradiria a barra. Consequência e erro ficam.
+    /// </summary>
+    private void LimparSucesso()
+    {
+        if (_msg is not null && !_avisoFica) FecharAviso();
     }
 
     private void Sair(string destino)
@@ -506,7 +730,11 @@ public partial class PropostaPage : IAsyncDisposable
 
         if (falhas.Count == 0)
         {
-            Aviso($"Proposta {_proposta.Numero} salva e documentos baixados: {string.Join(", ", feitos)}.");
+            // quem gera tudo costuma mandar ao cliente em seguida: o "Marcar
+            // como enviada" fica no caminho, sem ir ao menu Mais
+            var texto = $"Proposta {_proposta.Numero} salva e documentos baixados: {string.Join(", ", feitos)}.";
+            if (_proposta.Enviada || NovaRevisaoPendente) Aviso(texto);
+            else Aviso(texto, acao: ("Marcar como enviada", MarcarEnviada));
             return;
         }
 
@@ -623,7 +851,7 @@ public partial class PropostaPage : IAsyncDisposable
 
         Aviso($"Cópia da {origem}: confira referência, projeto e data de fechamento. A seleção e a " +
               "curva de cada equipamento ficaram de fora — suba as desta proposta (etapa Começar ou " +
-              "aba Técnica do equipamento).");
+              "aba Técnica do equipamento).", fica: true);
     }
 
     /// <summary>
@@ -798,7 +1026,7 @@ public partial class PropostaPage : IAsyncDisposable
         }
 
         _sugestaoCliente = new SugestaoCliente(
-            $"{cliente.Nome} tem {cliente.Propostas} proposta(s) gravada(s); a última é a " +
+            $"{cliente.Nome} tem {Plural(cliente.Propostas, "proposta gravada", "propostas gravadas")}; a última é a " +
             $"{cliente.Ultima.Numero}.", false, cliente);
     }
 
@@ -1106,7 +1334,7 @@ public partial class PropostaPage : IAsyncDisposable
                 var equipamentos = LerFolha(bytes);
                 _origem = "importada";
                 _importados.Add((nome, equipamentos > 0
-                    ? $"folha de dados: {equipamentos} equipamento(s)"
+                    ? $"folha de dados: {Plural(equipamentos, "equipamento", "equipamentos")}"
                     : "folha de dados, sem quantidade na linha 31"));
             }
 
@@ -1144,7 +1372,7 @@ public partial class PropostaPage : IAsyncDisposable
                 var indice = Destino(nome, i => i.Tecnicos.Count == 0 && i.ArquivoDaSelecao.Length == 0);
                 var curvasDoWord = await AplicarSelecao(leitura, ext, bytes, nome, indice);
                 _importados.Add((nome, $"seleção do equipamento {indice + 1}"
-                    + (curvasDoWord > 0 ? $", com {curvasDoWord} curva(s)" : "")));
+                    + (curvasDoWord > 0 ? $", com {Plural(curvasDoWord, "curva", "curvas")}" : "")));
             }
 
             foreach (var (nome, _, bytes) in curvas.OrderBy(c => c.Nome, StringComparer.OrdinalIgnoreCase))
@@ -1164,7 +1392,8 @@ public partial class PropostaPage : IAsyncDisposable
             if (!Textos.Igual(clienteAntes, _proposta.Cliente)) LembrarCliente();
 
             _aberto = 0;
-            Aviso($"{lidos.Count} arquivo(s) lido(s) — confira para onde foi cada um, logo abaixo do botão.");
+            // o que foi para onde está logo abaixo do botão: o aviso só conta
+            Aviso($"{Plural(lidos.Count, "arquivo importado", "arquivos importados")}.");
         }
         catch (Exception ex)
         {
@@ -1245,7 +1474,7 @@ public partial class PropostaPage : IAsyncDisposable
         _apagandoItem = null;
 
         Aviso($"Equipamento {posicao + 1} duplicado como equipamento {posicao + 2}: confira o modelo e a " +
-              "quantidade, e suba a seleção e a curva dele.");
+              "quantidade, e suba a seleção e a curva dele.", fica: true);
     }
 
     /// <summary>Os escopos padrão, lidos ao recarregar.</summary>
@@ -1260,7 +1489,7 @@ public partial class PropostaPage : IAsyncDisposable
 
         var feitas = padrao.AplicarEm(item);
         Aviso(feitas > 0
-            ? $"Escopo padrão da série {serie} aplicado em {feitas} linha(s) — o que já estava marcado ficou como estava."
+            ? $"Escopo padrão da série {serie} aplicado em {Plural(feitas, "linha", "linhas")} — o que já estava marcado ficou como estava."
             : "Nada a aplicar: as listas deste equipamento já estão marcadas.");
     }
 
@@ -1289,7 +1518,8 @@ public partial class PropostaPage : IAsyncDisposable
 
         var feitas = padrao.AplicarEm(item);
         if (feitas > 0)
-            Aviso($"Escopo padrão da série {modelo.Serie} aplicado ({feitas} linha(s)) — confira e ajuste o que for diferente.");
+            Aviso($"Escopo padrão da série {modelo.Serie} aplicado ({Plural(feitas, "linha", "linhas")}) — confira e ajuste o que for diferente.",
+                fica: true);
     }
 
     /// <summary>O que a seleção diz do motor: a potência mínima, e os polos e a frequência quando dá para saber.</summary>

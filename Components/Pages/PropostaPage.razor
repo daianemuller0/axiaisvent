@@ -21,110 +21,129 @@
 }
 <div class="proposta @(_compacto ? "compacto" : "")">
 
-<div class="page-head">
-    <div>
-        <h1>Proposta</h1>
-        <p class="subtitle" style="margin:0">
+@* o topo diz QUAL proposta é e em que pé está; as ações que se usam pouco
+   (duplicar, marcar como enviada, ajuda, apagar) ficam no menu Mais *@
+<div class="page-head prop-head">
+    <div class="prop-titulo">
+        <div class="prop-titulo-linha">
+            <h1>@(_proposta.Id.Length > 0 ? _proposta.Numero : "Proposta nova")</h1>
             @if (_proposta.Id.Length > 0)
             {
-                <strong>@_proposta.Numero</strong>
-                <span> · rev @_proposta.Revisao.Trim()</span>
-            }
-            else
-            {
-                <strong>Proposta nova</strong>
-                <span> · o número é gerado ao salvar</span>
-            }
-            @if (_proposta.Cliente.Trim().Length > 0)
-            {
-                <span> · @_proposta.Cliente</span>
-            }
-        </p>
-    </div>
-    <div class="page-actions">
-        <button class="btn-ghost" @onclick="@(() => Navegacao.NavigateTo("/axiais/propostas"))">
-            ☰ Propostas
-        </button>
-        <button class="btn-ghost" @onclick="NovaEmBranco">+ Nova</button>
-        @if (_proposta.Id.Length > 0)
-        {
-            <button class="btn-ghost" @onclick="Duplicar"
-                    title="Uma proposta nova a partir desta: cliente, condições e equipamentos copiados">
-                ⧉ Duplicar proposta
-            </button>
-        }
-        @if (_proposta.Id.Length > 0 && !_proposta.Enviada)
-        {
-            <button class="btn-ghost" @onclick="MarcarEnviada" title="Registrar no histórico que foi enviada ao cliente">
-                ✈ Marcar como enviada
-            </button>
-        }
-        else if (_proposta.Enviada)
-        {
-            <span class="val-count" title="Clique para desfazer" style="cursor:pointer"
-                  @onclick="DesmarcarEnviada">enviada em @DataCurta(_proposta.EnviadaEm)</span>
-        }
-        @if (_proposta.Id.Length > 0)
-        {
-            <AuthorizeView Roles="adm,admin">
-                @if (_apagando)
+                <span class="prop-chip">rev @_proposta.Revisao.Trim()</span>
+                @if (_proposta.Enviada)
                 {
-                    <span class="aviso aviso-alerta" style="margin:0; padding:5px 9px">
-                        Apagar a proposta @_proposta.Numero (rev @_proposta.Revisao)?
-                    </span>
-                    <button class="btn-link" @onclick="Apagar">Sim, apagar</button>
-                    <button class="btn-link" @onclick="@(() => _apagando = false)">Cancelar</button>
+                    @* o chip desfaz, como antes: um "enviada" marcado por engano volta com um clique *@
+                    <button class="prop-chip chip-enviada" @onclick="DesmarcarEnviada"
+                            title="Clique para voltar a em elaboração">Enviada em @DiaEMes(_proposta.EnviadaEm)</button>
                 }
                 else
                 {
-                    <button class="btn-link" @onclick="@(() => _apagando = true)">✕ apagar</button>
+                    <span class="prop-chip chip-elaboracao">Em elaboração</span>
                 }
+            }
+            else
+            {
+                <span class="nota">o número é gerado ao salvar</span>
+            }
+        </div>
+        <p class="subtitle prop-sub" title="@ClienteEProjeto">@ClienteEProjeto</p>
+    </div>
+    <div class="page-actions">
+        @if (_apagando && _proposta.Id.Length > 0)
+        {
+            <AuthorizeView Roles="adm,admin">
+                <span class="aviso aviso-alerta" style="margin:0; padding:5px 9px">
+                    Apagar a proposta @_proposta.Numero (rev @_proposta.Revisao)?
+                </span>
+                <button class="btn-link texto-perigo" @onclick="Apagar">Sim, apagar</button>
+                <button class="btn-link" @onclick="@(() => _apagando = false)">Cancelar</button>
             </AuthorizeView>
         }
-        <button class="btn-ghost" @onclick="AlternarAjuda"
-                title="Mostra ou esconde os textos que explicam cada campo">
-            @(_compacto ? "? Mostrar ajuda" : "? Esconder ajuda")
-        </button>
+        else
+        {
+            <button class="btn-ghost" @onclick="@(() => Navegacao.NavigateTo("/axiais/propostas"))">
+                <Icone Nome="lista" /> Propostas
+            </button>
+            <button class="btn-ghost" @onclick="NovaEmBranco">+ Nova</button>
+            <div class="menu-dono">
+                <button id="botao-mais" class="btn-ghost" aria-haspopup="menu"
+                        aria-expanded="@(_menuAberto ? "true" : "false")" aria-controls="menu-mais"
+                        @onclick="AlternarMenu">
+                    <Icone Nome="mais" /> Mais
+                </button>
+                @if (_menuAberto)
+                {
+                    <div class="menu-pop" id="menu-mais" role="menu" aria-label="Mais ações da proposta">
+                        @if (_proposta.Id.Length > 0)
+                        {
+                            <button role="menuitem" tabindex="-1" @onclick="() => DoMenu(Duplicar)"
+                                    title="Uma proposta nova a partir desta: cliente, condições e equipamentos copiados">
+                                <Icone Nome="copiar" /> Duplicar proposta
+                            </button>
+                            @if (!_proposta.Enviada)
+                            {
+                                <button role="menuitem" tabindex="-1" @onclick="() => DoMenu(MarcarEnviada)"
+                                        title="Registrar no histórico que foi enviada ao cliente">
+                                    <Icone Nome="enviar" /> Marcar como enviada
+                                </button>
+                            }
+                        }
+                        <button role="menuitem" tabindex="-1" @onclick="() => DoMenu(AlternarAjuda)"
+                                title="Mostra ou esconde os textos que explicam cada campo">
+                            <Icone Nome="ajuda" /> @(_compacto ? "Mostrar ajuda" : "Esconder ajuda")
+                        </button>
+                        @if (_proposta.Id.Length > 0)
+                        {
+                            <AuthorizeView Roles="adm,admin">
+                                <div class="menu-sep" role="separator"></div>
+                                <button role="menuitem" tabindex="-1" class="perigo"
+                                        @onclick="() => DoMenu(() => _apagando = true)">Apagar proposta</button>
+                            </AuthorizeView>
+                        }
+                    </div>
+                }
+            </div>
+        }
     </div>
 </div>
 
 @if (_depoisDeConfirmar is not null)
 {
-    @* no lugar do aviso, como a confirmação de apagar: a ação pedida espera a resposta *@
+    @* no alto, fixa: a ação pedida espera a resposta *@
     <div class="aviso aviso-alerta guarda-barra" role="alertdialog" aria-label="Alterações não salvas">
         <span>@TextoDaGuarda</span>
         <span style="flex:1"></span>
-        <button class="btn-primary" @onclick="GuardaSalvar">💾 Salvar</button>
+        <button class="btn-primary" @onclick="GuardaSalvar"><Icone Nome="salvar" /> Salvar</button>
         <button class="btn-ghost" @onclick="GuardaDescartar">Descartar</button>
         <button class="btn-link" @onclick="FecharGuarda">Cancelar</button>
     </div>
 }
-else if (_msg is not null)
-{
-    <div class="@(_erro ? "aviso aviso-erro" : "aviso aviso-ok")" style="margin-bottom:14px">@_msg</div>
-}
 
+@* o selo de cada etapa diz a verdade: o visto só com conteúdo e nada pendente;
+   uma etapa ainda não começada fica sem selo *@
 <nav class="etapas-barra" aria-label="Etapas da proposta">
     @foreach (var (numero, nome) in Etapas)
     {
         var n = numero;
         var faltam = pendencias.Count(p => p.Etapa == n);
-        <button class="etapa-btn @(_etapa == n ? "ativa" : "")" @onclick="() => IrParaEtapa(n)">
+        var selo = SeloDaEtapa(n, faltam, pendencias.Count);
+        <button class="etapa-btn @(_etapa == n ? "ativa" : "")" aria-current="@(_etapa == n ? "step" : null)"
+                @onclick="() => IrParaEtapa(n)">
             <span class="etapa-num">@n</span>
             <span>@nome</span>
-            @if (n > 1 && faltam > 0)
+            @if (selo == Selo.Pendente)
             {
-                <span class="tab-badge warn" title="pendências nesta etapa">@faltam</span>
+                <span class="tab-badge warn" title="@Plural(faltam, "pendência nesta etapa", "pendências nesta etapa")">@faltam</span>
             }
-            else if (n > 1)
+            else if (selo == Selo.Ok)
             {
-                <span class="etapa-ok" title="nada pendente">✓</span>
+                <span class="etapa-ok" title="nada pendente"><Icone Nome="ok" /></span>
             }
         </button>
     }
     <span style="flex:1"></span>
     <span class="etapa-cron" title="Tempo de trabalho nesta proposta — pausas de mais de 3 minutos não contam">
-        ⏱ @TempoNaTela
+        <Icone Nome="relogio" /> @TempoNaTela
     </span>
 </nav>
 
@@ -133,7 +152,6 @@ else if (_msg is not null)
 @if (_etapa == 1)
 {
 <div class="panel" style="margin-bottom:14px">
-    <h2 style="margin:0 0 4px; font-size:15px">Começar</h2>
     <p class="subtitle ajuda" style="margin:0 0 12px">
         Três jeitos de começar: a partir de uma proposta gravada (abrir ou copiar), importando
         os arquivos da proposta de uma vez, ou em branco, já com os seus padrões.
@@ -158,7 +176,7 @@ else if (_msg is not null)
                         </div>
                         <button class="btn-link" @onclick="() => AbrirGravada(id)">abrir</button>
                         <button class="btn-ghost" @onclick="() => DuplicarGravada(id)"
-                                title="Proposta nova com o cliente, as condições e os equipamentos desta">⧉ copiar</button>
+                                title="Proposta nova com o cliente, as condições e os equipamentos desta">copiar</button>
                     </div>
                 }
                 @if (_gravadas.Count == 0)
@@ -237,7 +255,7 @@ else if (_msg is not null)
             <datalist id="clientes-gravados">
                 @foreach (var c in _clientes)
                 {
-                    <option value="@c.Nome">@c.Propostas proposta(s)</option>
+                    <option value="@c.Nome">@Plural(c.Propostas, "proposta", "propostas")</option>
                 }
             </datalist></label>
         <label>@Campo("Aos cuidados de", "D13")
@@ -374,7 +392,7 @@ else if (_msg is not null)
         @if (!_maisCampos)
         {
             <span class="subtitle" style="margin:0 0 0 6px">
-                ano, BU, fase, categoria, product, segmento, portal, fiança, benefícios e
+                ano, BU, fase, categoria, produto, segmento, portal, fiança, benefícios e
                 representante 2 — já no padrão
             </span>
         }
@@ -407,14 +425,14 @@ else if (_msg is not null)
                     <option value="@x">@x</option>
                 }
             </select></label>
-        <label>@Campo("Product")
+        <label>@Campo("Produto")
             <select class="cell" @bind="_proposta.Produto">
                 @foreach (var x in ListasDaProposta.Produtos)
                 {
                     <option value="@x">@x</option>
                 }
             </select></label>
-        <label>@Campo("Market Segments")
+        <label>@Campo("Segmento de mercado")
             <select class="cell" @bind="_proposta.MarketSegment">
                 @foreach (var x in ListasDaProposta.Segmentos)
                 {
@@ -467,7 +485,7 @@ else if (_msg is not null)
     @* entrega e pagamento saem inteiros na proposta comercial: o pagamento na
        sua seção, o incoterm com a descrição do lugar e, logo abaixo dele, a
        frase de armado ou desarmado *@
-    <div style="margin-top:18px; padding-top:16px; border-top:1px solid var(--linha, #e6e8ec)">
+    <div style="margin-top:18px; padding-top:16px; border-top:1px solid var(--border)">
         <h3 style="margin:0 0 12px; font-size:13.5px; letter-spacing:.02em">Entrega e pagamento</h3>
 
         <div class="form3">
@@ -531,7 +549,7 @@ else if (_msg is not null)
 
         @if (_proposta.Incoterm.Length > 0 || _proposta.Armado.Length > 0)
         {
-            <div class="panel" style="margin:12px 0 0; padding:12px; background:var(--fundo2, #f7f8fa)">
+            <div class="panel" style="margin:12px 0 0; padding:12px; background:#f7f9fc">
                 <div class="subtitle" style="margin-bottom:6px">Como vai sair na proposta</div>
                 @if (_proposta.Incoterm.Length > 0)
                 {
@@ -560,14 +578,14 @@ else if (_msg is not null)
                     <div class="toolbar" style="margin-bottom:8px">
                         <input class="cell" style="flex:1" value="@c.Texto"
                                @onchange="e => RenomearCondicao(c, e.Value?.ToString() ?? string.Empty)" />
-                        <button class="btn-ghost" title="Apagar"
-                                @onclick="() => ApagarCondicao(c)">✕</button>
+                        <button class="btn-ghost btn-icone" title="Remover esta condição" aria-label="Remover esta condição"
+                                @onclick="() => ApagarCondicao(c)"><Icone Nome="fechar" /></button>
                     </div>
                 }
                 <div class="toolbar">
                     <input class="cell" style="flex:1" placeholder="Nova condição de pagamento"
                            @bind="_novaCondicao" @bind:event="oninput" />
-                    <button class="btn" @onclick="AdicionarCondicao">+ linha</button>
+                    <button class="btn-ghost" @onclick="AdicionarCondicao">+ linha</button>
                 </div>
             </div>
         }
@@ -603,7 +621,7 @@ else if (_msg is not null)
 
     @if (_mostrarContato2 || _proposta.Contato2Nome.Trim().Length > 0)
     {
-    <div style="margin-top:18px; padding-top:16px; border-top:1px solid var(--linha, #e6e8ec)">
+    <div style="margin-top:18px; padding-top:16px; border-top:1px solid var(--border)">
         @Contato("Contato 2 (opcional)", _proposta.Contato2Nome, n => EscolherContato(n, 2))
         <div class="form3">
             <label>@Campo("Nome")<input class="cell" @bind="_proposta.Contato2Nome" /></label>
@@ -627,16 +645,17 @@ else if (_msg is not null)
 {
 <div class="panel" style="margin-bottom:14px">
     <div class="toolbar" style="flex-wrap:wrap; margin-bottom:12px">
-        <h2 style="margin:0; font-size:15px">Equipamentos</h2>
         <span style="flex:1"></span>
         <strong>Moeda do custo</strong>
-        @foreach (var m in Moedas.Todas)
-        {
-            var moeda = m;
-            <button class="@(_proposta.Moeda == moeda ? "btn-primary" : "btn-ghost")"
-                    @onclick="() => _proposta.MoedaCodigo = moeda.Codigo()">@moeda.Rotulo()</button>
-        }
-        <span class="subtitle ajuda" style="margin:0">manda em todos os custos</span>
+        <div class="seg" role="group" aria-label="Moeda do custo">
+            @foreach (var m in Moedas.Todas)
+            {
+                var moeda = m;
+                <button class="@(_proposta.Moeda == moeda ? "on" : "")" aria-pressed="@(_proposta.Moeda == moeda ? "true" : "false")"
+                        @onclick="() => _proposta.MoedaCodigo = moeda.Codigo()">@moeda.Rotulo()</button>
+            }
+        </div>
+        <span class="subtitle ajuda">manda em todos os custos</span>
     </div>
     <div class="tabs" style="margin-bottom:0">
         @for (var i = 0; i < _proposta.Itens.Count; i++)
@@ -675,7 +694,7 @@ else if (_msg is not null)
                 Técnica: seleção e curva
                 @if (aberto.Tecnicos.Count > 0 && aberto.Curvas.Count > 0)
                 {
-                    <span class="etapa-ok">✓</span>
+                    <span class="etapa-ok" title="seleção e curva"><Icone Nome="ok" /></span>
                 }
             </button>
         </div>
@@ -743,7 +762,7 @@ else if (_msg is not null)
             @if (ModeloDe(atual) is { } escolhidoAgora && PrecoDoEquipamento(escolhidoAgora) is null
                  && !EhManual(atual, "equipamento"))
             {
-                <span class="subtitle" style="margin:0; color:#c98a00">
+                <span class="subtitle texto-alerta">
                     este modelo não tem custo em @_proposta.Moeda.Rotulo() — ponha à mão abaixo
                 </span>
             }
@@ -753,47 +772,54 @@ else if (_msg is not null)
             }
 
             <strong style="margin-left:10px">Tipo</strong>
-            <button class="@(atual.Especial ? "btn-ghost" : "btn-primary")"
-                    @onclick="() => atual.Especial = false">Padrão</button>
-            <button class="@(atual.Especial ? "btn-primary" : "btn-ghost")"
-                    @onclick="() => atual.Especial = true">Especial</button>
-            <span class="subtitle ajuda" style="margin:0">a 2ª letra do código</span>
+            <div class="seg" role="group" aria-label="Tipo">
+                <button class="@(atual.Especial ? "" : "on")" aria-pressed="@(atual.Especial ? "false" : "true")"
+                        @onclick="() => atual.Especial = false">Padrão</button>
+                <button class="@(atual.Especial ? "on" : "")" aria-pressed="@(atual.Especial ? "true" : "false")"
+                        @onclick="() => atual.Especial = true">Especial</button>
+            </div>
+            <span class="subtitle ajuda">a 2ª letra do código</span>
 
             <span style="flex:1"></span>
             <button class="btn-link" @onclick="DuplicarEquipamento"
-                    title="Um equipamento igual a este logo depois dele — sem a seleção e a curva">⧉ duplicar equipamento</button>
+                    title="Um equipamento igual a este logo depois dele — sem a seleção e a curva">duplicar equipamento</button>
             @if (_apagandoItem == PosicaoValida)
             {
                 <span class="aviso aviso-alerta" style="margin:0; padding:5px 9px">
-                    Tirar o equipamento @(PosicaoValida + 1) da proposta?
+                    Remover o equipamento @(PosicaoValida + 1) da proposta?
                 </span>
-                <button class="btn-link" @onclick="Remover">Sim, tirar</button>
+                <button class="btn-link" @onclick="Remover">Sim, remover</button>
                 <button class="btn-link" @onclick="@(() => _apagandoItem = null)">Cancelar</button>
             }
             else
             {
-                <button class="btn-link" @onclick="@(() => _apagandoItem = PosicaoValida)">✕ tirar</button>
+                <button class="btn-link" @onclick="@(() => _apagandoItem = PosicaoValida)">Remover</button>
             }
         </div>
 
         <div class="toolbar" style="flex-wrap:wrap">
             <strong style="min-width:210px">@Campo("Arranjo / Instalação", "linha 40")</strong>
-            @foreach (var a in ListasDaProposta.Arranjos)
-            {
-                var arranjo = a;
-                <button class="@(atual.Arranjo == arranjo ? "btn-primary" : "btn-ghost")"
-                        @onclick="() => atual.Arranjo = arranjo">@arranjo</button>
-            }
+            <div class="seg" role="group" aria-label="Arranjo / Instalação">
+                @foreach (var a in ListasDaProposta.Arranjos)
+                {
+                    var arranjo = a;
+                    <button class="@(atual.Arranjo == arranjo ? "on" : "")" aria-pressed="@(atual.Arranjo == arranjo ? "true" : "false")"
+                            @onclick="() => atual.Arranjo = arranjo">@arranjo</button>
+                }
+            </div>
 
             @* a montagem se junta ao arranjo na proposta técnica:
                "Horizontal ao piso, arranjo 4" *@
             <strong style="margin-left:14px">@Campo("Montagem")</strong>
-            @foreach (var m in new[] { "Horizontal", "Vertical" })
-            {
-                var montagem = m;
-                <button class="@(Textos.Igual(atual.Montagem, montagem) ? "btn-primary" : "btn-ghost")"
-                        @onclick="() => atual.Montagem = montagem">@montagem</button>
-            }
+            <div class="seg" role="group" aria-label="Montagem">
+                @foreach (var m in new[] { "Horizontal", "Vertical" })
+                {
+                    var montagem = m;
+                    <button class="@(Textos.Igual(atual.Montagem, montagem) ? "on" : "")"
+                            aria-pressed="@(Textos.Igual(atual.Montagem, montagem) ? "true" : "false")"
+                            @onclick="() => atual.Montagem = montagem">@montagem</button>
+                }
+            </div>
 
             @if (DadosDoVentilador.Montagem(atual) is { Length: > 0 } linhaDaMontagem)
             {
@@ -816,8 +842,8 @@ else if (_msg is not null)
                     <thead>
                         <tr>
                             <th class="nowrap">Série</th>
-                            <th class="nowrap">Fan Diameter</th>
-                            <th class="nowrap">Fan Hub Diameter</th>
+                            <th class="nowrap">Diâmetro</th>
+                            <th class="nowrap">Cubo</th>
                             <th class="nowrap">FB/HB</th>
                             <th class="nowrap">Nº de estágios</th>
                             <th class="nowrap">Código</th>
@@ -841,7 +867,7 @@ else if (_msg is not null)
         else
         {
             <div class="panel empty" style="padding:16px; margin-bottom:14px">
-                Escolha o modelo: é ele que diz o Fan Diameter, e é pelo Fan Diameter que os
+                Escolha o modelo: é ele que diz o diâmetro, e é pelo diâmetro que os
                 preços de base, cone, silenciador, difusor, conexão a manga e damper são
                 puxados.
             </div>
@@ -855,7 +881,7 @@ else if (_msg is not null)
             @if (CodigoDoEquipamento.SemCodigo(atual, _custo, _proposta.Moeda)
                  is { Count: > 0 } semCodigo)
             {
-                <span class="subtitle" style="margin:0; color:#c98a00">
+                <span class="subtitle texto-alerta">
                     sem código no cadastro: @string.Join(", ", semCodigo) — cada um vira um
                     <strong>?</strong>
                 </span>
@@ -905,12 +931,17 @@ else if (_msg is not null)
             var temItem = escolhida.Length > 0 && !FamiliaDePreco.EhAusencia(escolhida);
 
             <div class="toolbar escopo-linha" style="flex-wrap:wrap; border-top:1px solid var(--border)">
-                <strong style="min-width:210px">@Campo(grupo, LinhaDaPlanilha(grupo))</strong>
+                <strong style="min-width:210px">@Campo(Exibir(grupo), LinhaDaPlanilha(grupo))</strong>
 
-                <button class="@(escolhida.Length > 0 && !temItem ? "btn-primary" : "btn-ghost")"
-                        @onclick="() => MarcarSem(atual, grupo)">Sem</button>
-                <button class="@(temItem ? "btn-primary" : "btn-ghost")"
-                        @onclick="() => MarcarCom(atual, grupo)">Com</button>
+                @* o mesmo controle do motor, do partidor e da instrumentação logo
+                   abaixo: duas cores para Sem e Com no mesmo escopo confundiam *@
+                <div class="seg" role="group" aria-label="@Exibir(grupo)">
+                    <button class="sem @(escolhida.Length > 0 && !temItem ? "on" : "")"
+                            aria-pressed="@(escolhida.Length > 0 && !temItem ? "true" : "false")"
+                            @onclick="() => MarcarSem(atual, grupo)">Sem</button>
+                    <button class="@(temItem ? "on" : "")" aria-pressed="@(temItem ? "true" : "false")"
+                            @onclick="() => MarcarCom(atual, grupo)">Com</button>
+                </div>
 
                 @if (temItem && comOpcoes.Count > 1)
                 {
@@ -937,7 +968,7 @@ else if (_msg is not null)
 
         <!-- ---------- parte elétrica: motor, partidor e instrumentação ---------- -->
         <div class="toolbar" style="flex-wrap:wrap; border-top:2px solid var(--border); padding-top:14px; margin-top:14px">
-            <h3 style="margin:0; font-size:14px">Parte Elétrica</h3>
+            <h3 style="margin:0; font-size:14px">Parte elétrica</h3>
             <span class="subtitle ajuda" style="margin:0">
                 o motor elétrico, o partidor e a instrumentação — cada um com o seu flag
             </span>
@@ -945,10 +976,12 @@ else if (_msg is not null)
 
         <div class="toolbar" style="flex-wrap:wrap">
             <strong style="min-width:210px">@Campo("Motor elétrico")</strong>
-            <button class="@(atual.ComMotor ? "btn-ghost" : "btn-primary")"
-                    @onclick="() => atual.ComMotor = false">Sem</button>
-            <button class="@(atual.ComMotor ? "btn-primary" : "btn-ghost")"
-                    @onclick="() => atual.ComMotor = true">Com</button>
+            <div class="seg" role="group" aria-label="Motor elétrico">
+                <button class="sem @(atual.ComMotor ? "" : "on")" aria-pressed="@(atual.ComMotor ? "false" : "true")"
+                        @onclick="() => atual.ComMotor = false">Sem</button>
+                <button class="@(atual.ComMotor ? "on" : "")" aria-pressed="@(atual.ComMotor ? "true" : "false")"
+                        @onclick="() => atual.ComMotor = true">Com</button>
+            </div>
 
             <span class="subtitle ajuda" style="margin:0">
                 o catálogo de motores, já filtrado pela série
@@ -961,7 +994,7 @@ else if (_msg is not null)
         {
             var candidatos = Candidatos(atual);
 
-            <div class="panel" style="margin:0 0 14px; border-left:3px solid var(--azul, #0b3d6b)">
+            <div class="panel" style="margin:0 0 14px; border-left:3px solid var(--primary)">
                 @if (SugestaoDoMotor(atual) is { } sugestaoDoMotor)
                 {
                     <div class="aviso aviso-neutro sugestao-motor">
@@ -991,7 +1024,7 @@ else if (_msg is not null)
                 </div>
 
                 <div class="toolbar" style="margin:14px 0 0; flex-wrap:wrap">
-                    <span class="val-count">@candidatos.Count motor(es) atendem</span>
+                    <span class="val-count">@Plural(candidatos.Count, "motor atende", "motores atendem")</span>
                     <span class="subtitle" style="margin:0">
                         @MotoresComPreco(candidatos) com custo em @_proposta.Moeda.Rotulo()
                     </span>
@@ -1005,7 +1038,7 @@ else if (_msg is not null)
 
                             @if (PrecoDoMotor(motor) is null && !EhManual(atual, "motor"))
                             {
-                                <span class="subtitle" style="margin:0; color:#c98a00; white-space:nowrap">
+                                <span class="subtitle texto-alerta" style="white-space:nowrap">
                                     este motor não tem custo em @_proposta.Moeda.Rotulo() — ponha à mão ao lado
                                 </span>
                             }
@@ -1044,11 +1077,13 @@ else if (_msg is not null)
 
         <!-- partidor: o preço vem da potência do motor -->
         <div class="toolbar" style="flex-wrap:wrap">
-            <strong style="min-width:210px">@ListaDosPartidores</strong>
-            <button class="@(atual.ComPartidor ? "btn-ghost" : "btn-primary")"
-                    @onclick="() => atual.ComPartidor = false">Sem</button>
-            <button class="@(atual.ComPartidor ? "btn-primary" : "btn-ghost")"
-                    @onclick="() => LigarPartidor(atual)">Com</button>
+            <strong style="min-width:210px">@Exibir(ListaDosPartidores)</strong>
+            <div class="seg" role="group" aria-label="@Exibir(ListaDosPartidores)">
+                <button class="sem @(atual.ComPartidor ? "" : "on")" aria-pressed="@(atual.ComPartidor ? "false" : "true")"
+                        @onclick="() => atual.ComPartidor = false">Sem</button>
+                <button class="@(atual.ComPartidor ? "on" : "")" aria-pressed="@(atual.ComPartidor ? "true" : "false")"
+                        @onclick="() => LigarPartidor(atual)">Com</button>
+            </div>
 
             @if (atual.ComPartidor)
             {
@@ -1070,11 +1105,13 @@ else if (_msg is not null)
 
         <!-- instrumentação: pode ser mais de uma -->
         <div class="toolbar" style="flex-wrap:wrap">
-            <strong style="min-width:210px">@ListaDaInstrumentacao</strong>
-            <button class="@(atual.ComInstrumentacao ? "btn-ghost" : "btn-primary")"
-                    @onclick="() => DesligarInstrumentacao(atual)">Sem</button>
-            <button class="@(atual.ComInstrumentacao ? "btn-primary" : "btn-ghost")"
-                    @onclick="() => atual.ComInstrumentacao = true">Com</button>
+            <strong style="min-width:210px">@Exibir(ListaDaInstrumentacao)</strong>
+            <div class="seg" role="group" aria-label="@Exibir(ListaDaInstrumentacao)">
+                <button class="sem @(atual.ComInstrumentacao ? "" : "on")" aria-pressed="@(atual.ComInstrumentacao ? "false" : "true")"
+                        @onclick="() => DesligarInstrumentacao(atual)">Sem</button>
+                <button class="@(atual.ComInstrumentacao ? "on" : "")" aria-pressed="@(atual.ComInstrumentacao ? "true" : "false")"
+                        @onclick="() => atual.ComInstrumentacao = true">Com</button>
+            </div>
             @if (atual.ComInstrumentacao)
             {
                 <span class="subtitle ajuda" style="margin:0">
@@ -1085,7 +1122,7 @@ else if (_msg is not null)
 
         @if (atual.ComInstrumentacao)
         {
-            <div class="panel" style="margin:0 0 14px; border-left:3px solid var(--azul, #0b3d6b)">
+            <div class="panel" style="margin:0 0 14px; border-left:3px solid var(--primary)">
                 @foreach (var o in OpcoesReais(ListaDaInstrumentacao))
                 {
                     var opcao = o;
@@ -1167,7 +1204,7 @@ else if (_msg is not null)
                         <span style="flex:1"></span>
                         @if (opcionais.Count > 0)
                         {
-                            <span class="val-count">@opcionais.Count opcional(is)</span>
+                            <span class="val-count">@Plural(opcionais.Count, "opcional", "opcionais")</span>
                         }
                     </div>
 
@@ -1179,8 +1216,8 @@ else if (_msg is not null)
 
                         var posta = item.Opcionais.GetValueOrDefault(grupo, "");
 
-                        <div class="toolbar" style="flex-wrap:wrap; border-top:1px solid var(--linha, #e6e8ec); padding-top:10px">
-                            <strong style="min-width:210px; font-size:12.5px">@grupo</strong>
+                        <div class="toolbar" style="flex-wrap:wrap; border-top:1px solid var(--border); padding-top:10px">
+                            <strong style="min-width:210px; font-size:12.5px">@Exibir(grupo)</strong>
                             <select class="cell" style="min-width:260px" value="@posta"
                                     @onchange="e => MudarOpcional(item, grupo, e.Value?.ToString() ?? string.Empty)">
                                 <option value="">— nenhum —</option>
@@ -1199,7 +1236,7 @@ else if (_msg is not null)
                     }
 
                     @* ----- motor opcional ----- *@
-                    <div class="toolbar" style="flex-wrap:wrap; border-top:1px solid var(--linha, #e6e8ec); padding-top:10px">
+                    <div class="toolbar" style="flex-wrap:wrap; border-top:1px solid var(--border); padding-top:10px">
                         <strong style="min-width:210px; font-size:12.5px">Motor elétrico</strong>
                         <select class="cell" style="min-width:320px" value="@item.MotorOpcionalId"
                                 @onchange="e => item.MotorOpcionalId = e.Value?.ToString() ?? string.Empty">
@@ -1219,8 +1256,8 @@ else if (_msg is not null)
                     </div>
 
                     @* ----- instrumentação opcional ----- *@
-                    <div style="border-top:1px solid var(--linha, #e6e8ec); padding-top:10px; margin-top:10px">
-                        <strong style="font-size:12.5px">@ListaDaInstrumentacao</strong>
+                    <div style="border-top:1px solid var(--border); padding-top:10px; margin-top:10px">
+                        <strong style="font-size:12.5px">@Exibir(ListaDaInstrumentacao)</strong>
                         @foreach (var o in OpcoesReais(ListaDaInstrumentacao))
                         {
                             var opcao = o;
@@ -1286,7 +1323,7 @@ else if (_msg is not null)
             a seleção e a curva de cada equipamento
         </span>
         <span style="flex:1"></span>
-        <button class="btn-primary" @onclick="GerarTecnica">⬇ Gerar proposta técnica</button>
+        <button class="btn-primary" @onclick="GerarTecnica"><Icone Nome="baixar" /> Gerar proposta técnica</button>
     </div>
 
     @if (_proposta.Itens.Count == 0)
@@ -1326,13 +1363,13 @@ else if (_msg is not null)
                     @if (item.ArquivoDaSelecao.Length > 0)
                     {
                         <span class="val-count">@item.ArquivoDaSelecao</span>
-                        <button class="btn-link" @onclick="() => TirarSelecao(indice)">✕ tirar</button>
+                        <button class="btn-link" @onclick="() => TirarSelecao(indice)">Remover</button>
                     }
                 </div>
 
                 @if (_faltouNaSelecao.TryGetValue(indice, out var faltou) && faltou.Count > 0)
                 {
-                    <p class="subtitle" style="margin:8px 0 0; color:#c98a00">
+                    <p class="subtitle texto-alerta" style="margin:8px 0 0">
                         Não achei no arquivo: @string.Join(", ", faltou) — preencher à mão.
                     </p>
                 }
@@ -1357,7 +1394,7 @@ else if (_msg is not null)
 
                 @* ----- o que vai na tabela do documento ----- *@
                 <div style="margin-top:14px; padding-top:12px;
-                            border-top:1px solid var(--linha, #e6e8ec)">
+                            border-top:1px solid var(--border)">
                     <div class="subtitle" style="margin-bottom:8px">
                         <strong>DATOS DEL VENTILADOR</strong> — como a tabela vai sair no documento
                     </div>
@@ -1394,7 +1431,7 @@ else if (_msg is not null)
 
                 @* ----- parte elétrica ----- *@
                 <div style="margin-top:14px; padding-top:12px;
-                            border-top:1px solid var(--linha, #e6e8ec)">
+                            border-top:1px solid var(--border)">
                     <div class="subtitle" style="margin-bottom:8px">
                         <strong>@EletricaTextos.Secao.ToUpperInvariant()</strong>
                         — sai depois da curva, em página própria
@@ -1425,13 +1462,13 @@ else if (_msg is not null)
 
                     @if (SoOMetodoDePartida(item) is { Length: > 0 } semQuadro)
                     {
-                        <p class="subtitle" style="margin:8px 0 0; color:#c98a00">@semQuadro</p>
+                        <p class="subtitle texto-alerta" style="margin:8px 0 0">@semQuadro</p>
                     }
                 </div>
 
                 @* ----- curvas ----- *@
                 <div class="toolbar" style="flex-wrap:wrap; margin-top:14px; padding-top:12px;
-                                            border-top:1px solid var(--linha, #e6e8ec)">
+                                            border-top:1px solid var(--border)">
                     <strong style="min-width:150px; font-size:12.5px">
                         Curvas de performance
                         @if (item.Curvas.Count > 0)
@@ -1455,11 +1492,11 @@ else if (_msg is not null)
                         <div class="toolbar" style="justify-content:center">
                             <span class="val-count">@curva.Nome</span>
                             <span class="subtitle">@TamanhoDaCurva(curva)</span>
-                            <button class="btn-link" @onclick="() => TirarCurva(indice, posicao)">✕ tirar</button>
+                            <button class="btn-link" @onclick="() => TirarCurva(indice, posicao)">Remover</button>
                         </div>
                         <img src="/axiais/anexo/@_proposta.Id/@curva.Imagem"
                              alt="Curva @(posicao + 1) do item @(indice + 1)"
-                             style="max-width:100%; max-height:420px; border:1px solid var(--linha, #e6e8ec); border-radius:6px" />
+                             style="max-width:100%; max-height:420px; border:1px solid var(--border); border-radius:6px" />
                     </div>
                 }
 
@@ -1482,7 +1519,7 @@ else if (_msg is not null)
                 }
 
                 <div style="margin-top:14px; padding-top:12px;
-                            border-top:1px solid var(--linha, #e6e8ec)">
+                            border-top:1px solid var(--border)">
                     <div class="toolbar" style="flex-wrap:wrap; margin-bottom:8px">
                         <strong style="font-size:12.5px">@EscopoTextos.Incluso</strong>
                         <span class="subtitle ajuda">uma linha por item — é o que sai na lista</span>
@@ -1507,9 +1544,9 @@ else if (_msg is not null)
                             {
                                 var daLista = chave;
                                 <button class="btn-primary" style="font-size:11.5px"
-                                        title="Tirar da lista"
+                                        title="Remover da lista" aria-label="Remover da lista: @EscopoTextos.Catalogo.GetValueOrDefault(daLista, daLista)"
                                         @onclick="() => TirarDoEscopo(indice, daLista)">
-                                    @EscopoTextos.Catalogo.GetValueOrDefault(daLista, daLista) ✕
+                                    @EscopoTextos.Catalogo.GetValueOrDefault(daLista, daLista) <Icone Nome="fechar" Classe="ico-p" />
                                 </button>
                             }
                         </div>
@@ -1555,10 +1592,8 @@ else if (_msg is not null)
 
         @if (SemCurvas is { Count: > 0 } semCurva)
         {
-            <div class="panel" style="margin:0; padding:12px; border-left:3px solid #c98a00">
-                <div style="font-size:12.5px">
-                    <strong>Falta a curva de:</strong> @string.Join(", ", semCurva)
-                </div>
+            <div class="aviso aviso-alerta" style="font-size:12.5px">
+                <strong>Falta a curva de:</strong> @string.Join(", ", semCurva)
             </div>
         }
     }
@@ -1569,7 +1604,7 @@ else if (_msg is not null)
 @if (_etapa == 4)
 {
 <div class="panel" style="margin-bottom:14px">
-    <h2 style="margin:0; font-size:15px">Resumo da proposta</h2>
+    <h2 style="margin:0 0 12px; font-size:15px">Resumo da proposta</h2>
 
     @foreach (var (item, indice) in _proposta.Itens.Select((x, i) => (x, i)))
     {
@@ -1611,7 +1646,7 @@ else if (_msg is not null)
                     @foreach (var linha in itens)
                     {
                         <tr>
-                            <td class="nowrap">@linha.Lista</td>
+                            <td class="nowrap">@Exibir(linha.Lista)</td>
                             <td class="nowrap">@linha.Opcao</td>
                             <td class="nowrap">@(linha.Codigo.Length > 0 ? linha.Codigo : "—")</td>
                             <td class="nowrap"><span class="subtitle">@linha.Origem</span></td>
@@ -1638,7 +1673,7 @@ else if (_msg is not null)
                     @if (doItem.ComPartidor && LinhaDoPartidor(doItem) is { } partidor)
                     {
                         <tr>
-                            <td class="nowrap">@ListaDosPartidores</td>
+                            <td class="nowrap">@Exibir(ListaDosPartidores)</td>
                             <td class="nowrap">@(doItem.Partidor.Length > 0 ? doItem.Partidor : "não escolhido")</td>
                             <td class="nowrap">@(partidor.Codigo.Length > 0 ? partidor.Codigo : "—")</td>
                             <td class="nowrap"><span class="subtitle">@partidor.Origem</span></td>
@@ -1649,7 +1684,7 @@ else if (_msg is not null)
                     {
                         var linha = Resolver(doItem, ListaDaInstrumentacao, nome);
                         <tr>
-                            <td class="nowrap">@ListaDaInstrumentacao</td>
+                            <td class="nowrap">@Exibir(ListaDaInstrumentacao)</td>
                             <td class="nowrap">@nome</td>
                             <td class="nowrap">@(linha.Codigo.Length > 0 ? linha.Codigo : "—")</td>
                             <td class="nowrap"><span class="subtitle">@linha.Origem</span></td>
@@ -1677,7 +1712,7 @@ else if (_msg is not null)
     @if (FaltaPreco > 0)
     {
         <p class="subtitle" style="margin:10px 0 0">
-            @FaltaPreco item(ns) escolhido(s) ainda sem custo — nem do cadastro, nem à mão. O
+            @Plural(FaltaPreco, "item escolhido", "itens escolhidos") ainda sem custo — nem do cadastro, nem à mão. O
             custo conta só o que já tem valor; para os outros, digite o custo na própria linha
             do escopo.
         </p>
@@ -1698,7 +1733,7 @@ else if (_msg is not null)
             margem, comissões e impostos — a mesma conta da aba PRICING da planilha
         </span>
         <span style="flex:1"></span>
-        <button class="btn-primary" @onclick="GerarPricing">⬇ Gerar pricing</button>
+        <button class="btn-primary" @onclick="GerarPricing"><Icone Nome="baixar" /> Gerar pricing</button>
     </div>
 
     <div class="form3">
@@ -1721,10 +1756,10 @@ else if (_msg is not null)
         </label>
 
         <label>Calcular preço
-            <div style="display:flex; gap:6px">
-                <button class="@(PelaMargem ? "btn-primary" : "btn-ghost")"
+            <div class="seg" role="group" aria-label="Calcular preço" style="align-self:flex-start">
+                <button class="@(PelaMargem ? "on" : "")" aria-pressed="@(PelaMargem ? "true" : "false")"
                         @onclick="@(() => _proposta.ModoDoPreco = "margem")">pela margem</button>
-                <button class="@(PelaMargem ? "btn-ghost" : "btn-primary")"
+                <button class="@(PelaMargem ? "" : "on")" aria-pressed="@(PelaMargem ? "false" : "true")"
                         @onclick="@(() => _proposta.ModoDoPreco = "preco")">pelo preço</button>
             </div>
         </label>
@@ -1768,13 +1803,15 @@ else if (_msg is not null)
 
     <div class="toolbar" style="flex-wrap:wrap; margin-top:14px">
         <strong>Preço ao cliente em</strong>
-        @foreach (var m in Moedas.DePreco)
-        {
-            var moeda = m;
-            <button class="@(moedaVenda == moeda ? "btn-primary" : "btn-ghost")"
-                    @onclick="() => EscolherMoedaVenda(moeda)">@moeda.Rotulo()</button>
-        }
-        <span class="subtitle ajuda" style="margin:0">
+        <div class="seg" role="group" aria-label="Moeda do preço ao cliente">
+            @foreach (var m in Moedas.DePreco)
+            {
+                var moeda = m;
+                <button class="@(moedaVenda == moeda ? "on" : "")" aria-pressed="@(moedaVenda == moeda ? "true" : "false")"
+                        @onclick="() => EscolherMoedaVenda(moeda)">@moeda.Rotulo()</button>
+            }
+        </div>
+        <span class="subtitle ajuda">
             o custo e o pricing abaixo estão em @moedaCusto.Rotulo(); só o preço final é convertido
         </span>
     </div>
@@ -1783,7 +1820,7 @@ else if (_msg is not null)
     {
         <div style="margin-top:10px; padding:10px 12px; background:#FFF6E5; border:2px solid #E9A23B; border-radius:8px; font-size:13px">
             <div style="font-weight:700; color:#7A4E06; margin-bottom:6px">
-                💱 CONVERSÃO DA MOEDA — o custo está em @moedaCusto.Rotulo() e o preço ao cliente sai em @moedaVenda.Rotulo()
+                CONVERSÃO DA MOEDA — o custo está em @moedaCusto.Rotulo() e o preço ao cliente sai em @moedaVenda.Rotulo()
             </div>
             <div style="display:flex; gap:18px; align-items:center; flex-wrap:wrap">
                 <span>
@@ -1828,8 +1865,8 @@ else if (_msg is not null)
             }
             else
             {
-                <div style="margin-top:6px; color:#b3261e; font-weight:600">
-                    ⚠ Informe a taxa de conversão — sem ela o preço sai como se já estivesse em @moedaVenda.Rotulo().
+                <div style="margin-top:6px; color:var(--err-tx); font-weight:600; display:flex; align-items:center; gap:6px">
+                    <Icone Nome="alerta" /> Informe a taxa de conversão — sem ela o preço sai como se já estivesse em @moedaVenda.Rotulo().
                 </div>
             }
         </div>
@@ -1837,7 +1874,7 @@ else if (_msg is not null)
     else
     {
         <p class="subtitle" style="margin:8px 0 0">
-            💱 Custo e preço na mesma moeda (@moedaCusto.Rotulo()) — sem conversão. Escolha outra moeda
+            Custo e preço na mesma moeda (@moedaCusto.Rotulo()) — sem conversão. Escolha outra moeda
             acima para converter.
         </p>
     }
@@ -2002,21 +2039,20 @@ else if (_msg is not null)
 @if (_etapa == 5)
 {
 <div class="panel" style="margin-bottom:14px">
-    <div class="toolbar" style="flex-wrap:wrap; margin-bottom:10px">
-        <h2 style="margin:0; font-size:15px">Documentos</h2>
-        <span style="flex:1"></span>
-        <button class="btn-accent" @onclick="GerarTudo">⬇ Gerar tudo</button>
+    @* sem o título que repetia o nome da etapa: o Gerar tudo e os avulsos numa linha só *@
+    <div class="toolbar" style="flex-wrap:wrap; margin-bottom:12px">
+        <button class="btn-accent" @onclick="GerarTudo"><Icone Nome="baixar" /> Gerar tudo</button>
+        @* os avulsos são o caminho secundário: links, para caberem na linha do Gerar tudo *@
+        <span class="nota" style="margin-left:6px">ou um documento só:</span>
+        <button class="btn-link" @onclick="GerarProposta">Proposta comercial</button>
+        <button class="btn-link" @onclick="GerarTecnica">Proposta técnica</button>
+        <button class="btn-link" @onclick="GerarPricing">Pricing</button>
+        <button class="btn-link" @onclick="IrParaCustoPrevisto">Custo previsto</button>
     </div>
     <p class="subtitle ajuda" style="margin:0 0 10px">
         <strong>Gerar tudo</strong> salva a proposta e baixa a comercial, a técnica e o pricing de
-        uma vez. Os botões abaixo geram um documento só.
+        uma vez. Os botões ao lado geram um documento só.
     </p>
-    <div class="toolbar" style="flex-wrap:wrap; margin-bottom:12px">
-        <button class="btn-ghost" @onclick="GerarProposta">⬇ Proposta comercial</button>
-        <button class="btn-ghost" @onclick="GerarTecnica">⬇ Proposta técnica</button>
-        <button class="btn-ghost" @onclick="GerarPricing">⬇ Pricing</button>
-        <button class="btn-ghost" @onclick="IrParaCustoPrevisto">⬇ Custo previsto</button>
-    </div>
     @if (pendencias.Count == 0)
     {
         <div class="aviso aviso-ok">Nada pendente: os documentos saem completos.</div>
@@ -2024,7 +2060,7 @@ else if (_msg is not null)
     else
     {
         <div class="aviso aviso-alerta" style="font-weight:400">
-            <strong>@pendencias.Count pendência(s).</strong> Os documentos saem mesmo assim, com
+            <strong>@Plural(pendencias.Count, "pendência", "pendências").</strong> Os documentos saem mesmo assim, com
             esses campos em branco. Clique para ir até cada uma:
             <div class="pendencias-lista">
                 @foreach (var p in pendencias)
@@ -2045,7 +2081,7 @@ else if (_msg is not null)
             o modelo em Word da equipe, preenchido — com o preço de VENDA, não o custo
         </span>
         <span style="flex:1"></span>
-        <button class="btn-primary" @onclick="GerarProposta">⬇ Gerar proposta</button>
+        <button class="btn-primary" @onclick="GerarProposta"><Icone Nome="baixar" /> Gerar proposta</button>
     </div>
 
     @if (_proposta.Itens.Count == 0)
@@ -2090,9 +2126,9 @@ else if (_msg is not null)
 
         @if (FaltamParaProposta is { Count: > 0 } faltam)
         {
-            <div class="panel" style="margin:12px 0 0; padding:12px; border-left:3px solid #c98a00">
-                <div style="font-size:12.5px"><strong>Falta preencher para o documento sair completo:</strong></div>
-                <div class="subtitle" style="margin-top:4px">@string.Join(" · ", faltam)</div>
+            <div class="aviso aviso-alerta" style="margin-top:12px; font-size:12.5px">
+                <strong>Falta preencher para o documento sair completo:</strong>
+                <div style="margin-top:4px">@string.Join(" · ", faltam)</div>
             </div>
         }
     }
@@ -2107,7 +2143,7 @@ else if (_msg is not null)
         <span style="flex:1"></span>
         @if (!_pedindoCustoPrevisto)
         {
-            <button class="btn-primary" @onclick="PedirCustoPrevisto">⬇ Gerar custo previsto</button>
+            <button class="btn-primary" @onclick="PedirCustoPrevisto"><Icone Nome="baixar" /> Gerar custo previsto</button>
         }
     </div>
 
@@ -2120,7 +2156,7 @@ else if (_msg is not null)
             <strong>Número do pedido</strong>
             <input class="cell" style="width:150px" value="@_cpPedido"
                    @oninput="e => _cpPedido = e.Value?.ToString() ?? string.Empty" />
-            <button class="btn-primary" @onclick="GerarCustoPrevisto">⬇ Gerar</button>
+            <button class="btn-primary" @onclick="GerarCustoPrevisto"><Icone Nome="baixar" /> Gerar</button>
             <button class="btn-ghost" @onclick="@(() => _pedindoCustoPrevisto = false)">Cancelar</button>
         </div>
         <p class="subtitle" style="margin:10px 0 0">
@@ -2135,6 +2171,25 @@ else if (_msg is not null)
 
 
 }
+@* o aviso fica no pé da coluna do meio, por cima do conteúdo e nunca do painel:
+   o sucesso some sozinho em 6 s; a consequência e o erro ficam até alguém
+   fechar (ver Aviso). Vem antes do rodapé: no fim da página ele para logo
+   acima dos botões Voltar e Continuar, em vez de cobri-los *@
+<div class="aviso-pe-area" aria-live="polite">
+    @if (_msg is not null)
+    {
+        <div class="aviso-pe @(_erro ? "erro" : _avisoFica ? "consequencia" : "ok")" role="@(_erro ? "alert" : "status")">
+            <span class="aviso-pe-texto">@_msg</span>
+            @if (_avisoAcao is { } acaoDoAviso)
+            {
+                <button class="btn-ghost aviso-pe-acao" @onclick="FazerAcaoDoAviso">@acaoDoAviso.Rotulo</button>
+            }
+            <button class="btn-link btn-icone aviso-pe-fechar" title="Fechar o aviso" aria-label="Fechar o aviso"
+                    @onclick="FecharAviso"><Icone Nome="fechar" /></button>
+        </div>
+    }
+</div>
+
 <div class="etapa-rodape">
     @if (_etapa > 1)
     {
@@ -2151,12 +2206,12 @@ else if (_msg is not null)
     }
     else
     {
-        <button class="btn-accent" @onclick="GerarTudo">⬇ Gerar tudo</button>
+        <button class="btn-accent" @onclick="GerarTudo"><Icone Nome="baixar" /> Gerar tudo</button>
     }
 </div>
 
 </div>
-<aside class="prop-side">
+<aside class="prop-side" aria-label="Resumo da proposta">
     @{
         var comImpostos = pricingAtual.PrecoComImpostos != pricingAtual.VendaLiquida;
     }
@@ -2164,15 +2219,46 @@ else if (_msg is not null)
         <div class="kpi-label" style="color:#cfe3f7">
             Venda líquida@(Cambio.Converte(_proposta) ? $" em {_proposta.MoedaVenda.Rotulo()}" : "")
         </div>
-        <div class="side-total-value">
-            @(Total > 0m ? DinheiroVenda(Cambio.ParaVenda(_proposta, pricingAtual.VendaLiquida)) : "—")
-        </div>
-        @if (Total > 0m && !comImpostos)
+        @if (Total > 0m)
         {
-            <div class="side-total-nota">sem impostos (exportação)</div>
+            <div class="side-total-value">@DinheiroVenda(Cambio.ParaVenda(_proposta, pricingAtual.VendaLiquida))</div>
+            @if (!comImpostos)
+            {
+                <div class="side-total-nota">sem impostos (exportação)</div>
+            }
+        }
+        else
+        {
+            <div class="side-total-vazio">Sem custo ainda</div>
         }
     </div>
-    <div class="panel" style="padding:8px 14px">
+
+    @* o Salvar diz se há o que gravar: azul com alteração, discreto ("Salvo") sem *@
+    @if (TemAlteracao || NovaRevisaoPendente)
+    {
+        <button class="btn-primary btn-block btn-salvar" @onclick="() => Salvar(explicito: true)"
+                title="Grava a proposta (Ctrl+S)">
+            <Icone Nome="salvar" /> Salvar <span class="atalho">Ctrl+S</span>
+        </button>
+    }
+    else if (_proposta.Id.Length > 0)
+    {
+        <button class="btn-ghost btn-block btn-salvar salvo" @onclick="() => Salvar(explicito: true)"
+                title="Nada mudou desde a última gravação" aria-label="Salvo — nada mudou desde a última gravação">
+            <Icone Nome="ok" /> Salvo
+        </button>
+    }
+    else
+    {
+        <button class="btn-ghost btn-block btn-salvar" @onclick="() => Salvar(explicito: true)"
+                title="Grava a proposta (Ctrl+S)">
+            <Icone Nome="salvar" /> Salvar <span class="atalho">Ctrl+S</span>
+        </button>
+    }
+
+    @GerarTudoDividido("lado")
+
+    <div class="panel side-numeros">
         <div class="side-item"><span>Custo total</span><strong>@(Total > 0m ? Dinheiro(Total) : "—")</strong></div>
         <div class="side-item">
             <span>Margem</span>
@@ -2202,16 +2288,17 @@ else if (_msg is not null)
     }
     @if (pendencias.Count > 0)
     {
+        @* quatro de cada vez: o painel tem de caber num notebook de 768 px *@
         <div class="pendencias-lado">
             <strong>Pendências (@pendencias.Count)</strong>
-            @foreach (var p in pendencias.Take(6))
+            @foreach (var p in pendencias.Take(4))
             {
                 var alvo = p;
                 <button class="pendencia" @onclick="() => IrPara(alvo)">@p.Texto →</button>
             }
-            @if (pendencias.Count > 6)
+            @if (pendencias.Count > 4)
             {
-                <button class="pendencia" @onclick="() => IrParaEtapa(5)"><strong>ver todas</strong></button>
+                <button class="pendencia" @onclick="() => IrParaEtapa(5)"><strong>ver todas (@pendencias.Count)</strong></button>
             }
         </div>
     }
@@ -2219,28 +2306,6 @@ else if (_msg is not null)
     {
         <div class="side-ok">Nada pendente para os documentos.</div>
     }
-    <div class="salvo-status">
-        @if (TemAlteracao)
-        {
-            <span class="sujo">● alterações não salvas</span>
-        }
-        else
-        {
-            <span>✓ tudo salvo</span>
-        }
-        <span title="Tempo de trabalho nesta proposta">⏱ @TempoNaTela</span>
-    </div>
-    <button class="btn-primary btn-block" @onclick="() => Salvar(explicito: true)">
-        💾 Salvar <span style="opacity:.75; font-weight:400">(Ctrl+S)</span>
-    </button>
-    <button class="btn-accent btn-block" @onclick="GerarTudo">⬇ Gerar tudo</button>
-    <div class="side-caption">salva e baixa comercial, técnica e pricing</div>
-    <div class="side-links">
-        <button class="btn-link" @onclick="GerarProposta">comercial</button>
-        <button class="btn-link" @onclick="GerarTecnica">técnica</button>
-        <button class="btn-link" @onclick="GerarPricing">pricing</button>
-        <button class="btn-link" @onclick="IrParaCustoPrevisto">custo previsto</button>
-    </div>
 </aside>
 
 </div>
@@ -2256,7 +2321,7 @@ else if (_msg is not null)
     // (ou perder a conexão por mais tempo que o servidor guarda a sessão) o
     // apagava. Por isso a proposta em andamento é copiada para o navegador a
     // cada alteração, e volta quando a página abre — enquanto não for gravada
-    // (💾 Salvar), que é quando o rascunho deixa de ser necessário.
+    // (Salvar), que é quando o rascunho deixa de ser necessário.
 
     /// <summary>A proposta como está gravada (ou como nasceu): o que NÃO é rascunho.</summary>
     private string _baseSalva = "";
@@ -2276,7 +2341,7 @@ else if (_msg is not null)
     {
         if (firstRender)
         {
-            // a saída pelo próprio servidor (☰ Propostas) passa pela guarda de
+            // a saída pelo próprio servidor (botão Propostas) passa pela guarda de
             // alteração não salva; os links do menu, pelo appGuarda
             _guardaDeSaida = Navegacao.RegisterLocationChangingHandler(AoSairDaTela);
 
@@ -2297,6 +2362,7 @@ else if (_msg is not null)
 
         TickCronometro();
         await Rolar();
+        await LigarMenus();
 
         try
         {
@@ -2351,7 +2417,7 @@ else if (_msg is not null)
 
         _etapa = 2;
         Aviso("Recuperei o que você estava preenchendo e ainda não tinha gravado. " +
-              "Grave com 💾 Salvar — ou descarte com + Nova.");
+              "Grave com Salvar — ou descarte com + Nova.", fica: true);
         // quem desenhou foi a tela, ao abrir: o cronômetro não conta
         _desenhoDoSistema = true;
         StateHasChanged();
@@ -2650,23 +2716,29 @@ else if (_msg is not null)
     /// <summary>O campo de preço de uma linha: puxado, editável, e com volta.</summary>
     private RenderFragment Preco(ItemProposta item, string chave, decimal? puxado) => @<text>
         <div style="display:flex; align-items:center; gap:6px; justify-content:flex-end">
-            <input class="cell num" style="max-width:120px" placeholder="—"
+            <input class="cell num" style="max-width:150px" placeholder="—"
                    value="@TextoDoPreco(item, chave, puxado)"
                    @onchange="e => DefinirPrecoManual(item, chave, e.Value?.ToString() ?? string.Empty, puxado)" />
             @if (EhManual(item, chave))
             {
-                <button class="btn-link" title="Voltar ao custo do cadastro"
-                        @onclick="() => item.PrecosManuais.Remove(chave)">↺</button>
+                <button class="btn-link btn-icone" title="Voltar ao custo do cadastro" aria-label="Voltar ao custo do cadastro"
+                        @onclick="() => item.PrecosManuais.Remove(chave)"><Icone Nome="desfazer" /></button>
             }
         </div>
     </text>;
 
-    private string TextoDoPreco(ItemProposta item, string chave, decimal? puxado)
+    /// <summary>
+    /// O texto do campo de custo: o digitado à mão, como foi digitado; o do
+    /// cadastro com separador de milhar e até duas casas (um CLP inteiro sai
+    /// "30.500.000"). Nunca o N0 dos valores de leitura — ver
+    /// <see cref="Exibicao.NoCampo"/>.
+    /// </summary>
+    private static string TextoDoPreco(ItemProposta item, string chave, decimal? puxado)
     {
         if (item.PrecosManuais.TryGetValue(chave, out var texto) && texto.Trim().Length > 0)
             return texto;
 
-        return puxado?.ToString("N2", new System.Globalization.CultureInfo("pt-BR")) ?? "";
+        return Exibicao.NoCampo(puxado);
     }
 
     private void DefinirPrecoManual(ItemProposta item, string chave, string texto, decimal? puxado)
@@ -2686,8 +2758,9 @@ else if (_msg is not null)
             return;
         }
 
-        // digitar o mesmo número que o cadastro já dava não é uma exceção
-        if (puxado is not null && numero == puxado)
+        // digitar o mesmo número que o cadastro já dava não é uma exceção —
+        // comparado em duas casas, que é o que o campo mostra
+        if (Exibicao.MesmoValor(numero, puxado))
         {
             item.PrecosManuais.Remove(chave);
             return;
@@ -2809,7 +2882,7 @@ else if (_msg is not null)
         if (!tinha) return;
 
         item.PrecosManuais.Remove("equipamento");
-        Aviso($"Modelo trocado: o preço à mão do anterior ({antigo}) foi descartado.");
+        Aviso($"Modelo trocado: o preço à mão do anterior ({antigo}) foi descartado.", fica: true);
     }
 
     // ---------- quais modelos têm preço ----------
@@ -2842,7 +2915,7 @@ else if (_msg is not null)
     /// para a linha não ficar comprida.
     /// </summary>
     private string RotuloDoModelo(Equipamento e) => PrecoDoEquipamento(e) is { } preco
-        ? $"{e.Rotulo} · {preco.ToString("N2", new System.Globalization.CultureInfo("pt-BR"))}"
+        ? $"{e.Rotulo} · {preco.ToString(Formato(_proposta.Moeda), Br)}"
         : $"{e.Rotulo} · sem custo";
 
     /// <summary>
@@ -2860,11 +2933,21 @@ else if (_msg is not null)
     /// <summary>Um valor na moeda do PREÇO ao cliente (a do custo, quando não há conversão).</summary>
     private string DinheiroVenda(decimal? valor) => valor is null
         ? "—"
-        : $"{_proposta.MoedaVenda.Rotulo()} {valor.Value.ToString("N2", new System.Globalization.CultureInfo("pt-BR"))}";
+        : $"{_proposta.MoedaVenda.Rotulo()} {valor.Value.ToString(Formato(_proposta.MoedaVenda), Br)}";
 
+    /// <summary>Um valor na moeda do CUSTO. Só para ler: o campo editável usa <see cref="TextoDoPreco"/>.</summary>
     private string Dinheiro(decimal? valor) => valor is null
         ? "—"
-        : $"{_proposta.Moeda.Rotulo()} {valor.Value.ToString("N2", new System.Globalization.CultureInfo("pt-BR"))}";
+        : $"{_proposta.Moeda.Rotulo()} {valor.Value.ToString(Formato(_proposta.Moeda), Br)}";
+
+    /// <summary>"N0" para CLP, "N2" para as outras moedas (ver <see cref="Exibicao.Formato"/>).</summary>
+    private static string Formato(Moeda m) => Exibicao.Formato(m);
+
+    /// <summary>"1 item", "3 itens" — no lugar do "item(ns)".</summary>
+    private static string Plural(int n, string singular, string plural) => Exibicao.Plural(n, singular, plural);
+
+    /// <summary>O nome de uma lista do cadastro como se lê ("PARTIDORES" → "Partidores"). Só mostra; nunca grava.</summary>
+    private static string Exibir(string grupo) => Exibicao.Exibir(grupo);
 
     // ---------- flags ----------
 
@@ -2875,7 +2958,7 @@ else if (_msg is not null)
 
         if (ausencia is null)
         {
-            Aviso($"A lista \"{grupo}\" não tem uma opção de \"sem\" cadastrada.", erro: true);
+            Aviso($"A lista \"{Exibir(grupo)}\" não tem uma opção de \"sem\" cadastrada.", erro: true);
             return;
         }
 
@@ -2889,7 +2972,7 @@ else if (_msg is not null)
 
         if (primeira is null)
         {
-            Aviso($"A lista \"{grupo}\" só tem a opção de \"sem\".", erro: true);
+            Aviso($"A lista \"{Exibir(grupo)}\" só tem a opção de \"sem\".", erro: true);
             return;
         }
 
@@ -3296,7 +3379,7 @@ else if (_msg is not null)
 
     private void PedirCustoPrevisto()
     {
-        _msg = null;
+        FecharAviso();
         _pedindoCustoPrevisto = true;
     }
 
@@ -3374,7 +3457,7 @@ else if (_msg is not null)
             {
                 Aviso($"Pricing gerado: {PricingExcel.NomeDoArquivo(_proposta)}. A planilha não tem " +
                       $"{_proposta.MoedaVenda.Rotulo()} na caixa de moedas — nela os valores ficam em " +
-                      $"{_proposta.Moeda.Rotulo()}; a conversão vale na tela e na proposta.");
+                      $"{_proposta.Moeda.Rotulo()}; a conversão vale na tela e na proposta.", fica: true);
                 if (!_gerandoTudo) RegistrarTempo("pricing");
                 return true;
             }
@@ -3560,7 +3643,7 @@ else if (_msg is not null)
 
             var curvas = await AplicarSelecao(resultado, extensao, bytes, e.File.Name, indice);
 
-            Aviso($"Seleção lida: {resultado.Dados.Count} dado(s) do equipamento {indice + 1}"
+            Aviso($"Seleção lida: {Plural(resultado.Dados.Count, "dado", "dados")} do equipamento {indice + 1}"
                 + curvas switch
                 {
                     0 => ".",
@@ -3789,7 +3872,7 @@ else if (_msg is not null)
     /// Sem nada mudado desde a última gravação, não escreve: cada gravação é um
     /// arquivo novo na pasta de rede, e passar por uma etapa, gerar de novo ou
     /// um documento avulso logo depois do Gerar tudo não são motivo para outro.
-    /// <paramref name="explicito"/> é o 💾 Salvar e o Ctrl+S: só aí a tela diz
+    /// <paramref name="explicito"/> é o Salvar do painel e o Ctrl+S: só aí a tela diz
     /// que não havia o que gravar.
     /// </summary>
     private bool Salvar(bool explicito = false)
@@ -3847,9 +3930,13 @@ else if (_msg is not null)
         _baseSalva = Foto();
         AtualizarGravadas();
 
-        Aviso(novaRevisao
-            ? $"Revisão {_proposta.Revisao.Trim()} gravada como uma proposta nova — a revisão anterior continua como estava."
-            : $"Proposta {_proposta.Numero} gravada.");
+        // a revisão nova é uma consequência a ler (outra proposta no banco); o
+        // "gravada" comum some sozinho
+        if (novaRevisao)
+            Aviso($"Revisão {_proposta.Revisao.Trim()} gravada como uma proposta nova — a revisão anterior continua como estava.",
+                fica: true);
+        else
+            Aviso($"Proposta {_proposta.Numero} gravada.");
         return true;
     }
 
@@ -3916,7 +4003,7 @@ else if (_msg is not null)
     {
         if (NovaRevisaoPendente)
         {
-            Aviso("A revisão mudou: grave a nova revisão (💾 Salvar) antes de marcar como enviada.", erro: true);
+            Aviso("A revisão mudou: grave a nova revisão (Salvar) antes de marcar como enviada.", erro: true);
             return;
         }
 
@@ -3932,7 +4019,7 @@ else if (_msg is not null)
     {
         if (NovaRevisaoPendente)
         {
-            Aviso("A revisão mudou: grave a nova revisão (💾 Salvar) antes.", erro: true);
+            Aviso("A revisão mudou: grave a nova revisão (Salvar) antes.", erro: true);
             return;
         }
 
@@ -3958,9 +4045,32 @@ else if (_msg is not null)
         Aviso($"Proposta {numero} apagada.");
     }
 
-    private void Aviso(string texto, bool erro = false)
-    {
-        _msg = texto;
-        _erro = erro;
-    }
+    /// <summary>
+    /// O botão dividido "Gerar tudo": o botão grande salva e baixa os três
+    /// documentos; a seta abre os quatro avulsos. Um só, para o painel e a
+    /// etapa Documentos mostrarem o mesmo botão — <paramref name="onde"/>
+    /// separa o menu de cada lugar.
+    /// </summary>
+    private RenderFragment GerarTudoDividido(string onde) => @<div class="split menu-dono">
+        <button class="btn-accent split-principal" @onclick="GerarTudo"
+                title="Salva e baixa a proposta comercial, a técnica e o pricing">
+            <Icone Nome="baixar" /> Gerar tudo
+        </button>
+        <button id="@($"seta-gerar-{onde}")" class="btn-accent split-seta" aria-haspopup="menu"
+                aria-expanded="@(_gerarAberto == onde ? "true" : "false")" aria-controls="@($"menu-gerar-{onde}")"
+                title="Gerar um documento só" aria-label="Gerar um documento só"
+                @onclick="() => AlternarGerar(onde)">
+            <Icone Nome="seta" />
+        </button>
+        @if (_gerarAberto == onde)
+        {
+            <div class="menu-pop" id="@($"menu-gerar-{onde}")" role="menu" aria-label="Gerar um documento só">
+                <button role="menuitem" tabindex="-1" @onclick="() => DoMenuGerar(onde, GerarProposta)">Proposta comercial</button>
+                <button role="menuitem" tabindex="-1" @onclick="() => DoMenuGerar(onde, GerarTecnica)">Proposta técnica</button>
+                <button role="menuitem" tabindex="-1" @onclick="() => DoMenuGerar(onde, GerarPricing)">Pricing</button>
+                <button role="menuitem" tabindex="-1" @onclick="() => DoMenu(IrParaCustoPrevisto)"
+                        title="Pede o número do projeto e do pedido">Custo previsto…</button>
+            </div>
+        }
+    </div>;
 }

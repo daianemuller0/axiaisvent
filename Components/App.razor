@@ -11,6 +11,9 @@
 </head>
 
 <body>
+    @* o menu recolhido antes do primeiro desenho, sem piscar aberto no notebook:
+       a mesma regra do appMenu (app.js), que só carrega no fim da página *@
+    <script>try { var m = localStorage.getItem('axiais.pref.menuRecolhido'); if (m === 'sim' || (m !== 'nao' && window.innerWidth < 1400)) document.body.classList.add('menu-recolhido'); } catch (e) { }</script>
     <Routes />
     <script src="_framework/blazor.web.js" autostart="false"></script>
     <script src="app.js?v=@Versao"></script>

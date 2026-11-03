@@ -118,3 +118,98 @@ window.appPreferencia = {
     ler: (chave) => { try { return localStorage.getItem('axiais.pref.' + chave); } catch (e) { return null; } },
     gravar: (chave, valor) => { try { localStorage.setItem('axiais.pref.' + chave, valor); } catch (e) { } },
 };
+
+// Menu do app recolhido (só os ícones). A escolha da pessoa fica guardada; sem
+// escolha, o menu só recolhe abaixo de 1400 px — o notebook de 1366, onde os
+// 256 px dele apertavam a proposta. A 1440 nunca recolhe sozinho. O menu não é
+// interativo (é HTML do servidor): o botão chama appMenu.alternar() direto, e
+// a navegação aprimorada do Blazor, que refaz o <body>, devolve a classe pelo
+// evento enhancedload.
+window.appMenu = {
+    recolhido: () => {
+        let escolha = null;
+        try { escolha = window.appPreferencia.ler('menuRecolhido'); } catch (e) { }
+        if (escolha === 'sim') return true;
+        if (escolha === 'nao') return false;
+        return window.innerWidth < 1400;
+    },
+    aplicar: () => {
+        try {
+            const recolhido = window.appMenu.recolhido();
+            document.body.classList.toggle('menu-recolhido', recolhido);
+            document.querySelectorAll('.menu-alternar').forEach((b) => {
+                const texto = recolhido ? 'Expandir menu' : 'Recolher menu';
+                b.title = texto;
+                b.setAttribute('aria-label', texto);
+                b.setAttribute('aria-expanded', recolhido ? 'false' : 'true');
+            });
+        } catch (e) { }
+    },
+    alternar: () => {
+        try {
+            const recolher = !document.body.classList.contains('menu-recolhido');
+            window.appPreferencia.gravar('menuRecolhido', recolher ? 'sim' : 'nao');
+            window.appMenu.aplicar();
+        } catch (e) { }
+    },
+};
+window.appMenu.aplicar();
+window.addEventListener('resize', () => window.appMenu.aplicar());
+(function ligarAoBlazor() {
+    if (!window.Blazor || !window.Blazor.addEventListener) { setTimeout(ligarAoBlazor, 100); return; }
+    try { window.Blazor.addEventListener('enhancedload', () => window.appMenu.aplicar()); } catch (e) { }
+})();
+
+// Teclado dos menus que abrem de um botão (Mais, a seta do Gerar tudo): o foco
+// entra no primeiro item, as setas andam entre os itens, Esc fecha e devolve o
+// foco ao botão, Tab e o clique fora fecham. Quem abre e fecha é o servidor
+// (FecharMenus); aqui é só o foco e os avisos de "fechar".
+window.appMenuPop = {
+    abrir: (id, dotnet) => {
+        window.appMenuPop.soltar();
+        const menu = document.getElementById(id);
+        if (!menu) return;
+        const dono = menu.closest('.menu-dono');
+        const botao = dono ? dono.querySelector('[aria-haspopup]') : null;
+        const itens = () => [...menu.querySelectorAll('[role=menuitem]:not([disabled])')];
+        const fechar = (devolverFoco) => {
+            window.appMenuPop.soltar();
+            dotnet.invokeMethodAsync('FecharMenus')
+                .then(() => { if (devolverFoco && botao) botao.focus({ preventScroll: true }); })
+                .catch(() => { });
+        };
+        const fora = (e) => {
+            if (!document.body.contains(menu)) { window.appMenuPop.soltar(); return; }
+            if (dono && dono.contains(e.target)) return;
+            fechar(false);
+        };
+        const tecla = (e) => {
+            const lista = itens();
+            const i = lista.indexOf(document.activeElement);
+            if (e.key === 'ArrowDown') { e.preventDefault(); lista[(i + 1) % lista.length]?.focus(); }
+            else if (e.key === 'ArrowUp') { e.preventDefault(); lista[(i - 1 + lista.length) % lista.length]?.focus(); }
+            else if (e.key === 'Home') { e.preventDefault(); lista[0]?.focus(); }
+            else if (e.key === 'End') { e.preventDefault(); lista[lista.length - 1]?.focus(); }
+            else if (e.key === 'Escape') { e.preventDefault(); fechar(true); }
+            else if (e.key === 'Tab') { fechar(false); }
+        };
+        document.addEventListener('pointerdown', fora, true);
+        menu.addEventListener('keydown', tecla);
+        window.appMenuPop._atual = { fora, tecla, menu };
+        const primeiro = itens()[0];
+        if (primeiro) primeiro.focus({ preventScroll: true });
+    },
+    soltar: () => {
+        const atual = window.appMenuPop._atual;
+        if (!atual) return;
+        document.removeEventListener('pointerdown', atual.fora, true);
+        atual.menu.removeEventListener('keydown', atual.tecla);
+        window.appMenuPop._atual = null;
+    },
+    // depois de escolher um item, o foco volta ao botão que abriu o menu
+    focar: (id) => {
+        window.appMenuPop.soltar();
+        const el = document.getElementById(id);
+        if (el) el.focus({ preventScroll: true });
+    },
+};

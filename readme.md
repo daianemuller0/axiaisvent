@@ -182,8 +182,8 @@ A guia **Base** (planilha solta) foi retirada; o sistema abre na **Proposta**.
 
 A tela de proposta deixou de ser uma página só com doze caixas abertas. Agora são **cinco etapas**
 — **Começar**, **Cliente e condições**, **Equipamentos**, **Preço** e **Documentos** —, cada uma a
-um clique na barra do alto (com ✓ ou o número de pendências), e um **painel fixo à direita** com a
-venda líquida, o custo, a margem, as pendências, **💾 Salvar (Ctrl+S)** e **⬇ Gerar tudo**. Cada etapa
+um clique na barra do alto (com o visto ou o número de pendências), e um **painel fixo à direita** com a
+venda líquida, **Salvar (Ctrl+S)**, **Gerar tudo**, o custo, a margem e as pendências. Cada etapa
 termina em **Salvar e continuar**.
 
 - **Começar**: abrir ou **copiar** uma proposta gravada (busca por cliente, número ou projeto),
@@ -203,7 +203,7 @@ termina em **Salvar e continuar**.
 - **Pendências**: tudo o que os documentos deixariam em branco, de todas as etapas, sempre à vista
   e clicável — leva direto ao campo ou ao equipamento.
 - **Gerar tudo**: salva e baixa comercial, técnica e pricing de uma vez.
-- **Modo compacto**: os textos de ajuda ficam escondidos; o botão **? Mostrar ajuda** traz de volta
+- **Modo compacto**: os textos de ajuda ficam escondidos; **Mais › Mostrar ajuda** traz de volta
   (a escolha fica lembrada no navegador). Campos que quase nunca mudam ficam em **Mais campos**.
 
 ### Nota de versão — Onda 0: medir antes de mexer, gravar só o que mudou
@@ -213,7 +213,7 @@ termina em **Salvar e continuar**.
   equipamentos e quantas vezes cada atalho da tela foi usado. Desenhos a menos de 400 ms um do outro
   contam como uma interação só.
 - **Gravar só o que mudou**: Salvar, Salvar e continuar e Gerar tudo não escrevem outro arquivo na
-  pasta de rede quando nada mudou (o 💾 Salvar e o Ctrl+S avisam "Nada mudou desde a última
+  pasta de rede quando nada mudou (o Salvar e o Ctrl+S avisam "Nada mudou desde a última
   gravação"). Depois de gravar, só a lista de propostas é relida — e ela já traz o que os colegas
   gravaram.
 - **Documento sempre com número**: comercial, técnica, pricing e custo previsto avulsos gravam a
@@ -226,6 +226,30 @@ termina em **Salvar e continuar**.
   diz de que data é na aba Conversão (âmbar depois de 7 dias); o painel mostra *2 itens · 3 un.* e só
   mostra o preço com impostos quando ele é diferente; fora do Brasil, o J6 do pricing vira uma nota
   sob o país; o segundo país se chama *País de destino*.
+
+### Nota de versão — Onda 1: base visual e moldura da tela
+
+- **Topo enxuto**: o título é o número da proposta, com os selos *rev 00* e *Em elaboração* (ou
+  *Enviada em 03/11*, que desfaz com um clique) e, embaixo, cliente · projeto. Ficam à vista só
+  **Propostas**, **+ Nova** e **Mais** — Duplicar proposta, Marcar como enviada, Mostrar/Esconder
+  ajuda e Apagar (ADM). O menu abre e anda pelo teclado (setas, Esc).
+- **Aviso em três níveis**, no pé da coluna do meio (nunca por cima do painel): o sucesso some em
+  6 s; a consequência ("Modelo trocado: o preço à mão do anterior foi descartado", "Cópia da …",
+  "Recuperei…") e o erro ficam até alguém fechar. Depois de um Gerar tudo sem falha, o aviso oferece
+  **Marcar como enviada**.
+- **Etapas que dizem a verdade**: o visto só aparece com conteúdo e nada pendente (Documentos: com
+  equipamento e nenhuma pendência em lugar nenhum); etapa não começada fica sem selo. A barra não
+  quebra linha; o cronômetro fica só nela.
+- **Painel que cabe no notebook (1366x768)**: venda líquida, **Salvar** azul quando há o que gravar e
+  "Salvo" discreto quando não, **Gerar tudo** com seta para os documentos avulsos (comercial,
+  técnica, pricing, custo previsto), os números e quatro pendências com "ver todas".
+- **Menu do app recolhível**: botão no rodapé do menu; sem escolha guardada, ele recolhe sozinho só
+  abaixo de 1400 px de largura.
+- **Base visual**: cores por função nos avisos (contraste do âmbar corrigido), ícones de traço no
+  lugar dos emojis, controle segmentado (moeda, tipo, arranjo, montagem, Sem/Com, margem/preço),
+  valores em CLP sem centavos nas telas de leitura (o campo de custo continua com até duas casas),
+  "1 item / 3 itens" no lugar de "item(ns)" e os nomes das listas como se leem ("Partidores",
+  "Conexão manga descarga") — só na tela; o que é gravado não muda.
 
 ### O cronômetro (tempo de cada proposta)
 

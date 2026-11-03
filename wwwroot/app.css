@@ -15,6 +15,26 @@
     --radius-sm: 10px;
     --shadow-sm: 0 1px 2px rgba(12, 35, 64, .05), 0 1px 4px rgba(12, 35, 64, .04);
     --shadow: 0 6px 20px rgba(12, 35, 64, .08);
+
+    /* cores por função: o fundo, a borda, o texto e a barra da esquerda de cada
+       aviso. O âmbar antigo (#c98a00 sobre branco) dava contraste de 3:1; o
+       texto de alerta agora é o --warn-tx, que passa de 7:1 */
+    --ok-bg: #f0fdf4;
+    --ok-bd: #bbf7d0;
+    --ok-tx: #166534;
+    --ok-barra: #22c55e;
+    --warn-bg: #fffbeb;
+    --warn-bd: #fde68a;
+    --warn-tx: #92400e;
+    --warn-barra: #f59e0b;
+    --err-bg: #fef2f2;
+    --err-bd: #fecaca;
+    --err-tx: #b91c1c;
+    --err-barra: #ef4444;
+    --info-bg: #f5f8fc;
+    --info-bd: #dbe4ef;
+    --info-tx: #334155;
+    --info-barra: #7b93b4;
 }
 
 * { box-sizing: border-box; }
@@ -122,6 +142,9 @@ a { color: var(--secondary); }
 
 h1 { font-size: 24px; margin: 0 0 4px; color: var(--primary); letter-spacing: -.01em; }
 .subtitle { color: var(--muted); margin: 0 0 24px; font-size: 13.5px; line-height: 1.5; }
+/* o .subtitle de parágrafo tem 24 px embaixo; num span dentro de uma linha flex
+   esse respiro empurrava o texto 12 px para cima dos vizinhos */
+span.subtitle { margin: 0; }
 
 .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
 .card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow-sm); }
@@ -166,6 +189,9 @@ h1 { font-size: 24px; margin: 0 0 4px; color: var(--primary); letter-spacing: -.
 .grid .cell { width: 100%; }
 .grid td.center { text-align: center; }
 .grid .right, th.right { text-align: right; }
+/* números de colunas e do painel com algarismos da mesma largura: os valores
+   ficam alinhados casa com casa */
+.cell.num, .grid .right, .side-item strong, .side-total-value { font-variant-numeric: tabular-nums; }
 .grid .nowrap { white-space: nowrap; }
 .empty { text-align: center; color: var(--muted); }
 
@@ -186,20 +212,39 @@ h1 { font-size: 24px; margin: 0 0 4px; color: var(--primary); letter-spacing: -.
 .alert-error { background: #fde8e8; color: #b91c1c; padding: 10px 13px; border-radius: var(--radius-sm); font-size: 13px; text-align: center; margin-bottom: 12px; }
 .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* ---- resultado da verificação (aba Dados) ---- */
-.aviso { padding: 11px 14px; border-radius: var(--radius-sm); font-size: 13.5px; line-height: 1.5; }
-.aviso-ok { background: #dcfce7; color: #15803d; }
-.aviso-alerta { background: #fef9c3; color: #a16207; font-weight: 600; }
-.aviso-erro { background: #fde8e8; color: #b91c1c; font-weight: 600; }
-.aviso-neutro { background: #eef2f7; color: #55607a; }
+/* ---- avisos (proposta, aba Dados, Configurações) ----
+   borda fina com a barra da esquerda na cor da função, e peso normal: o
+   negrito em todo aviso âmbar fazia tudo parecer urgente */
+.aviso {
+    padding: 10px 14px; border-radius: var(--radius-sm); font-size: 13.5px; line-height: 1.5;
+    font-weight: 400; border: 1px solid var(--info-bd); border-left-width: 3px;
+    background: var(--info-bg); color: var(--info-tx);
+}
+.aviso-ok { background: var(--ok-bg); border-color: var(--ok-bd); border-left-color: var(--ok-barra); color: var(--ok-tx); }
+.aviso-alerta { background: var(--warn-bg); border-color: var(--warn-bd); border-left-color: var(--warn-barra); color: var(--warn-tx); }
+.aviso-erro { background: var(--err-bg); border-color: var(--err-bd); border-left-color: var(--err-barra); color: var(--err-tx); }
+.aviso-info, .aviso-neutro { background: var(--info-bg); border-color: var(--info-bd); border-left-color: var(--info-barra); color: var(--info-tx); }
+/* texto de alerta numa linha comum (modelo sem custo, campo que não veio) */
+.texto-alerta { color: var(--warn-tx); }
 /* célula da matriz com combinação válida — o amarelo da planilha original */
 .combina { background: #fef9c3; }
 
-/* ---- botões ---- */
+/* ---- ícones (Components/Icone.razor) ---- */
+.ico {
+    width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 2;
+    stroke-linecap: round; stroke-linejoin: round;
+}
+
+/* ---- botões ----
+   inline-flex com gap: o ícone e o texto ficam alinhados pelo meio, sem
+   espaço digitado entre eles */
+.btn-primary, .btn-ghost, .btn-accent {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+}
 .btn-primary {
     background: var(--primary); color: #fff; border: none; padding: 10px 18px;
     border-radius: var(--radius-sm); cursor: pointer; font-size: 13.5px; font-weight: 600;
-    text-decoration: none; display: inline-block; font-family: inherit;
+    text-decoration: none; font-family: inherit;
     box-shadow: 0 2px 8px rgba(0, 71, 133, .25);
     transition: background .15s, transform .1s, box-shadow .15s;
 }
@@ -209,9 +254,14 @@ h1 { font-size: 24px; margin: 0 0 4px; color: var(--primary); letter-spacing: -.
     background: var(--panel); border: 1px solid var(--border); color: var(--text);
     padding: 10px 18px; border-radius: var(--radius-sm); cursor: pointer;
     font-size: 13.5px; font-family: inherit; font-weight: 500;
-    transition: all .15s; text-decoration: none; display: inline-block;
+    transition: all .15s; text-decoration: none;
 }
 .btn-ghost:hover { border-color: #c8d4e4; background: #f8fafc; }
+/* o foco do teclado num anel da cor do sistema, e não no contorno preto do navegador */
+.btn-primary:focus-visible, .btn-ghost:focus-visible, .btn-accent:focus-visible,
+.btn-link:focus-visible, .etapa-btn:focus-visible, .prop-chip:focus-visible {
+    outline: 2px solid var(--secondary); outline-offset: 2px;
+}
 .btn-link { background: none; border: none; color: var(--secondary); cursor: pointer; font-size: 13.5px; font-family: inherit; padding: 2px 4px; }
 .btn-link:hover { text-decoration: underline; }
 
@@ -428,11 +478,11 @@ h1 { font-size: 24px; margin: 0 0 4px; color: var(--primary); letter-spacing: -.
     border-radius: var(--radius-sm); padding: 11px 13px; font-size: 12.5px; line-height: 1.5;
 }
 .side-ok {
-    background: #dcfce7; color: #15803d; border-radius: var(--radius-sm);
-    padding: 11px 13px; font-size: 13px; font-weight: 600;
+    background: var(--ok-bg); color: var(--ok-tx); border: 1px solid var(--ok-bd); border-radius: var(--radius-sm);
+    padding: 10px 13px; font-size: 13px; font-weight: 600;
 }
 .side-caption { text-align: center; font-size: 11.5px; color: var(--muted); margin: -4px 0 2px; }
-.btn-block { display: block; width: 100%; text-align: center; }
+.btn-block { display: flex; width: 100%; text-align: center; }
 .btn-accent {
     background: linear-gradient(135deg, var(--accent), #00a89b); color: #fff; border: none;
     padding: 12px 18px; border-radius: var(--radius-sm); cursor: pointer;
@@ -635,13 +685,19 @@ h1 { font-size: 24px; margin: 0 0 4px; color: var(--primary); letter-spacing: -.
 /* ---- proposta em etapas ---- */
 /* a proposta usa a largura da tela: o painel fixo come 300 px da coluna */
 .content:has(.prop-etapas) { max-width: 1560px; }
+/* a barra fica numa linha só (rola na horizontal se faltar espaço): quebrada
+   em duas, ela empurrava o conteúdo e o painel para baixo. A altura é medida
+   (52 px a 1366 e a 1440) e é dela que saem os tops do painel e das faixas
+   fixas */
+:root { --altura-etapas: 52px; }
 .etapas-barra {
-    display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 16px; padding: 6px;
+    display: flex; flex-wrap: nowrap; overflow-x: auto; align-items: center; gap: 6px;
+    margin-bottom: 16px; padding: 6px; min-height: var(--altura-etapas);
     background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
     box-shadow: var(--shadow-sm); position: sticky; top: 66px; z-index: 6;
 }
 .etapa-btn {
-    display: inline-flex; align-items: center; gap: 8px; border: 1px solid transparent;
+    display: inline-flex; align-items: center; gap: 8px; border: 1px solid transparent; flex: none; white-space: nowrap;
     background: transparent; color: var(--text); padding: 7px 13px; border-radius: var(--radius-sm);
     cursor: pointer; font: inherit; font-size: 13.5px; font-weight: 500;
 }
@@ -652,11 +708,22 @@ h1 { font-size: 24px; margin: 0 0 4px; color: var(--primary); letter-spacing: -.
     background: #e8eef6; color: var(--primary); font-size: 12px; font-weight: 700;
 }
 .etapa-btn.ativa .etapa-num { background: rgba(255, 255, 255, .22); color: #fff; }
-.etapa-ok { color: #15803d; font-weight: 700; }
+.etapa-ok { color: #15803d; font-weight: 700; display: inline-flex; }
+.etapa-ok .ico { width: 15px; height: 15px; stroke-width: 2.5; }
 .etapa-btn.ativa .etapa-ok { color: #bbf7d0; }
-.etapa-cron { font-size: 12.5px; color: var(--muted); padding-right: 8px; }
+.etapa-cron {
+    font-size: 12.5px; color: var(--muted); padding-right: 8px; white-space: nowrap;
+    display: inline-flex; align-items: center; gap: 5px; flex: none;
+}
+.etapa-cron .ico { width: 14px; height: 14px; }
 .prop-etapas { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 18px; align-items: start; }
-.prop-etapas .prop-side { top: 130px; max-height: calc(100vh - 140px); overflow-y: auto; padding-bottom: 4px; }
+/* o painel começa logo abaixo da barra de etapas e, num notebook de 768 px,
+   cabe inteiro; a rolagem por dentro fica só para o caso extremo */
+.prop-etapas .prop-side {
+    top: calc(66px + var(--altura-etapas) + 16px);
+    max-height: calc(100vh - 66px - var(--altura-etapas) - 26px);
+    overflow-y: auto; padding-bottom: 4px; z-index: 7;
+}
 @media (max-width: 1100px) {
     .prop-etapas { grid-template-columns: 1fr; }
     .prop-etapas .prop-side { position: static; }
@@ -692,18 +759,16 @@ h1 { font-size: 24px; margin: 0 0 4px; color: var(--primary); letter-spacing: -.
 .lembranca-cliente { margin-top: 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 
 .pendencias-lado {
-    background: #fffbeb; border: 1px solid #fde68a; border-radius: var(--radius-sm);
-    padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; font-size: 13px; color: #92400e;
+    background: var(--warn-bg); border: 1px solid var(--warn-bd); border-radius: var(--radius-sm);
+    padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; font-size: 13px; color: var(--warn-tx);
 }
 .pendencias-lista { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; }
 .pendencia {
-    background: none; border: none; text-align: left; padding: 3px 0; color: #92400e;
+    background: none; border: none; text-align: left; padding: 3px 0; color: var(--warn-tx);
     font: inherit; font-size: 12.5px; cursor: pointer;
 }
 .pendencia:hover { text-decoration: underline; }
-.salvo-status { font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; gap: 8px; }
-.salvo-status .sujo { color: #b45309; font-weight: 600; }
-.side-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px 8px; }
+
 /* linhas do escopo mais baixas: são umas dez por equipamento */
 .escopo-linha { margin-bottom: 4px !important; padding-top: 6px; padding-bottom: 2px; }
 .escopo-linha .btn-ghost, .escopo-linha .btn-primary { padding-top: 5px; padding-bottom: 5px; }
@@ -719,7 +784,7 @@ h1 { font-size: 24px; margin: 0 0 4px; color: var(--primary); letter-spacing: -.
 }
 .guarda-barra .btn-primary, .guarda-barra .btn-ghost { padding: 7px 14px; }
 /* nota curta sob um campo: o que o campo faz, sem parecer erro */
-.nota { font-size: 12px; font-weight: 400; color: var(--muted); line-height: 1.4; }
+.nota { font-size: 12.5px; font-weight: 400; color: var(--muted); line-height: 1.4; }
 /* de onde veio a taxa de câmbio; âmbar quando passou de 7 dias */
 .taxa-origem { display: block; font-size: 12.5px; color: var(--muted); margin-top: 4px; }
 .taxa-origem.velha { color: #b45309; font-weight: 600; }
@@ -738,3 +803,136 @@ h1 { font-size: 24px; margin: 0 0 4px; color: var(--primary); letter-spacing: -.
 .tempos-tabela { box-shadow: none; }
 .tempos-tabela th, .tempos-tabela td { padding: 8px 10px; }
 .texto-verde { color: #15803d; }
+
+/* ---- controle segmentado: um par (ou um trio) de escolhas que se excluem ----
+   No lugar dos pares de botões cheios: uma borda só em volta, a escolha ligada
+   em azul. O "Sem" ligado fica cinza neutro, para não parecer uma escolha a
+   mais no escopo. Os botões são os mesmos de antes (mesmo @onclick). */
+.seg {
+    display: inline-flex; align-items: stretch; flex: none;
+    border: 1px solid #cdd6e3; border-radius: 8px; background: var(--panel); overflow: hidden;
+}
+.seg > button {
+    border: none; border-left: 1px solid #cdd6e3; background: transparent; color: var(--text);
+    padding: 6px 12px; font: inherit; font-size: 13px; font-weight: 500; cursor: pointer;
+    line-height: 1.3; white-space: nowrap; transition: background .12s, color .12s;
+}
+.seg > button:first-child { border-left: none; }
+.seg > button:hover { background: #f1f5fa; }
+.seg > button.on { background: var(--primary); color: #fff; font-weight: 600; }
+.seg > button.sem.on { background: #e5e9f0; color: #334155; }
+.seg > button:focus-visible { outline: 2px solid var(--secondary); outline-offset: -2px; }
+
+/* ---- moldura da proposta (topo, menus, aviso, painel) ---- */
+.prop-head { align-items: center; margin-bottom: 14px; }
+.prop-titulo { flex: 1; min-width: 0; }
+.prop-titulo-linha { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.prop-titulo-linha h1 { margin: 0; line-height: 1.25; }
+.prop-sub { margin: 2px 0 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.prop-chip {
+    display: inline-flex; align-items: center; border: 1px solid var(--info-bd); border-radius: 999px;
+    padding: 1px 10px; font: inherit; font-size: 12px; font-weight: 600; line-height: 1.6;
+    background: var(--info-bg); color: var(--info-tx); white-space: nowrap;
+}
+.chip-elaboracao { background: #eef3fa; color: var(--primary); border-color: #d4e0ef; }
+.chip-enviada { background: var(--ok-bg); color: var(--ok-tx); border-color: var(--ok-bd); cursor: pointer; }
+.chip-enviada:hover { border-color: var(--ok-barra); }
+.texto-perigo { color: var(--err-tx); }
+
+/* botão só com ícone */
+.btn-icone { display: inline-flex; align-items: center; justify-content: center; }
+.btn-link.btn-icone { padding: 4px; border-radius: 6px; color: var(--muted); }
+.btn-link.btn-icone:hover { background: #eef2f7; color: var(--text); text-decoration: none; }
+.btn-ghost.btn-icone { padding-left: 10px; padding-right: 10px; }
+.ico-p { width: 13px; height: 13px; }
+
+/* menus que abrem de um botão (Mais, a seta do Gerar tudo): fecham ao
+   escolher, ao clicar fora e com Esc (appMenuPop no app.js) */
+.menu-dono { position: relative; display: inline-flex; }
+.menu-pop {
+    position: absolute; top: calc(100% + 6px); right: 0; z-index: 30; min-width: 230px;
+    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-sm);
+    box-shadow: 0 12px 32px rgba(12, 35, 64, .18); padding: 6px;
+    display: flex; flex-direction: column; gap: 1px;
+}
+.menu-pop [role=menuitem] {
+    display: flex; align-items: center; gap: 9px; width: 100%; text-align: left;
+    background: none; border: none; border-radius: 6px; padding: 8px 10px;
+    font: inherit; font-size: 13.5px; color: var(--text); cursor: pointer; white-space: nowrap;
+}
+.menu-pop [role=menuitem] .ico { color: var(--muted); }
+.menu-pop [role=menuitem]:hover, .menu-pop [role=menuitem]:focus { background: #eef3fa; outline: none; }
+.menu-pop [role=menuitem]:focus-visible { box-shadow: inset 0 0 0 2px var(--secondary); }
+.menu-pop .perigo { color: var(--err-tx); }
+.menu-pop .perigo:hover, .menu-pop .perigo:focus { background: var(--err-bg); }
+.menu-sep { height: 1px; background: var(--border); margin: 4px 2px; }
+
+/* botão dividido: o Gerar tudo e a seta dos avulsos */
+.split { display: flex; width: 100%; border-radius: var(--radius-sm); box-shadow: 0 3px 10px rgba(0, 148, 150, .3); }
+.split .btn-accent { background: var(--accent); box-shadow: none; }
+.split .btn-accent:hover { background: #008385; box-shadow: none; }
+.split .split-principal { flex: 1; border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
+.split .split-seta {
+    flex: none; padding-left: 11px; padding-right: 11px;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0; border-left: 1px solid rgba(255, 255, 255, .4);
+}
+.split .menu-pop { left: 0; right: 0; min-width: 0; }
+
+/* o aviso do pé da coluna do meio: fica à vista com a tela rolada, sem cobrir o painel */
+.aviso-pe-area { position: sticky; bottom: 14px; z-index: 7; }
+.aviso-pe-area:has(.aviso-pe) { margin-bottom: 12px; }
+.aviso-pe {
+    display: flex; align-items: center; gap: 10px; margin-top: 10px;
+    padding: 9px 8px 9px 14px; border: 1px solid; border-left-width: 4px; border-radius: var(--radius-sm);
+    box-shadow: 0 10px 28px rgba(12, 35, 64, .16); font-size: 13.5px; line-height: 1.45;
+}
+.aviso-pe.ok { background: var(--ok-bg); border-color: var(--ok-bd); border-left-color: var(--ok-barra); color: var(--ok-tx); }
+.aviso-pe.consequencia { background: #fff; border-color: var(--info-bd); border-left-color: var(--primary); color: var(--info-tx); }
+.aviso-pe.erro { background: var(--err-bg); border-color: var(--err-bd); border-left-color: var(--err-barra); color: var(--err-tx); }
+.aviso-pe-texto { flex: 1; min-width: 0; }
+.aviso-pe-acao { flex: none; }
+.aviso-pe-fechar { flex: none; color: inherit !important; opacity: .75; }
+.aviso-pe-fechar:hover { opacity: 1; }
+
+/* painel do lado, compacto: tem de caber em 768 px de altura */
+.prop-etapas .side-total { padding: 14px 16px; }
+.prop-etapas .side-total-value { font-size: 24px; margin-top: 3px; }
+.side-total-vazio { font-size: 13px; color: #cfe3f7; margin-top: 4px; }
+.side-numeros { padding: 4px 14px; }
+.side-numeros .side-item { padding: 6px 0; }
+.btn-salvar { position: relative; }
+.btn-salvar .atalho { font-size: 11.5px; font-weight: 400; opacity: .75; margin-left: 4px; }
+.btn-salvar.salvo { color: var(--ok-tx); }
+.btn-salvar.salvo .ico { stroke-width: 2.5; }
+
+/* densidade, só dentro da proposta: as outras telas continuam como estão */
+.proposta .cell { padding: 6px 10px; font-size: 13px; }
+.proposta .form3 { gap: 10px 16px; }
+.proposta .grid th, .proposta .grid td { padding: 7px 12px; }
+.proposta .btn-primary, .proposta .btn-ghost, .proposta .btn-accent { padding: 7px 14px; }
+.proposta .split .btn-accent { padding-top: 9px; padding-bottom: 9px; }
+.proposta .split .split-seta { padding-left: 11px; padding-right: 11px; }
+.proposta .btn-ghost.btn-icone { padding-left: 9px; padding-right: 9px; }
+
+/* ---- menu do app recolhido: só os ícones, 68 px ----
+   Recolhe por escolha da pessoa (botão no rodapé do menu) e, sem escolha
+   guardada, só abaixo de 1400 px de largura — o notebook de 1366 (appMenu no
+   app.js) */
+.menu-alternar {
+    display: flex; align-items: center; gap: 10px; width: 100%; margin-bottom: 8px;
+    background: none; border: none; border-radius: var(--radius-sm); padding: 9px 12px;
+    color: #9fbad3; font: inherit; font-size: 12.5px; cursor: pointer; text-align: left;
+}
+.menu-alternar:hover { background: rgba(255, 255, 255, .08); color: #fff; }
+.menu-alternar .ico { width: 18px; height: 18px; transition: transform .15s; }
+body.menu-recolhido .sidebar { width: 68px; padding-left: 10px; padding-right: 10px; }
+body.menu-recolhido .brand-name, body.menu-recolhido .brand-sub,
+body.menu-recolhido .nav-section, body.menu-recolhido .version,
+body.menu-recolhido .nav-item span, body.menu-recolhido .menu-alternar span { display: none; }
+body.menu-recolhido .brand, body.menu-recolhido .brand.logo { justify-content: center; padding: 0; }
+body.menu-recolhido .brand-img img { max-width: 44px; max-height: 44px; }
+body.menu-recolhido .nav { margin-top: 18px; gap: 6px; }
+body.menu-recolhido .nav-item { justify-content: center; padding: 10px 0; }
+body.menu-recolhido .sidebar-footer { padding-top: 8px; }
+body.menu-recolhido .menu-alternar { justify-content: center; padding: 9px 0; }
+body.menu-recolhido .menu-alternar .ico { transform: rotate(180deg); }

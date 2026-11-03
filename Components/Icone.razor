@@ -1,0 +1,91 @@
+@*
+    Os ícones da tela, no mesmo traço dos ícones do menu do app (NavMenu):
+    linha de 2 px, pontas e cantos redondos, sem preenchimento, na cor do
+    texto em volta. Estão no lugar dos emojis, que no Windows (WebView2) saíam
+    coloridos pela Segoe UI Emoji, cada um de um tamanho, e não seguiam a cor
+    do botão. O ícone é só enfeite para o leitor de tela (aria-hidden): quem
+    diz o que o botão faz é o texto dele, ou o title e o aria-label quando o
+    botão é só o ícone.
+*@
+<svg class="ico @Classe" viewBox="0 0 24 24" aria-hidden="true" focusable="false"
+     fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    @switch (Nome)
+    {
+        case "salvar":
+            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+            <polyline points="17 21 17 13 7 13 7 21" />
+            <polyline points="7 3 7 8 15 8" />
+            break;
+        case "baixar":
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+            break;
+        case "copiar":
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+            break;
+        case "enviar":
+            <line x1="22" y1="2" x2="11" y2="13" />
+            <polygon points="22 2 15 22 11 13 2 9 22 2" />
+            break;
+        case "lista":
+            <line x1="8" y1="6" x2="21" y2="6" />
+            <line x1="8" y1="12" x2="21" y2="12" />
+            <line x1="8" y1="18" x2="21" y2="18" />
+            <line x1="3" y1="6" x2="3.01" y2="6" />
+            <line x1="3" y1="12" x2="3.01" y2="12" />
+            <line x1="3" y1="18" x2="3.01" y2="18" />
+            break;
+        case "ajuda":
+            <circle cx="12" cy="12" r="10" />
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+            <line x1="12" y1="17" x2="12.01" y2="17" />
+            break;
+        case "relogio":
+            <circle cx="12" cy="12" r="10" />
+            <polyline points="12 6 12 12 16 14" />
+            break;
+        case "alerta":
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+            <line x1="12" y1="9" x2="12" y2="13" />
+            <line x1="12" y1="17" x2="12.01" y2="17" />
+            break;
+        case "desfazer":
+            <polyline points="1 4 1 10 7 10" />
+            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+            break;
+        case "fechar":
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+            break;
+        case "mais":
+            <circle cx="12" cy="12" r="1" />
+            <circle cx="19" cy="12" r="1" />
+            <circle cx="5" cy="12" r="1" />
+            break;
+        case "pasta":
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+            break;
+        // os três abaixo não têm emoji para substituir: a seta do botão
+        // dividido, o visto do "Salvo" e o recolher do menu do app
+        case "seta":
+            <polyline points="6 9 12 15 18 9" />
+            break;
+        case "ok":
+            <polyline points="20 6 9 17 4 12" />
+            break;
+        case "recolher":
+            <polyline points="11 17 6 12 11 7" />
+            <polyline points="18 17 13 12 18 7" />
+            break;
+    }
+</svg>
+
+@code {
+    /// <summary>salvar, baixar, copiar, enviar, lista, ajuda, relogio, alerta, desfazer, fechar, mais, pasta, seta, ok ou recolher.</summary>
+    [Parameter] public string Nome { get; set; } = "";
+
+    /// <summary>Uma classe a mais, para o ícone que muda de tamanho ou gira.</summary>
+    [Parameter] public string Classe { get; set; } = "";
+}
