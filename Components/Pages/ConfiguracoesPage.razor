@@ -9,8 +9,8 @@
     <div>
         <h1>Configurações</h1>
         <p class="subtitle">
-            Os usuários do sistema e o que cada um pode fazer, e a identidade visual (os
-            logos). Quem for cadastrado aqui entra pela tela de login com o usuário e a senha
+            Os usuários do sistema e o que cada um pode fazer, a identidade visual (os
+            logos) e o tempo que cada proposta levou para ser montada. Quem for cadastrado aqui entra pela tela de login com o usuário e a senha
             definidos, e o <strong>papel</strong> decide o que cada um pode fazer.
         </p>
     </div>
@@ -27,6 +27,10 @@
 @if (_aba == "identidade")
 {
     <VistaIdentidade />
+}
+else if (_aba == "tempos")
+{
+    <VistaTempos />
 }
 else
 {
@@ -132,7 +136,7 @@ else
 @code {
     private static readonly (string Chave, string Titulo)[] Abas =
     {
-        ("usuarios", "Usuários"), ("identidade", "Identidade Visual"),
+        ("usuarios", "Usuários"), ("identidade", "Identidade Visual"), ("tempos", "Tempo das propostas"),
     };
 
     /// <summary>A seção à vista. /axiais/marca (o endereço antigo) abre na identidade visual.</summary>

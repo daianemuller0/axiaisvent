@@ -178,6 +178,48 @@ a revisão já existir, o sistema recusa e avisa.
 
 A guia **Base** (planilha solta) foi retirada; o sistema abre na **Proposta**.
 
+## Proposta em etapas (montar em menos tempo)
+
+A tela de proposta deixou de ser uma página só com doze caixas abertas. Agora são **cinco etapas**
+— **Começar**, **Cliente e condições**, **Equipamentos**, **Preço** e **Documentos** —, cada uma a
+um clique na barra do alto (com ✓ ou o número de pendências), e um **painel fixo à direita** com a
+venda líquida, o custo, a margem, as pendências, **💾 Salvar (Ctrl+S)** e **⬇ Gerar tudo**. Cada etapa
+termina em **Salvar e continuar**.
+
+- **Começar**: abrir ou **copiar** uma proposta gravada (busca por cliente, número ou projeto),
+  **importar todos os arquivos de uma vez** (folha de dados, seleções e curvas — cada arquivo vai
+  para o equipamento certo: pelo número no nome, "eq2", "item 3", senão para o primeiro livre) ou
+  começar em branco.
+- **O que já se sabe não se digita**: a proposta nova nasce com os padrões de quem está logado
+  (preparada por, contato Howden, BU, idioma, validade, prazo e moeda do custo da última proposta
+  dele); ao escolher um **cliente** que já tem proposta, contato, cidade, país, condições de
+  pagamento, incoterm, entrega, representante e moedas vêm da última proposta dele — só o que ainda
+  estava em branco ou no padrão, com **desfazer**; a **taxa de câmbio** CLP↔USD vem da aba Conversão.
+- **Equipamentos**: abas por equipamento (Escopo e parte elétrica · Opcionais · Técnica),
+  **filtro** na lista de modelos, **duplicar equipamento**, **escopo padrão por série** (guardado uma
+  vez a partir de um equipamento bem montado; o próximo da série já nasce com ele) e **sugestão de
+  motor pela seleção** (potência consumida + 10% de folga; polos e frequência pela rotação, ou a
+  frequência do país de destino).
+- **Pendências**: tudo o que os documentos deixariam em branco, de todas as etapas, sempre à vista
+  e clicável — leva direto ao campo ou ao equipamento.
+- **Gerar tudo**: salva e baixa comercial, técnica e pricing de uma vez.
+- **Modo compacto**: os textos de ajuda ficam escondidos; o botão **? Mostrar ajuda** traz de volta
+  (a escolha fica lembrada no navegador). Campos que quase nunca mudam ficam em **Mais campos**.
+
+### O cronômetro (tempo de cada proposta)
+
+A tela mede o tempo de trabalho em cada proposta — pausas de mais de 3 minutos não contam — e grava,
+a cada documento gerado, o tempo e o número de interações (entidade `tempos_proposta`). Em
+**Configurações › Tempo das propostas** (ADM) ficam o tempo médio, a mediana e a lista, contando a
+primeira geração de cada revisão. É o número para comparar com o processo antigo.
+
+### Anexos sempre na pasta certa
+
+Uma proposta nova é **gravada antes do primeiro anexo** (curva ou seleção do VAX com curva). Antes ela
+ganhava um id provisório, e o primeiro "Salvar" — que via ali uma revisão nova — trocava o id e
+deixava as curvas para trás. E uma **revisão nova** leva os anexos da anterior para a pasta dela
+(`Anexos.CopiarTodos`): antes, as curvas da revisão nova abriam quebradas.
+
 ## Rascunho: recarregar a página não perde a proposta
 
 A proposta em andamento é copiada para o navegador (localStorage) a cada alteração e volta quando a

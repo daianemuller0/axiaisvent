@@ -1,0 +1,107 @@
+@inject TempoRepository Tempos
+
+<p class="subtitle">
+    Quanto tempo cada proposta levou para ser montada, medido pelo próprio sistema: o tempo de
+    trabalho na tela de proposta, desde abrir ou criar a proposta até gerar os documentos pela
+    primeira vez. Pausas de mais de 3 minutos não contam, e gerar de novo a mesma revisão não conta
+    como outra proposta. É o número para comparar com o processo antigo.
+</p>
+
+@if (_propostas.Count == 0)
+{
+    <div class="aviso aviso-neutro">
+        Ainda não há propostas medidas. O tempo é gravado a cada documento gerado na tela de proposta.
+    </div>
+}
+else
+{
+    <div class="kpis">
+        <div class="kpi k-risk">
+            <div class="kpi-label">Propostas medidas</div>
+            <div class="kpi-value">@_propostas.Count</div>
+            <div class="kpi-sub">primeira geração de cada revisão</div>
+        </div>
+        <div class="kpi k-ren">
+            <div class="kpi-label">Tempo médio</div>
+            <div class="kpi-value">@Minutos(_propostas.Average(t => t.SegundosAtivos))</div>
+            <div class="kpi-sub">@Interacoes(_propostas.Average(t => t.Interacoes)) interações em média</div>
+        </div>
+        <div class="kpi k-plan">
+            <div class="kpi-label">Mediana</div>
+            <div class="kpi-value">@Minutos(Mediana(_propostas.Select(t => (double)t.SegundosAtivos)))</div>
+            <div class="kpi-sub">metade das propostas leva menos que isso</div>
+        </div>
+        <div class="kpi k-aten">
+            <div class="kpi-label">Últimos 30 dias</div>
+            <div class="kpi-value">@(_ultimos30.Count > 0 ? Minutos(_ultimos30.Average(t => t.SegundosAtivos)) : "—")</div>
+            <div class="kpi-sub">@_ultimos30.Count proposta(s) no período</div>
+        </div>
+    </div>
+
+    <div class="panel" style="padding:0; overflow-x:auto">
+        <table class="grid">
+            <thead>
+                <tr>
+                    <th class="nowrap">Proposta</th>
+                    <th class="nowrap">Rev.</th>
+                    <th class="nowrap">Quem</th>
+                    <th class="nowrap">Gerada em</th>
+                    <th class="nowrap right">Tempo de trabalho</th>
+                    <th class="nowrap right">Interações</th>
+                    <th class="nowrap">Como</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var t in _propostas)
+                {
+                    <tr>
+                        <td class="nowrap"><strong>@t.Numero</strong></td>
+                        <td class="nowrap">@t.Revisao</td>
+                        <td class="nowrap">@(t.Usuario.Length > 0 ? t.Usuario : "—")</td>
+                        <td class="nowrap">@(t.FimComoData?.ToString("dd/MM/yyyy HH:mm") ?? t.Fim)</td>
+                        <td class="nowrap right">@Minutos(t.SegundosAtivos)</td>
+                        <td class="nowrap right">@t.Interacoes</td>
+                        <td class="nowrap">@Evento(t.Evento)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private List<TempoProposta> _propostas = new();
+    private List<TempoProposta> _ultimos30 = new();
+
+    protected override void OnInitialized()
+    {
+        _propostas = TempoRepository.PrimeiraDeCada(Tempos.Todos());
+        var corte = DateTime.Now.AddDays(-30);
+        _ultimos30 = _propostas.Where(t => t.FimComoData is { } d && d >= corte).ToList();
+    }
+
+    private static string Minutos(double segundos)
+    {
+        var minutos = segundos / 60d;
+        return minutos < 1 ? "< 1 min" : $"{minutos:0.#} min".Replace('.', ',');
+    }
+
+    private static string Interacoes(double media) => Math.Round(media).ToString("0");
+
+    private static double Mediana(IEnumerable<double> valores)
+    {
+        var ordenados = valores.OrderBy(v => v).ToList();
+        if (ordenados.Count == 0) return 0;
+        var meio = ordenados.Count / 2;
+        return ordenados.Count % 2 == 1 ? ordenados[meio] : (ordenados[meio - 1] + ordenados[meio]) / 2d;
+    }
+
+    private static string Evento(string evento) => evento switch
+    {
+        "gerar-tudo" => "Gerar tudo",
+        "comercial" => "só a comercial",
+        "tecnica" => "só a técnica",
+        "pricing" => "só o pricing",
+        _ => evento,
+    };
+}

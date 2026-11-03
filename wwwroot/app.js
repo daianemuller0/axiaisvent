@@ -49,3 +49,37 @@ window.appRascunho = {
     gravar: (chave, valor) => { try { localStorage.setItem('axiais.rascunho.' + chave, valor); } catch (e) { } },
     limpar: (chave) => { try { localStorage.removeItem('axiais.rascunho.' + chave); } catch (e) { } },
 };
+
+// Atalhos da proposta: Ctrl+S salva de qualquer etapa. O campo que está sendo
+// editado perde o foco antes, para o valor dele chegar ao servidor primeiro —
+// sem isso o Ctrl+S gravaria a proposta sem o último campo digitado.
+window.appAtalhos = {
+    ligar: (dotnet) => {
+        window.appAtalhos.desligar();
+        const aoTeclar = (e) => {
+            if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === 's' || e.key === 'S')) {
+                e.preventDefault();
+                const ativo = document.activeElement;
+                if (ativo && typeof ativo.blur === 'function') ativo.blur();
+                setTimeout(() => dotnet.invokeMethodAsync('SalvarPeloTeclado'), 60);
+            }
+        };
+        window.appAtalhos._aoTeclar = aoTeclar;
+        document.addEventListener('keydown', aoTeclar);
+    },
+    desligar: () => {
+        if (window.appAtalhos._aoTeclar) {
+            document.removeEventListener('keydown', window.appAtalhos._aoTeclar);
+            window.appAtalhos._aoTeclar = null;
+        }
+    },
+};
+
+// Troca de etapa: a etapa nova começa do alto.
+window.appTopo = () => window.scrollTo(0, 0);
+
+// Preferências pequenas de cada pessoa (ex.: mostrar ou esconder a ajuda).
+window.appPreferencia = {
+    ler: (chave) => { try { return localStorage.getItem('axiais.pref.' + chave); } catch (e) { return null; } },
+    gravar: (chave, valor) => { try { localStorage.setItem('axiais.pref.' + chave, valor); } catch (e) { } },
+};

@@ -60,6 +60,15 @@ public sealed class MainForm : Form
 
             await _webView.EnsureCoreWebView2Async(ambiente);
 
+            // "Gerar tudo" baixa três arquivos seguidos (comercial, técnica e
+            // pricing): sem isto o navegador embutido pararia para perguntar se
+            // pode, a cada proposta
+            _webView.CoreWebView2.PermissionRequested += (_, pedido) =>
+            {
+                if (pedido.PermissionKind == CoreWebView2PermissionKind.MultipleAutomaticDownloads)
+                    pedido.State = CoreWebView2PermissionState.Allow;
+            };
+
             _progresso(85, "Carregando o sistema…");
             _webView.CoreWebView2.NavigationCompleted += (_, _) =>
             {
