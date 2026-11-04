@@ -1,17 +1,203 @@
+@using System.Globalization
+@inject EquipamentoRepository Equipamentos
+@inject MotorRepository Motores
+@inject CaracteristicaRepository Caracteristicas
+@inject PrecoReferenciaRepository Precos
 @*
     "Mudou desde a rev 00", na etapa Documentos (item 21 do plano): compara a
     proposta aberta com a revisão anterior do mesmo número, entre as gravadas —
     preço total e, por equipamento, modelo, quantidade, listas com escolha
-    diferente e motor.
+    diferente e motor. É o que se confere antes de mandar a revisão: a
+    comparação é da MESMA proposta, então não há o falso alarme de comparar
+    com outra proposta do cliente.
 
-    Por enquanto não desenha nada: o lugar dele na etapa 5 (entre o Gerar tudo
-    e a lista dos equipamentos) já está reservado, e o item 21 só preenche
-    este arquivo, sem mexer na PropostaPage. Sem diferença, também não desenha.
+    Até 6 linhas, com "ver todas". Sem revisão anterior, ou sem diferença
+    nenhuma, não desenha nada.
 *@
+@if (_anterior is { } anterior && _linhas.Count > 0)
+{
+    <div class="panel mudancas-revisao" id="mudou-desde">
+        <div class="mudancas-cabeca">
+            <h2>Mudou desde a rev @anterior.Revisao.Trim()</h2>
+            <span class="nota">@Exibicao.Plural(_linhas.Count, "diferença", "diferenças") · a rev @anterior.Revisao.Trim() fica como foi gravada</span>
+        </div>
+        <ul class="mudancas-lista">
+            @foreach (var linha in _todas ? _linhas : _linhas.Take(Mostradas))
+            {
+                <li>
+                    <span class="mudanca-onde">@linha.Onde</span>
+                    <span class="mudanca-o-que">@linha.OQue</span>
+                    <span class="mudanca-valores">
+                        <span class="mudanca-antes">@linha.Antes</span>
+                        <span class="mudanca-seta" aria-label="mudou para">→</span>
+                        <span class="mudanca-depois">@linha.Depois</span>
+                    </span>
+                </li>
+            }
+        </ul>
+        @if (_linhas.Count > Mostradas)
+        {
+            <button class="btn-link mudancas-todas" @onclick="() => _todas = !_todas">
+                @(_todas ? "ver menos" : $"ver todas ({_linhas.Count})")
+            </button>
+        }
+    </div>
+}
+
 @code {
     /// <summary>A proposta que está na tela.</summary>
     [Parameter] public Proposta Atual { get; set; } = default!;
 
     /// <summary>As propostas gravadas (a revisão anterior sai daqui, pelo mesmo número).</summary>
     [Parameter] public List<Proposta> Gravadas { get; set; } = new();
+
+    /// <summary>Quantas diferenças aparecem antes do "ver todas".</summary>
+    private const int Mostradas = 6;
+
+    private static readonly CultureInfo Br = Exibicao.Br;
+
+    /// <summary>Uma diferença: onde ("Equip. 1", "Proposta"), o quê, antes e depois.</summary>
+    private sealed record Mudanca(string Onde, string OQue, string Antes, string Depois);
+
+    private CustoDaProposta _custo = default!;
+    private List<Equipamento> _equipamentos = new();
+    private List<Motor> _motores = new();
+    private List<string> _ordemDasListas = new();
+
+    private Proposta? _anterior;
+    private List<Mudanca> _linhas = new();
+    private bool _todas;
+
+    protected override void OnInitialized()
+    {
+        // o mesmo cálculo da lista de propostas: as duas revisões com o
+        // cadastro de hoje, para a diferença ser só o que a revisão mudou (e
+        // não um custo do cadastro que andou desde a anterior)
+        _equipamentos = Equipamentos.Todos();
+        _motores = Motores.Todos();
+        var grupos = Caracteristicas.Grupos();
+        _custo = new CustoDaProposta(_equipamentos, _motores, Caracteristicas.Todas(), grupos, Precos.Todos());
+        _ordemDasListas = grupos.OrderBy(g => g.Ordem).Select(g => g.Nome).ToList();
+    }
+
+    /// <summary>
+    /// Refeita a cada desenho da etapa: a pessoa edita a revisão e volta aos
+    /// documentos, e o bloco tem de mostrar o que está na tela agora.
+    /// </summary>
+    protected override void OnParametersSet()
+    {
+        _anterior = Anterior();
+        _linhas = _anterior is null ? new() : Comparar(_anterior, Atual);
+    }
+
+    /// <summary>
+    /// A revisão anterior do mesmo número: a maior revisão gravada abaixo da
+    /// aberta. Com uma revisão nova ainda não gravada, a aberta tem o id da
+    /// anterior — e é ela mesma, como está no banco, que conta.
+    /// </summary>
+    private Proposta? Anterior()
+    {
+        if (Atual.Numero.Trim().Length == 0 || Numero(Atual.Revisao) is not { } atual || atual <= 0) return null;
+
+        return Gravadas
+            .Where(g => Textos.Igual(g.Numero, Atual.Numero) && Numero(g.Revisao) is { } r && r < atual)
+            .OrderByDescending(g => Numero(g.Revisao))
+            .ThenByDescending(g => g.Id == Atual.Id)
+            .ThenByDescending(g => g.CriadaEm, StringComparer.Ordinal)
+            .FirstOrDefault();
+    }
+
+    private static int? Numero(string revisao) =>
+        int.TryParse(revisao.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out var n) ? n : null;
+
+    private List<Mudanca> Comparar(Proposta antes, Proposta depois)
+    {
+        var linhas = new List<Mudanca>();
+
+        var precoAntes = Preco(antes);
+        var precoDepois = Preco(depois);
+        if (precoAntes != precoDepois) linhas.Add(new("Proposta", "Preço total", precoAntes, precoDepois));
+
+        var n = Math.Max(antes.Itens.Count, depois.Itens.Count);
+        for (var i = 0; i < n; i++)
+        {
+            var onde = $"Equip. {i + 1}";
+            var a = i < antes.Itens.Count ? antes.Itens[i] : null;
+            var d = i < depois.Itens.Count ? depois.Itens[i] : null;
+
+            if (a is null || d is null)
+            {
+                // um equipamento a mais ou a menos: uma linha só, e não cada lista dele
+                linhas.Add(new(onde, "equipamento",
+                    a is null ? "não existia" : Modelo(a), d is null ? "saiu" : Modelo(d)));
+                continue;
+            }
+
+            if (a.EquipamentoId != d.EquipamentoId) linhas.Add(new(onde, "modelo", Modelo(a), Modelo(d)));
+
+            if (!Textos.Igual(a.Quantidade, d.Quantidade))
+                linhas.Add(new(onde, "quantidade", Ou(a.Quantidade, "—"), Ou(d.Quantidade, "—")));
+
+            foreach (var lista in Listas(a, d))
+            {
+                var de = a.Escolhas.GetValueOrDefault(lista, "");
+                var para = d.Escolhas.GetValueOrDefault(lista, "");
+                if (!Textos.Igual(de, para))
+                    linhas.Add(new(onde, Exibicao.Exibir(lista), Ou(de, "a decidir"), Ou(para, "a decidir")));
+            }
+
+            if (Motor(a) != Motor(d)) linhas.Add(new(onde, "motor", Motor(a), Motor(d)));
+            if (Partidor(a) != Partidor(d)) linhas.Add(new(onde, "partidor", Partidor(a), Partidor(d)));
+            if (Instrumentacao(a) != Instrumentacao(d)) linhas.Add(new(onde, "instrumentação", Instrumentacao(a), Instrumentacao(d)));
+        }
+
+        return linhas;
+    }
+
+    /// <summary>As listas dos dois lados, na ordem do cadastro (a mesma do escopo na tela).</summary>
+    private IEnumerable<string> Listas(ItemProposta a, ItemProposta d)
+    {
+        var todas = a.Escolhas.Keys.Union(d.Escolhas.Keys).ToList();
+        return todas.OrderBy(l => _ordemDasListas.IndexOf(l) is var i && i >= 0 ? i : int.MaxValue)
+            .ThenBy(l => l, StringComparer.Ordinal);
+    }
+
+    /// <summary>A venda líquida na moeda de venda, como na lista de propostas.</summary>
+    private string Preco(Proposta p)
+    {
+        var custo = _custo.Total(p);
+        if (custo <= 0m) return "sem custo";
+
+        var pricing = CalculoPricing.Da(p, custo);
+        var moeda = p.MoedaVenda;
+        return $"{moeda.Rotulo()} {Cambio.ParaVenda(p, pricing.VendaLiquida).ToString(Exibicao.Formato(moeda), Br)}";
+    }
+
+    private string Modelo(ItemProposta item) =>
+        _equipamentos.FirstOrDefault(e => e.Id == item.EquipamentoId)?.Rotulo
+        ?? (item.EquipamentoId.Length > 0 ? "modelo fora do cadastro" : "sem modelo");
+
+    private string Motor(ItemProposta item)
+    {
+        if (!item.ComMotor) return "sem motor";
+        if (_motores.FirstOrDefault(m => m.Id == item.MotorId) is not { } motor) return "a definir";
+
+        var partes = new[]
+        {
+            motor.Fabricante.Trim(),
+            motor.PotenciaCv.Trim().Length > 0 ? $"{motor.PotenciaCv.Trim()} CV" : "",
+            motor.Polos.Trim().Length > 0 ? $"{motor.Polos.Trim()} polos" : "",
+        }.Where(p => p.Length > 0).ToList();
+        return partes.Count > 0 ? string.Join(" · ", partes) : "motor do cadastro";
+    }
+
+    private static string Partidor(ItemProposta item) =>
+        item.ComPartidor ? Ou(item.Partidor, "a definir") : "sem partidor";
+
+    private static string Instrumentacao(ItemProposta item) =>
+        item.ComInstrumentacao
+            ? (item.Instrumentacao.Count > 0 ? string.Join(", ", item.Instrumentacao.OrderBy(x => x, StringComparer.Ordinal)) : "a definir")
+            : "sem instrumentação";
+
+    private static string Ou(string valor, string vazio) => valor.Trim().Length > 0 ? valor.Trim() : vazio;
 }

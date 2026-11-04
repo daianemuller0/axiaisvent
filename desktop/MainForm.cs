@@ -15,6 +15,9 @@ public sealed class MainForm : Form
     private readonly Action _pronto;
     private bool _avisouPronto;
 
+    /// <summary>Os documentos da proposta direto na pasta dela (item 20; ver PastaDasPropostas.cs).</summary>
+    private PastaDasPropostas? _pastaDasPropostas;
+
     public MainForm(string url, Action<int, string> progresso, Action pronto)
     {
         _homeUrl = url;
@@ -68,6 +71,14 @@ public sealed class MainForm : Form
                 if (pedido.PermissionKind == CoreWebView2PermissionKind.MultipleAutomaticDownloads)
                     pedido.State = CoreWebView2PermissionState.Allow;
             };
+
+            // a comercial, a técnica, o pricing e o custo previsto vão direto
+            // para <raiz>\PRP-2026-104 rev 00, sem apagar a versão anterior; os
+            // outros downloads seguem para Downloads. Cada evento tem o seu
+            // try/catch: uma pasta de rede fora do ar nunca derruba a janela
+            _pastaDasPropostas = new PastaDasPropostas(
+                PastaDasPropostas.RaizConfigurada(AppContext.BaseDirectory), _homeUrl);
+            _pastaDasPropostas.Ligar(_webView.CoreWebView2);
 
             _progresso(85, "Carregando o sistema…");
             _webView.CoreWebView2.NavigationCompleted += (_, _) =>

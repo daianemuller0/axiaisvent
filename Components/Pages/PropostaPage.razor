@@ -83,6 +83,14 @@
                                     title="Uma proposta nova a partir desta: cliente, condições e equipamentos copiados">
                                 <Icone Nome="copiar" /> Duplicar proposta
                             </button>
+                            @if (PodeNovaRevisao)
+                            {
+                                @* item 21: a revisão nova do mesmo número, que o Salvar grava como outra proposta *@
+                                <button role="menuitem" tabindex="-1" class="sem-icone" @onclick="() => DoMenu(NovaRevisao)"
+                                        title="A próxima revisão desta proposta: o que mudar daqui em diante vai para ela, e a anterior fica como está">
+                                    Nova revisão (rev @ProximaRevisao())
+                                </button>
+                            }
                             @if (!_proposta.Enviada)
                             {
                                 <button role="menuitem" tabindex="-1" @onclick="() => DoMenu(MarcarEnviada)"
@@ -117,6 +125,12 @@
         <span>@TextoDaGuarda</span>
         <span style="flex:1"></span>
         <button class="btn-primary" @onclick="GuardaSalvar"><Icone Nome="salvar" /> Salvar</button>
+        @if (_proposta.Enviada && PodeNovaRevisao)
+        {
+            @* enviada: o que mudou pode virar a próxima revisão, sem mexer na que o cliente recebeu (item 21) *@
+            <button class="btn-ghost" @onclick="GuardaNovaRevisao"
+                    title="Grava o que mudou como a próxima revisão; a enviada fica como o cliente recebeu">Nova revisão (rev @ProximaRevisao())</button>
+        }
         <button class="btn-ghost" @onclick="GuardaDescartar">Descartar</button>
         <button class="btn-link" @onclick="FecharGuarda">Cancelar</button>
     </div>
@@ -154,13 +168,114 @@
 <div class="etapa-corpo">
 @if (_etapa == 1)
 {
-<div class="panel" style="margin-bottom:14px">
+@* importar à esquerda (é o começo mais comum), as recentes à direita e
+   "começar em branco" como link sob a área de soltar (item 19) *@
+<div class="panel comecar" style="margin-bottom:14px">
     <p class="subtitle ajuda" style="margin:0 0 12px">
-        Três jeitos de começar: a partir de uma proposta gravada (abrir ou copiar), importando
-        os arquivos da proposta de uma vez, ou em branco, já com os seus padrões.
+        Três jeitos de começar: importando os arquivos da proposta de uma vez, a partir de uma
+        proposta gravada (abrir ou copiar), ou em branco, já com os seus padrões.
     </p>
     <div class="comecar-grid">
-        <div class="comecar-box">
+        <div class="comecar-box comecar-importar">
+            <strong>Importar arquivos</strong>
+            @* o InputFile fica esticado por cima da área, invisível: clicar ou
+               soltar arquivos nela dá no mesmo OnChange, e o "Choose Files" do
+               navegador (em inglês) não aparece *@
+            <label class="dropzone comecar-soltar">
+                <Icone Nome="subir" />
+                <strong>Arraste aqui a folha de dados, as seleções e as curvas</strong>
+                <span>ou clique para escolher · .xlsx .txt .docx .pdf .png</span>
+                <InputFile OnChange="@(e => ImportarArquivos(e))" multiple
+                           accept=".xlsx,.xlsm,.txt,.docx,.pdf,.png,.jpg,.jpeg"
+                           title="Arraste os arquivos aqui ou clique para escolher" />
+            </label>
+            <div class="comecar-branco">
+                ou <button class="btn-link" @onclick="NovaEContinuar"
+                           title="Já com os seus padrões: preparada por, contato Howden, BU, validade e prazo da sua última proposta">começar em branco</button>
+                <span class="nota">· já com os seus padrões</span>
+            </div>
+            @if (_lendo)
+            {
+                <span class="saved-flag">lendo os arquivos…</span>
+            }
+            @if (MostraImportados)
+            {
+                <div class="importados">
+                    <div class="importados-titulo">
+                        Onde cada arquivo entrou
+                        @if (_importados.Any(x => IndiceDoImportado(x) >= 0) && _proposta.Itens.Count > 1)
+                        {
+                            <span class="nota">· troque o equipamento se precisar</span>
+                        }
+                    </div>
+                    @foreach (var importado in _importados)
+                    {
+                        var x = importado;
+                        var onde = IndiceDoImportado(x);
+                        <div class="importado">
+                            <span class="mono importado-nome" title="@x.Arquivo">@x.Arquivo</span>
+                            <span class="importado-seta" aria-hidden="true">→</span>
+                            <span class="importado-destino">
+                                @if (onde >= 0)
+                                {
+                                    <span>@(x.Tipo == TipoDoImportado.Selecao ? "seleção do" : "curva do")</span>
+                                    @if (_proposta.Itens.Count > 1)
+                                    {
+                                        <select class="cell destino-equip" aria-label="@($"Equipamento de {x.Arquivo}")"
+                                                @onchange="e => MudarDestino(x, e)">
+                                            @for (var i = 0; i < _proposta.Itens.Count; i++)
+                                            {
+                                                <option value="@i" selected="@(i == onde)">@OpcaoDoDestino(x, i)</option>
+                                            }
+                                        </select>
+                                    }
+                                    else
+                                    {
+                                        <span>equip. 1</span>
+                                    }
+                                    @if (x.Tipo == TipoDoImportado.Selecao && x.Curvas.Count > 0)
+                                    {
+                                        <span class="nota">com @Plural(x.Curvas.Count, "curva", "curvas")</span>
+                                    }
+                                    @if (x.Substituiu)
+                                    {
+                                        <span class="nota">no lugar da anterior</span>
+                                    }
+                                }
+                                else
+                                {
+                                    <span class="@(x.Ignorado ? "texto-alerta" : "")">@x.Destino</span>
+                                }
+                            </span>
+                        </div>
+                    }
+                </div>
+            }
+            @if (_daPlanilha.Count > 0)
+            {
+                <div class="aviso aviso-ok" style="margin:0">
+                    <strong>Veio da planilha:</strong> @string.Join(" · ", _daPlanilha)
+                </div>
+            }
+
+            @* aviso só quando há mesmo o que resolver: o que a folha não traz já está
+               escrito no rótulo de cada campo, não precisa de lista a cada importação *@
+            @foreach (var aviso in _avisos)
+            {
+                <div class="aviso aviso-alerta" style="margin:0">@aviso</div>
+            }
+
+            <p class="subtitle ajuda" style="margin:0">
+                <strong>D4</strong> número da proposta · <strong>D6</strong> cliente ·
+                <strong>D13</strong> aos cuidados de · <strong>D14</strong> e-mail ·
+                <strong>D15</strong> telefone. Da <strong>linha 31</strong> sai a quantidade de cada
+                equipamento — coluna com número é equipamento, coluna com "preencher" não é — e de
+                cada coluna saem a <strong>linha 40</strong> (arranjo), a <strong>42</strong>
+                (difusor), a <strong>44</strong> (damper mariposa) e a <strong>51</strong>
+                (contrarrecuo ou freio). O resto é preenchido aqui na tela.
+            </p>
+        </div>
+        <div class="comecar-box comecar-recentes">
             <strong>Abrir ou copiar uma proposta</strong>
             <input class="cell" placeholder="Buscar por cliente, número ou projeto"
                    value="@_buscaGravadas"
@@ -169,78 +284,29 @@
                 @foreach (var g in GravadasDaBusca())
                 {
                     var id = g.Id;
+                    @* a linha inteira abre; copiar é o botão do ícone, ao lado *@
                     <div class="linha @(g.Id == _proposta.Id ? "aberta" : "")">
-                        <div style="flex:1; min-width:0">
-                            <strong>@g.Numero</strong>
-                            <span class="subtitle" style="margin:0">rev @g.Revisao.Trim()</span>
-                            <div class="subtitle" style="margin:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis">
-                                @(g.Cliente.Length > 0 ? g.Cliente : "sem cliente")@(g.Projeto.Length > 0 ? " · " + g.Projeto : "")
-                            </div>
-                        </div>
-                        <button class="btn-link" @onclick="() => AbrirGravada(id)">abrir</button>
-                        <button class="btn-ghost" @onclick="() => DuplicarGravada(id)"
-                                title="Proposta nova com o cliente, as condições e os equipamentos desta">copiar</button>
+                        <button class="linha-abrir" @onclick="() => AbrirGravada(id)"
+                                title="@($"Abrir a {g.Numero} rev {g.Revisao.Trim()}")">
+                            <span class="numero">@g.Numero</span>
+                            <span class="prop-chip">rev @g.Revisao.Trim()</span>
+                            <span class="data">@DataDaRecente(g)</span>
+                            <span class="cliente">@(g.Cliente.Length > 0 ? g.Cliente : "sem cliente")@(g.Projeto.Length > 0 ? " · " + g.Projeto : "")</span>
+                        </button>
+                        <button class="btn-link btn-icone linha-copiar" @onclick="() => DuplicarGravada(id)"
+                                title="Copiar como nova: uma proposta nova com o cliente, as condições e os equipamentos desta"
+                                aria-label="@($"Copiar a {g.Numero} como nova")"><Icone Nome="copiar" /></button>
                     </div>
                 }
                 @if (_gravadas.Count == 0)
                 {
                     <span class="subtitle" style="margin:0">Nenhuma proposta gravada ainda.</span>
                 }
+                else if (!GravadasDaBusca().Any())
+                {
+                    <span class="subtitle" style="margin:0">Nenhuma proposta com esse texto.</span>
+                }
             </div>
-        </div>
-        <div class="comecar-box">
-            <strong>Importar arquivos</strong>
-            <InputFile OnChange="@(e => ImportarArquivos(e))" multiple
-                       accept=".xlsx,.xlsm,.txt,.docx,.pdf,.png,.jpg,.jpeg" class="cell" />
-            <span class="subtitle" style="margin:0">
-                Folha de dados (.xlsx), seleções (.txt do Joy, .docx do VAX) e curvas (PDF, imagem
-                ou TXT): pode escolher todos juntos.
-            </span>
-            @if (_lendo)
-            {
-                <span class="saved-flag">lendo os arquivos…</span>
-            }
-            @if (_importados.Count > 0)
-            {
-                <div class="importados">
-                    @foreach (var (arquivo, destino) in _importados)
-                    {
-                        <div><span class="mono">@arquivo</span> <span class="subtitle" style="margin:0">→ @destino</span></div>
-                    }
-                </div>
-            }
-    @if (_daPlanilha.Count > 0)
-    {
-        <div class="aviso aviso-ok" style="margin-top:12px">
-            <strong>Veio da planilha:</strong> @string.Join(" · ", _daPlanilha)
-        </div>
-    }
-
-    @* aviso só quando há mesmo o que resolver: o que a folha não traz já está
-       escrito no rótulo de cada campo, não precisa de lista a cada importação *@
-    @foreach (var aviso in _avisos)
-    {
-        <div class="aviso aviso-alerta" style="margin-top:8px">@aviso</div>
-    }
-
-    <p class="subtitle ajuda" style="margin:10px 0 0">
-        <strong>D4</strong> número da proposta · <strong>D6</strong> cliente ·
-        <strong>D13</strong> aos cuidados de · <strong>D14</strong> e-mail ·
-        <strong>D15</strong> telefone. Da <strong>linha 31</strong> sai a quantidade de cada
-        equipamento — coluna com número é equipamento, coluna com "preencher" não é — e de
-        cada coluna saem a <strong>linha 40</strong> (arranjo), a <strong>42</strong>
-        (difusor), a <strong>44</strong> (damper mariposa) e a <strong>51</strong>
-        (contrarrecuo ou freio). O resto é preenchido aqui na tela.
-    </p>
-
-        </div>
-        <div class="comecar-box">
-            <strong>Em branco</strong>
-            <span class="subtitle" style="margin:0">
-                Já com os seus padrões: preparada por, contato Howden, BU, validade e prazo da sua
-                última proposta.
-            </span>
-            <button class="btn-ghost" @onclick="NovaEContinuar">Começar em branco</button>
         </div>
     </div>
 </div>
@@ -2457,6 +2523,10 @@
     {
         <div class="aviso-pe @(_erro ? "erro" : _avisoFica ? "consequencia" : "ok")" role="@(_erro ? "alert" : "status")">
             <span class="aviso-pe-texto">@_msg</span>
+            @if (MostraAbrirPasta)
+            {
+                <button class="btn-ghost aviso-pe-acao" @onclick="AbrirPastaDoAviso"><Icone Nome="pasta" /> Abrir pasta</button>
+            }
             @if (_avisoAcao is { } acaoDoAviso)
             {
                 <button class="btn-ghost aviso-pe-acao" @onclick="FazerAcaoDoAviso">@acaoDoAviso.Rotulo</button>
@@ -2682,6 +2752,7 @@
             _guardaDeSaida = Navegacao.RegisterLocationChangingHandler(AoSairDaTela);
 
             await LigarAtalhos();
+            await LigarPastaDaProposta();
 
             try
             {
@@ -3798,6 +3869,7 @@
 
             var bytes = CustoPrevistoExcel.Gerar(_proposta, _custo, projeto, pedido, DateTime.Now);
             var nome = CustoPrevistoExcel.NomeDoArquivo(projeto);
+            await AvisarPastaDoCustoPrevisto();
 
             await JS.InvokeVoidAsync("appDownload", nome,
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
