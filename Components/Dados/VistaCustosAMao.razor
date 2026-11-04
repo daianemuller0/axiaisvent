@@ -1,0 +1,167 @@
+@using System.Globalization
+@using System.Text
+@inject PropostaRepository Propostas
+@inject EquipamentoRepository Equipamentos
+@inject MotorRepository Motores
+@inject CaracteristicaRepository Caracteristicas
+@inject PrecoReferenciaRepository Precos
+@inject IJSRuntime JS
+
+@* item 22: só leitura. Serve ao ADM para completar o cadastro pela tela de
+   Dados que já existe; nada daqui é gravado em lugar nenhum. *@
+<div class="custos-a-mao">
+    <p class="subtitle">
+        Os custos que alguém digitou à mão nas propostas gravadas, porque o cadastro não tinha
+        (ou tinha outro). Use a lista para completar o cadastro na tela de Dados: o que entra lá
+        passa a vir sozinho nas próximas propostas.
+    </p>
+
+    @if (_todos.Count == 0)
+    {
+        <div class="aviso aviso-neutro">Nenhum custo digitado à mão nas propostas gravadas.</div>
+    }
+    else
+    {
+        <div class="panel custos-a-mao-filtro">
+            <label class="tempos-campo">
+                <span>Lista</span>
+                <select class="cell" id="custos-lista" value="@_lista" @onchange="e => _lista = e.Value?.ToString() ?? string.Empty">
+                    <option value="">todas (@_listas.Count)</option>
+                    @foreach (var nome in _listas)
+                    {
+                        <option value="@nome">@nome</option>
+                    }
+                </select>
+            </label>
+            <label class="tempos-campo">
+                <span>Moeda</span>
+                <select class="cell" id="custos-moeda" value="@_moeda" @onchange="e => _moeda = e.Value?.ToString() ?? string.Empty">
+                    <option value="">todas</option>
+                    @foreach (var codigo in _moedas)
+                    {
+                        <option value="@codigo">@Moedas.Ler(codigo).Rotulo()</option>
+                    }
+                </select>
+            </label>
+            <span style="flex:1"></span>
+            <span class="nota">@Exibicao.Plural(Filtrados.Count, "custo à mão", "custos à mão") · mais recentes primeiro</span>
+            <button class="btn-ghost btn-icone custos-a-mao-csv" @onclick="ExportarCsv" disabled="@(Filtrados.Count == 0)">
+                <Icone Nome="baixar" /> Exportar CSV
+            </button>
+        </div>
+
+        @if (Filtrados.Count == 0)
+        {
+            <div class="aviso aviso-neutro">Nenhum custo à mão neste filtro.</div>
+        }
+        else
+        {
+            <div class="panel" style="padding:0; overflow-x:auto">
+                <table class="grid custos-a-mao-tabela">
+                    <thead>
+                        <tr>
+                            <th class="nowrap">Lista</th>
+                            <th>Opção</th>
+                            <th class="nowrap">Diâmetro</th>
+                            <th class="nowrap right">Custo à mão</th>
+                            <th class="nowrap">Proposta</th>
+                            <th class="nowrap">Data</th>
+                            <th class="nowrap">Preparada por</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var c in Filtrados)
+                        {
+                            <tr>
+                                <td class="nowrap">@NomeDaLista(c)</td>
+                                <td>@(c.Opcao.Length > 0 ? c.Opcao : "—")</td>
+                                <td class="nowrap">@(c.Diametro.Length > 0 ? c.Diametro : "—")</td>
+                                <td class="nowrap right num">@Valor(c)</td>
+                                <td class="nowrap">@Proposta(c) <span class="nota">· equip. @(c.Equipamento + 1)</span></td>
+                                <td class="nowrap">@(c.Data?.ToString("dd/MM/yyyy", Br) ?? "—")</td>
+                                <td class="nowrap">@c.Proposta.PreparadaPor</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private static readonly CultureInfo Br = new("pt-BR");
+
+    /// <summary>A aspa do CSV, numa constante: escrita dentro de um texto, o Razor se perde.</summary>
+    private const string Aspas = "\u0022";
+
+    private List<CustoAMao> _todos = new();
+    private List<string> _listas = new();
+    private List<string> _moedas = new();
+
+    /// <summary>O filtro de lista, pelo nome como aparece ("Partidores", "Silenciador entrada (opcional)").</summary>
+    private string _lista = "";
+    private string _moeda = "";
+
+    protected override void OnInitialized()
+    {
+        var caracteristicas = Caracteristicas.Todas();
+        var custo = new CustoDaProposta(Equipamentos.Todos(), Motores.Todos(), caracteristicas,
+            Caracteristicas.Grupos(), Precos.Todos());
+
+        _todos = CustosAMao.De(Propostas.Todas(), custo);
+        _listas = _todos.Select(NomeDaLista).Distinct().OrderBy(n => n, StringComparer.CurrentCultureIgnoreCase).ToList();
+        _moedas = _todos.Select(c => c.Moeda).Where(m => m.Length > 0).Distinct().OrderBy(m => m).ToList();
+    }
+
+    private List<CustoAMao> Filtrados => _todos
+        .Where(c => _lista.Length == 0 || NomeDaLista(c) == _lista)
+        .Where(c => _moeda.Length == 0 || c.Moeda == _moeda)
+        .ToList();
+
+    private static string NomeDaLista(CustoAMao c) =>
+        Exibicao.Exibir(c.Lista) + (c.Opcional ? " (opcional)" : "");
+
+    private static string Valor(CustoAMao c)
+    {
+        var moeda = Moedas.Ler(c.Moeda);
+        return $"{moeda.Rotulo()} {c.Valor.ToString(Exibicao.Formato(moeda), Br)}";
+    }
+
+    private static string Proposta(CustoAMao c)
+    {
+        var revisao = c.Proposta.Revisao.Trim();
+        return revisao.Length > 0 ? $"{c.Proposta.Numero} rev {revisao}" : c.Proposta.Numero;
+    }
+
+    /// <summary>
+    /// O CSV do que está no filtro, para o Excel em português: ponto e vírgula
+    /// entre as colunas, vírgula decimal sem separador de milhar e BOM, para
+    /// os acentos abrirem certos.
+    /// </summary>
+    private async Task ExportarCsv()
+    {
+        static string Campo(string t)
+        {
+            var texto = (t ?? "").Replace('\r', ' ').Replace('\n', ' ');
+            if (texto.IndexOf(';') < 0 && texto.IndexOf(Aspas, StringComparison.Ordinal) < 0) return texto;
+            return string.Concat(Aspas, texto.Replace(Aspas, Aspas + Aspas), Aspas);
+        }
+
+        var csv = new StringBuilder();
+        csv.AppendLine("Lista;Opção;Diâmetro;Moeda;Custo à mão;Proposta;Revisão;Equipamento;Data;Preparada por");
+        foreach (var c in Filtrados)
+        {
+            csv.AppendLine(string.Join(';', new[]
+            {
+                Campo(NomeDaLista(c)), Campo(c.Opcao), Campo(c.Diametro), Campo(c.Moeda),
+                c.Valor.ToString("0.##", Br), Campo(c.Proposta.Numero), Campo(c.Proposta.Revisao),
+                (c.Equipamento + 1).ToString(CultureInfo.InvariantCulture),
+                c.Data?.ToString("dd/MM/yyyy", Br) ?? "", Campo(c.Proposta.PreparadaPor),
+            }));
+        }
+
+        var bytes = Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(csv.ToString())).ToArray();
+        await JS.InvokeVoidAsync("appDownload", $"custos-a-mao-{DateTime.Now:yyyy-MM-dd}.csv", "text/csv", Convert.ToBase64String(bytes));
+    }
+}

@@ -138,6 +138,18 @@ public static class FolhaDeDados
             foreach (var (palavra, rotulo, linha) in ListasDaPlanilha)
             {
                 var texto = Texto(ws, col, linha);
+
+                // a folha respondeu esta lista — até com "-", "n/a" ou um texto
+                // que o sistema não entende. Fica registrado ANTES de tratar o
+                // texto: um escopo trazido depois (outro equipamento, padrão da
+                // série, última proposta do cliente) não pode preencher o que o
+                // cliente respondeu, nem quando a tela não soube ler a resposta
+                if (Respondida(texto) && ListaDoCadastro(palavra, porGrupo.Keys) is { } respondida
+                    && !item.RespondidasNaFolha.Contains(respondida))
+                {
+                    item.RespondidasNaFolha.Add(respondida);
+                }
+
                 if (EmBranco(texto)) continue;
 
                 var lista = ListaDoCadastro(palavra, porGrupo.Keys);
@@ -164,7 +176,7 @@ public static class FolhaDeDados
         if (itens.Count > 0)
         {
             proposta.Itens = itens;
-            preenchidos.Add($"{itens.Count} equipamento(s), um por coluna");
+            preenchidos.Add($"{itens.Count} {(itens.Count == 1 ? "equipamento" : "equipamentos")}, um por coluna");
         }
         else
         {
@@ -189,6 +201,21 @@ public static class FolhaDeDados
 
         // a folha deixa as opções escritas na célula até alguém escolher uma
         return t.Contains(" / ");
+    }
+
+    /// <summary>
+    /// A célula diz alguma coisa de quem preencheu: não está vazia e não é o
+    /// espaço de preencher ("Preencher", "Escolher", a lista de opções ainda
+    /// intacta). Ao contrário de <see cref="EmBranco"/>, "-", "--", "n/a" e "na"
+    /// CONTAM como resposta — é o cliente dizendo que não quer, ou que não se
+    /// aplica, e nenhum escopo trazido deve passar por cima disso.
+    /// </summary>
+    private static bool Respondida(string texto)
+    {
+        var t = Textos.Simples(texto);
+        if (t.Length == 0) return false;
+        if (t is "preencher" or "escolher") return false;
+        return !t.Contains(" / ");
     }
 
     /// <summary>

@@ -940,6 +940,8 @@ public partial class PropostaPage : IAsyncDisposable
         var feitos = new List<string>();
         var falhas = new List<string>();
         _gerandoTudo = true;
+        // o retorno do app desktop sobre a pasta de cada documento (item 20)
+        _daPasta.Clear();
 
         try
         {
@@ -967,11 +969,9 @@ public partial class PropostaPage : IAsyncDisposable
 
         if (falhas.Count == 0)
         {
-            // quem gera tudo costuma mandar ao cliente em seguida: o "Marcar
-            // como enviada" fica no caminho, sem ir ao menu Mais
-            var texto = $"Proposta {_proposta.Numero} salva e documentos baixados: {string.Join(", ", feitos)}.";
-            if (_proposta.Enviada || NovaRevisaoPendente) Aviso(texto);
-            else Aviso(texto, acao: ("Marcar como enviada", MarcarEnviada));
+            // com o "Marcar como enviada" e, no app desktop, a pasta e o
+            // "Abrir pasta" (item 20, PropostaPage.Extras.cs)
+            AvisoDoGerarTudo(feitos);
             return;
         }
 
@@ -1542,8 +1542,8 @@ public partial class PropostaPage : IAsyncDisposable
     // todos os arquivos de uma vez
     // =====================================================================
 
-    /// <summary>O que a última importação fez com cada arquivo.</summary>
-    private List<(string Arquivo, string Destino)> _importados = new();
+    /// <summary>O que a última importação fez com cada arquivo (ver <see cref="Importado"/>, item 19).</summary>
+    private List<Importado> _importados = new();
 
     private static readonly string[] ExtensoesDeCurva = { ".pdf", ".png", ".jpg", ".jpeg" };
 
@@ -1552,7 +1552,8 @@ public partial class PropostaPage : IAsyncDisposable
     /// porque é ela que cria os equipamentos; cada seleção vai para um
     /// equipamento e cada curva também — pelo número no nome do arquivo quando
     /// ele diz ("eq2", "item 3"), senão para o primeiro que ainda não tem.
-    /// Sem equipamento livre, nasce um.
+    /// Sem equipamento livre, nasce um. A curva com o nome da seleção
+    /// ("selecao-eq1-curva.png") vai antes para o equipamento dela (item 19).
     /// <para>Com <paramref name="destinoFixo"/> (a área de soltar da aba
     /// Técnica, item 19), tudo vai para aquele equipamento: nenhum nasce, o
     /// aberto continua aberto, a seleção nova substitui a anterior e a folha de
@@ -1567,8 +1568,16 @@ public partial class PropostaPage : IAsyncDisposable
             return;
         }
 
+        // o limite vem antes de ler: o GetMultipleFiles(40) só diria o erro em inglês
+        if (e.FileCount > 40)
+        {
+            Aviso($"São {e.FileCount} arquivos: o máximo é 40 por vez. Solte em duas partes.", erro: true);
+            return;
+        }
+
         _lendo = true;
         _importados = new();
+        _propostaDosImportados = _proposta;
         var folhaIgnorada = false;
 
         // o que veio da folha só se apaga quando uma folha nova pode chegar
@@ -1583,10 +1592,21 @@ public partial class PropostaPage : IAsyncDisposable
             var lidos = new List<(string Nome, string Ext, byte[] Bytes)>();
             foreach (var arquivo in e.GetMultipleFiles(40))
             {
-                await using var fluxo = arquivo.OpenReadStream(25 * 1024 * 1024);
-                using var memoria = new MemoryStream();
-                await fluxo.CopyToAsync(memoria);
-                lidos.Add((arquivo.Name, Path.GetExtension(arquivo.Name).ToLowerInvariant(), memoria.ToArray()));
+                // um arquivo que não abre (uma pasta solta junto, um arquivo
+                // grande demais) fica de fora sozinho, e não derruba os outros
+                try
+                {
+                    await using var fluxo = arquivo.OpenReadStream(25 * 1024 * 1024);
+                    using var memoria = new MemoryStream();
+                    await fluxo.CopyToAsync(memoria);
+                    lidos.Add((arquivo.Name, Path.GetExtension(arquivo.Name).ToLowerInvariant(), memoria.ToArray()));
+                }
+                catch (Exception)
+                {
+                    _importados.Add(new Importado(arquivo.Name, arquivo.Size > 25 * 1024 * 1024
+                        ? "ignorado: maior que 25 MB"
+                        : "ignorado: não consegui ler (é uma pasta?)"));
+                }
             }
 
             lidos = lidos.OrderBy(l => l.Nome, StringComparer.OrdinalIgnoreCase).ToList();
@@ -1597,13 +1617,13 @@ public partial class PropostaPage : IAsyncDisposable
                 if (destinoFixo is not null)
                 {
                     folhaIgnorada = true;
-                    _importados.Add((nome, "ignorado: a folha de dados entra pela etapa Começar"));
+                    _importados.Add(new Importado(nome, "ignorado: a folha de dados entra pela etapa Começar"));
                     continue;
                 }
 
                 var equipamentos = LerFolha(bytes);
                 _origem = "importada";
-                _importados.Add((nome, equipamentos > 0
+                _importados.Add(new Importado(nome, equipamentos > 0
                     ? $"folha de dados: {Plural(equipamentos, "equipamento", "equipamentos")}"
                     : "folha de dados, sem quantidade na linha 31"));
             }
@@ -1623,7 +1643,7 @@ public partial class PropostaPage : IAsyncDisposable
             {
                 if (ext == ".doc")
                 {
-                    _importados.Add((nome, "ignorado: Word antigo (.doc) — salve como .docx"));
+                    _importados.Add(new Importado(nome, "ignorado: Word antigo (.doc) — salve como .docx"));
                     continue;
                 }
 
@@ -1636,14 +1656,14 @@ public partial class PropostaPage : IAsyncDisposable
                 if (leitura.Dados.Count == 0)
                 {
                     if (ext == ".txt") curvas.Add((nome, ext, bytes));
-                    else _importados.Add((nome, "ignorado: não parece um relatório de seleção"));
+                    else _importados.Add(new Importado(nome, "ignorado: não parece um relatório de seleção"));
                     continue;
                 }
 
                 // num equipamento só, a seleção é uma: a segunda apagaria a primeira
                 if (destinoFixo is not null && selecoesNoFixo++ > 0)
                 {
-                    _importados.Add((nome, "ignorado: o equipamento já recebeu uma seleção neste envio"));
+                    _importados.Add(new Importado(nome, "ignorado: o equipamento já recebeu uma seleção neste envio"));
                     continue;
                 }
 
@@ -1655,24 +1675,43 @@ public partial class PropostaPage : IAsyncDisposable
                 var substituiu = destinoFixo is not null && _proposta.Itens[indice].Tecnicos.Count > 0;
                 if (substituiu) TirarSelecao(indice);
 
+                var item = _proposta.Itens[indice];
+                var curvasAntes = item.Curvas.Count;
                 var curvasDoWord = await AplicarSelecao(leitura, ext, bytes, nome, indice);
-                _importados.Add((nome, $"seleção do equipamento {indice + 1}"
+                _importados.Add(new Importado(nome, $"seleção do equipamento {indice + 1}"
                     + (curvasDoWord > 0 ? $", com {Plural(curvasDoWord, "curva", "curvas")}" : "")
-                    + (substituiu ? " (no lugar da anterior)" : "")));
+                    + (substituiu ? " (no lugar da anterior)" : ""))
+                {
+                    // o que o select da lista precisa para mudar o destino sem reler
+                    Tipo = TipoDoImportado.Selecao,
+                    Item = item,
+                    Leitura = leitura,
+                    Curvas = item.Curvas.Skip(curvasAntes).ToList(),
+                    Substituiu = substituiu,
+                });
             }
 
             foreach (var (nome, _, bytes) in curvas.OrderBy(c => c.Nome, StringComparer.OrdinalIgnoreCase))
             {
-                var indice = Destino(nome, i => i.Curvas.Count == 0, destinoFixo);
+                // a curva com o nome da seleção vai para o equipamento dela,
+                // mesmo vindo antes na ordem alfabética (item 19)
+                var indice = destinoFixo is null && EquipamentoDaSelecaoDeMesmoNome(nome) is { } daSelecao
+                    ? daSelecao
+                    : Destino(nome, i => i.Curvas.Count == 0, destinoFixo);
                 await AnexarCurva(bytes, nome, indice);
-                _importados.Add((nome, $"curva do equipamento {indice + 1}"));
+                _importados.Add(new Importado(nome, $"curva do equipamento {indice + 1}")
+                {
+                    Tipo = TipoDoImportado.Curva,
+                    Item = _proposta.Itens[indice],
+                    Curvas = { _proposta.Itens[indice].Curvas[^1] },
+                });
             }
 
             foreach (var (nome, _, _) in lidos.Where(l =>
                          l.Ext is not (".xlsx" or ".xlsm" or ".docx" or ".txt" or ".doc")
                          && !ExtensoesDeCurva.Contains(l.Ext)))
             {
-                _importados.Add((nome, "ignorado: tipo de arquivo que a proposta não usa"));
+                _importados.Add(new Importado(nome, "ignorado: tipo de arquivo que a proposta não usa"));
             }
 
             if (!Textos.Igual(clienteAntes, _proposta.Cliente)) LembrarCliente();
@@ -1680,7 +1719,7 @@ public partial class PropostaPage : IAsyncDisposable
             if (destinoFixo is { } aberto)
             {
                 // na aba do equipamento não há a lista "arquivo → destino": o aviso diz
-                var ignorados = _importados.Count(x => x.Destino.StartsWith("ignorado", StringComparison.Ordinal));
+                var ignorados = _importados.Count(x => x.Ignorado);
                 var entraram = _importados.Count - ignorados;
                 var texto = entraram > 0
                     ? $"{Plural(entraram, "arquivo entrou", "arquivos entraram")} no equipamento {aberto + 1}."
@@ -1694,8 +1733,11 @@ public partial class PropostaPage : IAsyncDisposable
             }
 
             _aberto = 0;
-            // o que foi para onde está logo abaixo do botão: o aviso só conta
-            Aviso($"{Plural(lidos.Count, "arquivo importado", "arquivos importados")}.");
+            // o que foi para onde está logo abaixo da área: o aviso só conta
+            var deFora = _importados.Count(x => x.Ignorado);
+            Aviso($"{Plural(_importados.Count - deFora, "arquivo importado", "arquivos importados")}."
+                  + (deFora > 0 ? $" {Plural(deFora, "ficou de fora", "ficaram de fora")}: veja a lista." : ""),
+                fica: deFora > 0);
         }
         catch (Exception ex)
         {
@@ -1750,13 +1792,20 @@ public partial class PropostaPage : IAsyncDisposable
         (ModeloDe(item)?.Rotulo ?? "sem modelo escolhido")
         + (item.Coluna.Length > 0 ? $" · coluna {item.Coluna} da folha de dados" : "");
 
-    /// <summary>O que foi digitado no filtro do modelo (encurta a lista de ~100 modelos).</summary>
-    private string _filtroModelo = "";
+    /// <summary>
+    /// O que foi digitado no filtro do modelo (encurta a lista de ~100
+    /// modelos), por equipamento: o "27" digitado no equip. 1 não pode
+    /// esconder os modelos do equip. 2. Pela referência do item, e não pela
+    /// posição, para remover ou duplicar um equipamento não trocar os filtros.
+    /// </summary>
+    private readonly Dictionary<ItemProposta, string> _filtroModelo = new(ReferenceEqualityComparer.Instance);
+
+    private string FiltroDoModelo(ItemProposta item) => _filtroModelo.GetValueOrDefault(item, "");
 
     /// <summary>Os modelos que casam com o filtro — e sempre o escolhido, para a lista não perdê-lo.</summary>
     private IEnumerable<Equipamento> ModelosDoFiltro(ItemProposta item)
     {
-        var termos = Textos.Simples(_filtroModelo).Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var termos = Textos.Simples(FiltroDoModelo(item)).Split(' ', StringSplitOptions.RemoveEmptyEntries);
         if (termos.Length == 0) return _equipamentos;
 
         return _equipamentos.Where(e => e.Id == item.EquipamentoId
@@ -1806,14 +1855,16 @@ public partial class PropostaPage : IAsyncDisposable
     private EscopoPadrao? PadraoDaSerie(string serie) =>
         _padroes.FirstOrDefault(p => Textos.Igual(p.Serie, serie));
 
+    /// <summary>
+    /// O botão "Aplicar o padrão da série": pelas mesmas regras do escopo que
+    /// nasce pronto (item 15) — respeita o que a folha respondeu, descarta a
+    /// opção que saiu do cadastro e deixa o desfazer na linha.
+    /// </summary>
     private void AplicarPadrao(ItemProposta item, string serie)
     {
-        if (PadraoDaSerie(serie) is not { } padrao) return;
+        if (PadraoDaSerie(serie) is not { } padrao || ModeloDe(item) is null) return;
 
-        var feitas = padrao.AplicarEm(item);
-        Aviso(feitas > 0
-            ? $"Escopo padrão da série {serie} aplicado em {Plural(feitas, "linha", "linhas")} — o que já estava marcado ficou como estava."
-            : "Nada a aplicar: as listas deste equipamento já estão marcadas.");
+        TrazerEscopo(item, OrigemDoPadrao(padrao), automatico: false);
     }
 
     private void GuardarPadrao(ItemProposta item, string serie)
@@ -1831,18 +1882,14 @@ public partial class PropostaPage : IAsyncDisposable
     }
 
     /// <summary>
-    /// O primeiro modelo escolhido num equipamento traz o escopo padrão da
-    /// série, completando o que ainda está em branco (o que veio da folha de
-    /// dados fica).
+    /// Chamado por TrocarModelo no primeiro modelo, logo antes do gancho
+    /// DepoisDoPrimeiroModelo. Não faz mais nada de propósito: o padrão da
+    /// série é só UMA das origens do escopo inicial (item 15), e aplicá-lo
+    /// aqui passaria na frente do outro equipamento desta proposta, que vem
+    /// antes. Tudo fica com o AplicarEscopoInicial (PropostaPage.Escopo.cs).
     /// </summary>
     private void AplicarPadraoSeHouver(ItemProposta item)
     {
-        if (ModeloDe(item) is not { } modelo || PadraoDaSerie(modelo.Serie) is not { } padrao) return;
-
-        var feitas = padrao.AplicarEm(item);
-        if (feitas > 0)
-            Aviso($"Escopo padrão da série {modelo.Serie} aplicado ({Plural(feitas, "linha", "linhas")}) — confira e ajuste o que for diferente.",
-                fica: true);
     }
 
     /// <summary>O que a seleção diz do motor: a potência mínima, e os polos e a frequência quando dá para saber.</summary>
@@ -1917,11 +1964,15 @@ public partial class PropostaPage : IAsyncDisposable
     /// <summary>
     /// Leva a sugestão para o filtro do motor: frequência e polos primeiro, e a
     /// menor potência do catálogo que cobre a pedida por último — escolhida
-    /// entre os motores que sobraram.
+    /// entre os motores que sobraram. Devolve quantos motores sobraram, sem
+    /// aviso: quem chama (o fechamento automático do item 16, em
+    /// PropostaPage.Motor.cs) decide o que dizer. Zero quando nenhum motor da
+    /// série chega à potência pedida — aí o filtro fica só com a frequência e
+    /// os polos, e quem chama desfaz.
     /// </summary>
-    private void AplicarSugestaoDoMotor(ItemProposta item)
+    private int AplicarSugestaoDoMotor(ItemProposta item)
     {
-        if (SugestaoDoMotor(item) is not { } sugestao) return;
+        if (SugestaoDoMotor(item) is not { } sugestao) return Candidatos(item).Count;
 
         item.FiltroMotor.Clear();
         item.MotorId = "";
@@ -1948,15 +1999,10 @@ public partial class PropostaPage : IAsyncDisposable
             .Where(x => x.Cv >= sugestao.CvMinimo)
             .OrderBy(x => x.Cv)
             .FirstOrDefault();
-        if (potencia.Opcao is not null) FiltrarMotor(item, campoCv.Rotulo, potencia.Opcao);
+        if (potencia.Opcao is null) return 0;
 
-        var sobraram = Candidatos(item).Count;
-        Aviso(sobraram switch
-        {
-            0 => "Nenhum motor do catálogo atende à sugestão — ajuste o filtro à mão.",
-            1 => "Motor escolhido pela seleção — confira o código e o custo.",
-            _ => $"{sobraram} motores atendem à sugestão — escolha o fabricante ou a tensão para fechar.",
-        }, erro: sobraram == 0);
+        FiltrarMotor(item, campoCv.Rotulo, potencia.Opcao);
+        return Candidatos(item).Count;
     }
 
     private static IEnumerable<int> NumerosDe(string texto) => Regex.Matches(texto, @"\d{1,4}")

@@ -44,6 +44,17 @@ a base continua em `\\BZVCPFIL003\proj_ramires$\DB\axiais`, compartilhada
 por todos. O `appsettings.Desktop.json` só ajusta logging (e pode sobrepor
 a pasta de dados se um dia precisar).
 
+## Pasta das propostas
+
+No desktop, a comercial, a técnica, o pricing e o custo previsto não caem em
+Downloads: vão direto para `<raiz>\PRP-2026-104 rev 00` (`PastaDasPropostas.cs`).
+A raiz é `Propostas:Pasta` no `appsettings.Desktop.json`; vazia, é
+`Documentos\Propostas VA` (aceita pasta de rede e `%USERPROFILE%`). Um arquivo
+com o mesmo nome nunca é apagado: vai para `anteriores\` com a data em que foi
+gravado; se estiver aberto no Word, o novo sai com " (2)". Se a pasta falhar
+(rede fora do ar, sem permissão), o arquivo vai para Downloads como antes e a
+tela avisa. Depois do Gerar tudo, o aviso traz "Abrir pasta" (só no desktop).
+
 ## Como publicar
 
 Na sua máquina (na pasta do projeto):
@@ -62,6 +73,7 @@ limpa versões antigas. O atalho dos usuários aponta para
 - `Program.cs` — bootstrap: splash → Kestrel → janela → shutdown ordenado.
 - `SplashForm.cs` — tela de abertura com a barra de % de inicialização.
 - `MainForm.cs` — janela WinForms com o WebView2 (menu Início / Recarregar F5).
+- `PastaDasPropostas.cs` — os documentos da proposta direto na pasta dela.
 - `../BackendHost.cs` — fábrica do servidor, compartilhada com o modo site.
 - `../launcher/Program.cs` — o VA.exe da rede (verifica/copia versão e abre).
 - `../publicar.ps1` — publicação em um comando.

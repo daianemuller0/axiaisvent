@@ -274,10 +274,9 @@ else
     /// </summary>
     private static readonly (DateTime Data, string Nome)[] Marcos =
     {
-        (new DateTime(2026, 11, 3), "Onda 1: moldura, pendências e etapas"),
-        (new DateTime(2026, 11, 4), "Aba Técnica: numa tela, com diâmetro, altitude e ruído"),
-        (new DateTime(2026, 11, 5), "Preço e Documentos: entradas no alto e um cartão por equipamento"),
-        (new DateTime(2026, 11, 6), "Cliente e Opcionais: condições em resumo e um seletor de opcional"),
+        // a tela nova inteira (itens 01 a 22 do estudo de -25%) entra de uma vez: um marco só.
+        // Se a publicação na rede for noutro dia, troque a data por ela.
+        (new DateTime(2026, 11, 4), "Proposta v2: tela redesenhada para -25% de tempo"),
     };
 
     /// <summary>Abaixo disto, de um dos lados, a mediana ainda é sorte: a tela mostra "poucos dados".</summary>
@@ -453,11 +452,47 @@ else
         if (fechado + trocado > 0)
             linhas.Add(("Motor fechado sozinho", $"{fechado} (trocado depois {trocado})"));
 
+        // os outros atalhos da tela, um por linha, com o nome que a equipe reconhece
+        foreach (var (chave, rotulo) in NomesDosAtalhos)
+        {
+            var n = N(chave);
+            if (n > 0) linhas.Add((rotulo, n.ToString()));
+        }
+
         foreach (var (chave, n) in _contadores.OrderBy(c => c.Key, StringComparer.Ordinal))
             if (!usados.Contains(chave)) linhas.Add((chave, n.ToString()));
 
         return linhas;
     }
+
+    /// <summary>
+    /// Nome legível de cada contador da tela de proposta (a chave é a que a
+    /// página passa a Contar). Mostram quanto cada atalho é de fato usado.
+    /// </summary>
+    private static readonly (string Chave, string Rotulo)[] NomesDosAtalhos =
+    {
+        ("importar:destino-trocado", "Importar: destino do arquivo trocado"),
+        ("cliente:desfazer", "Cliente: lembrança desfeita"),
+        ("cliente:projeto-da-lista", "Cliente: projeto escolhido da lista"),
+        ("cliente:confirmar", "Condições lembradas confirmadas"),
+        ("cliente:pedaco", "Condições: campo aberto pelo resumo"),
+        ("cliente:editar-condicoes", "Condições: formulário inteiro aberto"),
+        ("contato:trocar", "Contato Howden trocado"),
+        ("contato:editar", "Contato Howden editado"),
+        ("opcionais:adicionar", "Opcional adicionado"),
+        ("opcionais:remover", "Opcional removido"),
+        ("tecnica:editar-selecao", "Técnica: dados da seleção editados"),
+        ("tecnica:diametro-lembrado", "Técnica: diâmetro lembrado"),
+        ("tecnica:diametro-corrigido", "Técnica: diâmetro lembrado corrigido"),
+        ("tecnica:altitude-do-cliente", "Técnica: altitude da proposta anterior usada"),
+        ("tecnica:altitude-aos-outros", "Técnica: altitude aplicada aos outros"),
+        ("preco:ver-linhas", "Preço: linhas de custo abertas"),
+        ("preco:memoria", "Preço: memória de cálculo aberta"),
+        ("preco:taxa-da-conversao", "Preço: taxa da aba Conversão usada"),
+        ("docs:editar-texto", "Documentos: texto editado"),
+        ("docs:marcar-enviada", "Documentos: marcada como enviada"),
+        ("revisao:nova", "Nova revisão em um clique"),
+    };
 
     /// <summary>Um lado da comparação: a mediana, ou "poucos dados" com quantas há.</summary>
     private static RenderFragment Lado(double mediana, int quantas, Func<double, string> formato) => __builder =>
