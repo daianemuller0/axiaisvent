@@ -1918,11 +1918,15 @@ public partial class PropostaPage : IAsyncDisposable
     /// <summary>
     /// Leva a sugestão para o filtro do motor: frequência e polos primeiro, e a
     /// menor potência do catálogo que cobre a pedida por último — escolhida
-    /// entre os motores que sobraram.
+    /// entre os motores que sobraram. Devolve quantos motores sobraram, sem
+    /// aviso: quem chama (o fechamento automático do item 16, em
+    /// PropostaPage.Motor.cs) decide o que dizer. Zero quando nenhum motor da
+    /// série chega à potência pedida — aí o filtro fica só com a frequência e
+    /// os polos, e quem chama desfaz.
     /// </summary>
-    private void AplicarSugestaoDoMotor(ItemProposta item)
+    private int AplicarSugestaoDoMotor(ItemProposta item)
     {
-        if (SugestaoDoMotor(item) is not { } sugestao) return;
+        if (SugestaoDoMotor(item) is not { } sugestao) return Candidatos(item).Count;
 
         item.FiltroMotor.Clear();
         item.MotorId = "";
@@ -1949,15 +1953,10 @@ public partial class PropostaPage : IAsyncDisposable
             .Where(x => x.Cv >= sugestao.CvMinimo)
             .OrderBy(x => x.Cv)
             .FirstOrDefault();
-        if (potencia.Opcao is not null) FiltrarMotor(item, campoCv.Rotulo, potencia.Opcao);
+        if (potencia.Opcao is null) return 0;
 
-        var sobraram = Candidatos(item).Count;
-        Aviso(sobraram switch
-        {
-            0 => "Nenhum motor do catálogo atende à sugestão — ajuste o filtro à mão.",
-            1 => "Motor escolhido pela seleção — confira o código e o custo.",
-            _ => $"{sobraram} motores atendem à sugestão — escolha o fabricante ou a tensão para fechar.",
-        }, erro: sobraram == 0);
+        FiltrarMotor(item, campoCv.Rotulo, potencia.Opcao);
+        return Candidatos(item).Count;
     }
 
     private static IEnumerable<int> NumerosDe(string texto) => Regex.Matches(texto, @"\d{1,4}")

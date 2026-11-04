@@ -10,7 +10,7 @@
         <h1>Configurações</h1>
         <p class="subtitle">
             Os usuários do sistema e o que cada um pode fazer, a identidade visual (os
-            logos) e o tempo que cada proposta levou para ser montada. Quem for cadastrado aqui entra pela tela de login com o usuário e a senha
+            logos), o tempo que cada proposta levou para ser montada e os custos digitados à mão. Quem for cadastrado aqui entra pela tela de login com o usuário e a senha
             definidos, e o <strong>papel</strong> decide o que cada um pode fazer.
         </p>
     </div>
@@ -31,6 +31,10 @@
 else if (_aba == "tempos")
 {
     <VistaTempos />
+}
+else if (_aba == "custos")
+{
+    <VistaCustosAMao />
 }
 else
 {
@@ -137,6 +141,7 @@ else
     private static readonly (string Chave, string Titulo)[] Abas =
     {
         ("usuarios", "Usuários"), ("identidade", "Identidade Visual"), ("tempos", "Tempo das propostas"),
+        ("custos", "Custos digitados à mão"),
     };
 
     /// <summary>A seção à vista. /axiais/marca (o endereço antigo) abre na identidade visual.</summary>

@@ -3,3 +3,64 @@
    cada pista escreve só no seu, e o app.css não vira ponto de conflito.
    Use os tokens do app.css (--primary, --warn-*, --info-*, --border...) e escreva
    as regras sob .proposta, para não mexer nas outras telas. */
+
+/* ---- o cartão do motor definido: as nove listas recolhidas numa linha ----
+   "WEG · 125 CV · 4 polos · 50 Hz · 380 V · código X · CLP 5.125.000" e, embaixo,
+   o porquê ("pela seleção (≥ 110 CV) e pela última proposta do cliente (WEG)")
+   com o "trocar". Fica sob a linha do motor, na largura das colunas 2 a 4 da grade,
+   para ler como parte dela. */
+.proposta .motor-cartao {
+    margin: 0 0 12px 212px; padding: 9px 12px;
+    border: 1px solid var(--border); border-left: 3px solid var(--primary);
+    border-radius: var(--radius-sm); background: var(--panel);
+}
+.proposta .motor-cartao-linha { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 10px; font-size: 13.5px; }
+.proposta .motor-cartao-linha strong { font-weight: 600; color: var(--text); }
+.proposta .motor-cartao-extra { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.proposta .motor-cartao-porque { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 8px; margin-top: 3px; }
+.proposta .motor-cartao .btn-link, .proposta .motor-filtros .btn-link { padding: 2px; font-size: 12.5px; }
+.proposta .motor-pede-mais { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 8px; margin-top: 6px; }
+.proposta .motor-pede-mais .texto-alerta { display: inline-flex; align-items: center; gap: 5px; font-weight: 500; }
+
+/* ---- sem motor definido: a sugestão numa linha, três filtros e os candidatos ---- */
+.proposta .motor-filtros {
+    margin: 0 0 14px 212px; padding: 12px 14px;
+    border-left: 3px solid var(--primary);
+}
+.proposta .motor-sugestao, .proposta .motor-do-pais {
+    display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 10px; margin: 0 0 10px;
+}
+.proposta .motor-do-pais .btn-ghost { padding: 5px 12px; font-size: 13px; }
+.proposta .motor-campos { gap: 10px 14px; }
+/* o campo que o sistema preencheu tem o mesmo azul do controle ligado: dá para
+   ver o que foi automático antes de mexer */
+.proposta .motor-campos label.motor-campo-auto select { border-color: #9db5d3; background-color: var(--info-bg); }
+.proposta .motor-mais { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 10px; margin: 8px 0 0; }
+.proposta .motor-mais + .motor-campos { margin-top: 8px; }
+.proposta .motor-conta {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px;
+    margin: 10px 0 0; padding-top: 10px; border-top: 1px solid var(--border);
+}
+.proposta .motor-conta .val-count { margin-left: 0; }
+
+/* os candidatos (até 10): uma linha clicável cada — descrição · código · custo.
+   As colunas do código e do custo têm a largura do maior deles (subgrid), e a
+   descrição fica com o resto; sem subgrid, larguras fixas. */
+.proposta .motor-candidatos {
+    display: grid; grid-template-columns: minmax(0, 1fr) max-content max-content;
+    column-gap: 14px; row-gap: 4px; margin-top: 8px;
+}
+.proposta .motor-candidato {
+    grid-column: 1 / -1;
+    display: grid; grid-template-columns: minmax(0, 1fr) 76px 104px; grid-template-columns: subgrid;
+    align-items: center; column-gap: 14px;
+    width: 100%; padding: 6px 10px; text-align: left; cursor: pointer;
+    font: inherit; font-size: 13px; color: var(--text);
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+}
+.proposta .motor-candidato:hover { border-color: #c8d4e4; background: #f8fafc; }
+.proposta .motor-candidato:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.proposta .motor-candidato.on { border-color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary); background: var(--info-bg); }
+.proposta .motor-candidato-desc { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.proposta .motor-candidato-cod { color: var(--muted); font-size: 12.5px; white-space: nowrap; }
+.proposta .motor-candidato-custo { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }

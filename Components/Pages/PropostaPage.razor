@@ -1115,7 +1115,7 @@
                 <button class="sem @(atual.ComMotor ? "" : "on")" aria-pressed="@(atual.ComMotor ? "false" : "true")"
                         @onclick="() => atual.ComMotor = false">Sem</button>
                 <button class="@(atual.ComMotor ? "on" : "")" aria-pressed="@(atual.ComMotor ? "true" : "false")"
-                        @onclick="() => atual.ComMotor = true">Com</button>
+                        @onclick="() => LigarMotor(atual)">Com</button>
             </div>
 
             <div class="escopo-escolha">
@@ -1144,8 +1144,8 @@
                 }
                 else
                 {
-                    <span class="nota escopo-origem" title="aperte o filtro até sobrar um motor — aí vêm o código e a observação">
-                        sem motor ainda — o preço dá para pôr à mão
+                    <span class="nota escopo-origem" title="escolha o motor abaixo — aí vêm o código e o custo; o custo também dá para pôr à mão">
+                        sem motor ainda — escolha abaixo
                     </span>
                 }
             </div>
@@ -1160,57 +1160,170 @@
 
         @if (atual.ComMotor)
         {
-            var candidatos = Candidatos(atual);
+            @* item 16: com o motor definido, as nove listas recolhem num cartão;
+               sem ele, a sugestão da seleção numa linha, três filtros à vista e
+               os candidatos em linhas clicáveis *@
+            var motorDefinido = MotorDe(atual);
+            var pedeMais = SelecaoPedeMais(atual);
 
-            <div id="f-motor" class="panel" style="margin:0 0 14px; border-left:3px solid var(--primary)">
-                @if (SugestaoDoMotor(atual) is { } sugestaoDoMotor)
-                {
-                    <div class="aviso aviso-neutro sugestao-motor">
-                        <span>@sugestaoDoMotor.Texto</span>
-                        <span style="flex:1"></span>
-                        <button class="btn-ghost" @onclick="() => AplicarSugestaoDoMotor(atual)">Aplicar ao filtro</button>
+            @if (motorDefinido is not null && !_filtrosAbertos.Contains(atual))
+            {
+                <div id="f-motor" class="motor-cartao">
+                    <div class="motor-cartao-linha">
+                        <strong>@ResumoDoMotor(motorDefinido)</strong>
+                        <span class="motor-cartao-extra">
+                            @(motorDefinido.Codigo.Length > 0 ? $"código {motorDefinido.Codigo}" : "sem código")
+                            · @CustoNoCartao(atual, motorDefinido)
+                        </span>
                     </div>
-                }
-                <div class="form3">
-                    @foreach (var campo in EscopoProposta.CamposDoMotor)
+                    <div class="motor-cartao-porque">
+                        <span class="nota">@PorQueDoMotor(atual)</span>
+                        <button class="btn-link motor-trocar" @onclick="() => TrocarMotor(atual)">trocar</button>
+                    </div>
+                    @if (pedeMais is not null)
                     {
-                        var rotulo = campo.Rotulo;
-                        var opcoes = OpcoesDoCampo(atual, campo);
-
-                        <label>
-                            @rotulo
-                            <select class="cell" value="@atual.FiltroMotor.GetValueOrDefault(rotulo, "")"
-                                    @onchange="e => FiltrarMotor(atual, rotulo, e.Value?.ToString() ?? string.Empty)">
-                                <option value="">— todos (@opcoes.Count) —</option>
-                                @foreach (var o in opcoes)
-                                {
-                                    <option value="@o" selected="@(o == atual.FiltroMotor.GetValueOrDefault(rotulo, ""))">@o</option>
-                                }
-                            </select>
-                        </label>
+                        <div class="motor-pede-mais">
+                            <span class="nota texto-alerta"><Icone Nome="alerta" /> @pedeMais</span>
+                            @if (atual.FiltroAuto.Count > 0 && FiltroSoAuto(atual))
+                            {
+                                <button class="btn-link" @onclick="() => RefazerMotor(atual)">refazer</button>
+                            }
+                            else
+                            {
+                                <button class="btn-link" @onclick="() => TrocarMotor(atual)">trocar</button>
+                            }
+                        </div>
+                    }
+                    @if (motorDefinido.Observacoes.Length > 0)
+                    {
+                        <p class="nota" style="margin:4px 0 0"><strong>Observação:</strong> @motorDefinido.Observacoes</p>
+                    }
+                    @if (AvisoDoMotor(atual) is { } avisoDoCartao)
+                    {
+                        <div class="aviso aviso-alerta" style="margin-top:8px">@avisoDoCartao</div>
                     }
                 </div>
+            }
+            else
+            {
+                var candidatos = Candidatos(atual);
+                var sugestaoDoMotor = SugestaoDoMotor(atual);
+                var doPais = SugestaoDoMotorPeloPais(atual);
+                var escondidosEmUso = FiltrosEscondidosEmUso(atual);
 
-                <div class="toolbar" style="margin:14px 0 0; flex-wrap:wrap">
-                    <span class="val-count">@Plural(candidatos.Count, "motor atende", "motores atendem")</span>
-                    <span class="subtitle" style="margin:0">
-                        @MotoresComPreco(candidatos) com custo em @_proposta.Moeda.Rotulo()
-                    </span>
-                    <button class="btn-link" @onclick="() => LimparFiltro(atual)">limpar filtro</button>
+                <div id="f-motor" class="panel motor-filtros">
+                    @if (modelo is null)
+                    {
+                        <p class="nota" style="margin:0 0 10px">
+                            sem modelo, o catálogo mostra os motores das duas linhas — escolha o modelo e o motor fecha pela seleção
+                        </p>
+                    }
+                    else if (sugestaoDoMotor is not null)
+                    {
+                        <div class="motor-sugestao">
+                            <span class="nota">@sugestaoDoMotor.Texto</span>
+                            @if (NenhumChegaAPotencia(atual))
+                            {
+                                <span class="nota texto-alerta">nenhum motor da série @modelo.Serie chega a @sugestaoDoMotor.CvMinimo.ToString("N0", Br) CV no catálogo</span>
+                            }
+                            else if (!SugestaoAplicada(atual))
+                            {
+                                <button class="btn-link" @onclick="() => AplicarSugestaoAoFiltro(atual)">aplicar ao filtro</button>
+                            }
+                        </div>
+                    }
+                    @if (pedeMais is not null)
+                    {
+                        <div class="motor-pede-mais">
+                            <span class="nota texto-alerta"><Icone Nome="alerta" /> @pedeMais</span>
+                        </div>
+                    }
+                    @if (doPais is not null)
+                    {
+                        <div class="motor-do-pais">
+                            <button class="btn-ghost" @onclick="() => UsarSugestaoDoPais(atual, doPais)">@doPais.Texto</button>
+                            <span class="nota">cliente sem motor em proposta anterior</span>
+                        </div>
+                    }
+
+                    <div class="form3 motor-campos">
+                        @foreach (var campo in EscopoProposta.CamposDoMotor.Where(c => FiltrosAVista.Contains(c.Rotulo)))
+                        {
+                            @CampoDoFiltro(atual, campo)
+                        }
+                    </div>
+
+                    <div class="motor-mais">
+                        <button class="btn-link" aria-expanded="@(_maisFiltros.Contains(atual) ? "true" : "false")"
+                                @onclick="() => AlternarMaisFiltros(atual)">
+                            @(_maisFiltros.Contains(atual) ? "Menos filtros" : $"Mais filtros ({EscopoProposta.CamposDoMotor.Length - FiltrosAVista.Length})")
+                        </button>
+                        @if (!_maisFiltros.Contains(atual) && escondidosEmUso.Length > 0)
+                        {
+                            <span class="nota">em uso: @escondidosEmUso</span>
+                        }
+                    </div>
+                    @if (_maisFiltros.Contains(atual))
+                    {
+                        <div class="form3 motor-campos">
+                            @foreach (var campo in EscopoProposta.CamposDoMotor.Where(c => !FiltrosAVista.Contains(c.Rotulo)))
+                            {
+                                @CampoDoFiltro(atual, campo)
+                            }
+                        </div>
+                    }
+
+                    <div class="motor-conta">
+                        <span class="val-count">@Plural(candidatos.Count, "motor atende", "motores atendem")</span>
+                        <span class="nota">@MotoresComPreco(candidatos) com custo em @_proposta.Moeda.Rotulo()</span>
+                        <span style="flex:1"></span>
+                        @if (atual.FiltroMotor.Values.Any(v => v.Length > 0) || atual.MotorId.Length > 0)
+                        {
+                            <button class="btn-link" @onclick="() => LimparFiltroDoMotor(atual)">limpar filtro</button>
+                        }
+                        @if (motorDefinido is not null)
+                        {
+                            <button class="btn-link" @onclick="() => _filtrosAbertos.Remove(atual)">voltar ao resumo</button>
+                        }
+                    </div>
+
+                    @if (candidatos.Count is > 0 and <= CandidatosEmLinhas)
+                    {
+                        <div class="motor-candidatos" role="group" aria-label="Motores que atendem">
+                            @foreach (var m in candidatos)
+                            {
+                                var candidato = m;
+                                var escolhido = motorDefinido?.Id == candidato.Id;
+                                <button class="motor-candidato @(escolhido ? "on" : "")"
+                                        aria-pressed="@(escolhido ? "true" : "false")"
+                                        @onclick="() => EscolherMotor(atual, candidato)">
+                                    <span class="motor-candidato-desc" title="@TituloDoCandidato(candidato)">@ResumoDoMotor(candidato)</span>
+                                    <span class="motor-candidato-cod">@(candidato.Codigo.Length > 0 ? candidato.Codigo : "sem código")</span>
+                                    <span class="motor-candidato-custo">@CustoDoMotor(candidato)</span>
+                                </button>
+                            }
+                        </div>
+                    }
+                    else if (candidatos.Count > CandidatosEmLinhas)
+                    {
+                        <p class="nota" style="margin:8px 0 0">aperte o filtro até sobrarem @CandidatosEmLinhas ou menos — aí eles aparecem aqui para escolher</p>
+                    }
+                    else
+                    {
+                        <p class="nota texto-alerta" style="margin:8px 0 0">nenhum motor atende a este filtro — limpe o filtro ou mude um campo</p>
+                    }
+
+                    @if (motorDefinido is { Observacoes.Length: > 0 })
+                    {
+                        <p class="nota" style="margin:8px 0 0"><strong>Observação:</strong> @motorDefinido.Observacoes</p>
+                    }
+
+                    @if (AvisoDoMotor(atual) is { } aviso)
+                    {
+                        <div class="aviso aviso-alerta" style="margin-top:10px">@aviso</div>
+                    }
                 </div>
-
-                @if (MotorDe(atual) is { } escolhido && escolhido.Observacoes.Length > 0)
-                {
-                    <p class="subtitle" style="margin:10px 0 0">
-                        <strong>Observação:</strong> @escolhido.Observacoes
-                    </p>
-                }
-
-                @if (AvisoDoMotor(atual) is { } aviso)
-                {
-                    <div class="aviso aviso-alerta" style="margin-top:10px">@aviso</div>
-                }
-            </div>
+            }
         }
 
         <!-- partidor: o preço vem da potência do motor -->
@@ -3061,6 +3174,32 @@
         item.FiltroMotor.Clear();
         item.MotorId = "";
     }
+
+    /// <summary>
+    /// Um campo do filtro do motor: as opções que sobram com os outros campos
+    /// como estão. A mudança é à mão (item 16, PropostaPage.Motor.cs): o campo
+    /// deixa de ser automático.
+    /// </summary>
+    private RenderFragment CampoDoFiltro(ItemProposta item, (string Rotulo, Func<Motor, string> Valor) campo) => @<text>
+        @{
+            var rotulo = campo.Rotulo;
+            var opcoes = OpcoesDoCampo(item, campo);
+            var valor = item.FiltroMotor.GetValueOrDefault(rotulo, "");
+            var automatico = item.FiltroAuto.Contains(rotulo) && valor.Length > 0;
+            var dica = automatico ? "preenchido pelo sistema (seleção ou histórico); mude à vontade" : null;
+        }
+        <label class="@(automatico ? "motor-campo-auto" : "")" title="@dica">
+            @rotulo
+            <select class="cell" value="@valor"
+                    @onchange="e => FiltrarMotorAMao(item, rotulo, e.Value?.ToString() ?? string.Empty)">
+                <option value="">— todos (@opcoes.Count) —</option>
+                @foreach (var o in opcoes)
+                {
+                    <option value="@o" selected="@(o == valor)">@o</option>
+                }
+            </select>
+        </label>
+    </text>;
 
     /// <summary>
     /// O frame escolhido cabe no equipamento? A regra já existe para a guia

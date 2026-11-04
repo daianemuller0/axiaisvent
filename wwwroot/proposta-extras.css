@@ -3,3 +3,19 @@
    cada pista escreve só no seu, e o app.css não vira ponto de conflito.
    Use os tokens do app.css (--primary, --warn-*, --info-*, --border...) e escreva
    as regras sob .proposta, para não mexer nas outras telas. */
+
+/* ---- item 22: o relatório "Custos digitados à mão" (Configurações) ----
+   Fora da tela da proposta, por isso sob .custos-a-mao e não sob .proposta. */
+.custos-a-mao-filtro {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px;
+    padding: 12px 18px; margin-bottom: 14px;
+}
+.custos-a-mao-filtro .btn-ghost { padding: 7px 14px; display: inline-flex; align-items: center; gap: 6px; }
+.custos-a-mao-filtro .btn-ghost:disabled { opacity: .5; cursor: default; }
+.custos-a-mao-tabela td, .custos-a-mao-tabela th { padding: 10px 14px; }
+.custos-a-mao-tabela td.num { font-variant-numeric: tabular-nums; }
+
+/* ---- item 22: a dica "último à mão" sob o campo de custo ----
+   Numa coluna estreita ela quebra em linhas do mesmo tamanho, e não com uma
+   palavra sozinha no fim. */
+.proposta .dica-do-custo { text-wrap: balance; }
