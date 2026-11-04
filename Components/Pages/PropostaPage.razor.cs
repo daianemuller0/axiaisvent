@@ -1746,13 +1746,20 @@ public partial class PropostaPage : IAsyncDisposable
         (ModeloDe(item)?.Rotulo ?? "sem modelo escolhido")
         + (item.Coluna.Length > 0 ? $" · coluna {item.Coluna} da folha de dados" : "");
 
-    /// <summary>O que foi digitado no filtro do modelo (encurta a lista de ~100 modelos).</summary>
-    private string _filtroModelo = "";
+    /// <summary>
+    /// O que foi digitado no filtro do modelo (encurta a lista de ~100
+    /// modelos), por equipamento: o "27" digitado no equip. 1 não pode
+    /// esconder os modelos do equip. 2. Pela referência do item, e não pela
+    /// posição, para remover ou duplicar um equipamento não trocar os filtros.
+    /// </summary>
+    private readonly Dictionary<ItemProposta, string> _filtroModelo = new(ReferenceEqualityComparer.Instance);
+
+    private string FiltroDoModelo(ItemProposta item) => _filtroModelo.GetValueOrDefault(item, "");
 
     /// <summary>Os modelos que casam com o filtro — e sempre o escolhido, para a lista não perdê-lo.</summary>
     private IEnumerable<Equipamento> ModelosDoFiltro(ItemProposta item)
     {
-        var termos = Textos.Simples(_filtroModelo).Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var termos = Textos.Simples(FiltroDoModelo(item)).Split(' ', StringSplitOptions.RemoveEmptyEntries);
         if (termos.Length == 0) return _equipamentos;
 
         return _equipamentos.Where(e => e.Id == item.EquipamentoId
@@ -1802,14 +1809,16 @@ public partial class PropostaPage : IAsyncDisposable
     private EscopoPadrao? PadraoDaSerie(string serie) =>
         _padroes.FirstOrDefault(p => Textos.Igual(p.Serie, serie));
 
+    /// <summary>
+    /// O botão "Aplicar o padrão da série": pelas mesmas regras do escopo que
+    /// nasce pronto (item 15) — respeita o que a folha respondeu, descarta a
+    /// opção que saiu do cadastro e deixa o desfazer na linha.
+    /// </summary>
     private void AplicarPadrao(ItemProposta item, string serie)
     {
-        if (PadraoDaSerie(serie) is not { } padrao) return;
+        if (PadraoDaSerie(serie) is not { } padrao || ModeloDe(item) is null) return;
 
-        var feitas = padrao.AplicarEm(item);
-        Aviso(feitas > 0
-            ? $"Escopo padrão da série {serie} aplicado em {Plural(feitas, "linha", "linhas")} — o que já estava marcado ficou como estava."
-            : "Nada a aplicar: as listas deste equipamento já estão marcadas.");
+        TrazerEscopo(item, OrigemDoPadrao(padrao), automatico: false);
     }
 
     private void GuardarPadrao(ItemProposta item, string serie)
@@ -1827,18 +1836,14 @@ public partial class PropostaPage : IAsyncDisposable
     }
 
     /// <summary>
-    /// O primeiro modelo escolhido num equipamento traz o escopo padrão da
-    /// série, completando o que ainda está em branco (o que veio da folha de
-    /// dados fica).
+    /// Chamado por TrocarModelo no primeiro modelo, logo antes do gancho
+    /// DepoisDoPrimeiroModelo. Não faz mais nada de propósito: o padrão da
+    /// série é só UMA das origens do escopo inicial (item 15), e aplicá-lo
+    /// aqui passaria na frente do outro equipamento desta proposta, que vem
+    /// antes. Tudo fica com o AplicarEscopoInicial (PropostaPage.Escopo.cs).
     /// </summary>
     private void AplicarPadraoSeHouver(ItemProposta item)
     {
-        if (ModeloDe(item) is not { } modelo || PadraoDaSerie(modelo.Serie) is not { } padrao) return;
-
-        var feitas = padrao.AplicarEm(item);
-        if (feitas > 0)
-            Aviso($"Escopo padrão da série {modelo.Serie} aplicado ({Plural(feitas, "linha", "linhas")}) — confira e ajuste o que for diferente.",
-                fica: true);
     }
 
     /// <summary>O que a seleção diz do motor: a potência mínima, e os polos e a frequência quando dá para saber.</summary>

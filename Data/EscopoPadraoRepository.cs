@@ -37,41 +37,161 @@ public sealed class EscopoPadrao
     };
 
     /// <summary>
-    /// Leva o padrão para um equipamento. Só preenche o que ainda está em
-    /// branco: o que veio da folha de dados ou foi marcado à mão vale mais que
-    /// o padrão. Devolve quantas escolhas foram feitas.
+    /// O que o escopo trazido precisa saber do cadastro e do equipamento para
+    /// não pôr lixo: se a opção ainda existe, quais listas a folha de dados já
+    /// respondeu e se a montagem pode vir junto (só do outro equipamento desta
+    /// proposta e do padrão da série — a montagem de outro cliente é de outra
+    /// mina).
     /// </summary>
-    public int AplicarEm(ItemProposta item)
+    public sealed record Regras(
+        Func<string, string, bool> OpcaoExiste,
+        Func<string, bool> PartidorExiste,
+        Func<string, bool> InstrumentacaoExiste,
+        IReadOnlyCollection<string> RespondidasNaFolha,
+        bool ComMontagem);
+
+    /// <summary>
+    /// Leva este escopo para um equipamento, completando só o que está em
+    /// branco: o que veio da folha de dados ou foi marcado à mão vale mais.
+    /// <list type="bullet">
+    /// <item>as listas que a folha respondeu ficam como a folha deixou, mesmo
+    /// quando ela disse "-" ou algo que o sistema não entendeu;</item>
+    /// <item>uma escolha cuja opção saiu do cadastro é jogada fora e volta em
+    /// <paramref name="ignoradas"/> — trazê-la daria uma linha sem preço e
+    /// sem código que ninguém pediu;</item>
+    /// <item>a parte elétrica só entra num equipamento que ainda não tem nada
+    /// dela; a montagem, só com <see cref="Regras.ComMontagem"/> e em
+    /// branco.</item>
+    /// </list>
+    /// Devolve as chaves que mudaram (ver <see cref="Ler"/>): é com elas que o
+    /// "desfazer" devolve SÓ o que foi trazido, sem levar junto a quantidade, a
+    /// seleção ou um preço digitado depois.
+    /// </summary>
+    public List<string> CompletarEm(ItemProposta item, Regras regras, List<string> ignoradas)
     {
-        var feitas = 0;
+        var mudadas = new List<string>();
 
         foreach (var (lista, opcao) in Escolhas)
         {
+            if (opcao.Trim().Length == 0) continue;
+            if (regras.RespondidasNaFolha.Any(r => Textos.Igual(r, lista))) continue;
             if (item.Escolhas.TryGetValue(lista, out var atual) && atual.Trim().Length > 0) continue;
+
+            if (!regras.OpcaoExiste(lista, opcao))
+            {
+                ignoradas.Add($"{lista}: {opcao}");
+                continue;
+            }
+
             item.Escolhas[lista] = opcao;
-            feitas++;
+            mudadas.Add(ChaveDaLista(lista));
         }
 
-        // a parte elétrica só entra num equipamento que ainda não tem nada dela
         if (!item.ComMotor && !item.ComPartidor && !item.ComInstrumentacao)
         {
-            if (ComMotor) { item.ComMotor = true; feitas++; }
-            if (ComPartidor) { item.ComPartidor = true; item.Partidor = Partidor; feitas++; }
+            if (ComMotor)
+            {
+                item.ComMotor = true;
+                mudadas.Add(ChaveComMotor);
+            }
+
+            if (ComPartidor)
+            {
+                // um partidor que saiu do cadastro não liga o "Com" vazio: ele
+                // viraria uma pendência que ninguém criou
+                if (Partidor.Length > 0 && !regras.PartidorExiste(Partidor))
+                {
+                    ignoradas.Add($"partidor: {Partidor}");
+                }
+                else
+                {
+                    item.ComPartidor = true;
+                    item.Partidor = Partidor;
+                    mudadas.Add(ChaveComPartidor);
+                    mudadas.Add(ChavePartidor);
+                }
+            }
+
             if (ComInstrumentacao)
             {
-                item.ComInstrumentacao = true;
-                item.Instrumentacao = Instrumentacao.ToList();
-                feitas++;
+                var existem = Instrumentacao.Where(regras.InstrumentacaoExiste).ToList();
+                ignoradas.AddRange(Instrumentacao.Except(existem).Select(n => $"instrumentação: {n}"));
+
+                if (existem.Count > 0 || Instrumentacao.Count == 0)
+                {
+                    item.ComInstrumentacao = true;
+                    item.Instrumentacao = existem;
+                    mudadas.Add(ChaveComInstrumentacao);
+                    mudadas.Add(ChaveInstrumentacao);
+                }
             }
         }
 
-        if (item.Montagem.Trim().Length == 0 && Montagem.Length > 0)
+        if (regras.ComMontagem && item.Montagem.Trim().Length == 0 && Montagem.Trim().Length > 0)
         {
             item.Montagem = Montagem;
-            feitas++;
+            mudadas.Add(ChaveMontagem);
         }
 
-        return feitas;
+        return mudadas;
+    }
+
+    // ---------- as chaves do que um escopo trazido muda ----------
+    // Uma chave por coisa que dá para devolver ao que era: cada lista, cada
+    // flag da parte elétrica, a montagem e as peças juntadas ao alcance. O
+    // valor vai como texto para o "desfazer" comparar e devolver do mesmo jeito.
+
+    public const string ChaveComMotor = "ComMotor";
+    public const string ChaveComPartidor = "ComPartidor";
+    public const string ChavePartidor = "Partidor";
+    public const string ChaveComInstrumentacao = "ComInstrumentacao";
+    public const string ChaveInstrumentacao = "Instrumentacao";
+    public const string ChaveMontagem = "Montagem";
+    public const string ChaveEscopoExtra = "EscopoExtra";
+    private const string PrefixoDaLista = "lista:";
+
+    public static string ChaveDaLista(string lista) => PrefixoDaLista + lista;
+
+    /// <summary>A lista de uma chave "lista:Base", ou nulo quando a chave é de outra coisa.</summary>
+    public static string? ListaDaChave(string chave) =>
+        chave.StartsWith(PrefixoDaLista, StringComparison.Ordinal) ? chave[PrefixoDaLista.Length..] : null;
+
+    /// <summary>O valor de uma chave no equipamento, como texto.</summary>
+    public static string Ler(ItemProposta item, string chave) => chave switch
+    {
+        ChaveComMotor => item.ComMotor ? "sim" : "",
+        ChaveComPartidor => item.ComPartidor ? "sim" : "",
+        ChavePartidor => item.Partidor,
+        ChaveComInstrumentacao => item.ComInstrumentacao ? "sim" : "",
+        ChaveInstrumentacao => JsonSerializer.Serialize(item.Instrumentacao),
+        ChaveMontagem => item.Montagem,
+        ChaveEscopoExtra => JsonSerializer.Serialize(item.EscopoExtra),
+        _ => ListaDaChave(chave) is { } lista ? item.Escolhas.GetValueOrDefault(lista, "") : "",
+    };
+
+    /// <summary>Devolve uma chave ao valor guardado por <see cref="Ler"/>.</summary>
+    public static void Gravar(ItemProposta item, string chave, string valor)
+    {
+        switch (chave)
+        {
+            case ChaveComMotor: item.ComMotor = valor.Length > 0; break;
+            case ChaveComPartidor: item.ComPartidor = valor.Length > 0; break;
+            case ChavePartidor: item.Partidor = valor; break;
+            case ChaveComInstrumentacao: item.ComInstrumentacao = valor.Length > 0; break;
+            case ChaveInstrumentacao:
+                item.Instrumentacao = JsonSerializer.Deserialize<List<string>>(valor) ?? new();
+                break;
+            case ChaveMontagem: item.Montagem = valor; break;
+            case ChaveEscopoExtra:
+                item.EscopoExtra = JsonSerializer.Deserialize<List<string>>(valor) ?? new();
+                break;
+            default:
+                if (ListaDaChave(chave) is not { } lista) break;
+                // em branco é sem a chave: é assim que a lista "a decidir" é gravada
+                if (valor.Length == 0) item.Escolhas.Remove(lista);
+                else item.Escolhas[lista] = valor;
+                break;
+        }
     }
 }
 

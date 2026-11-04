@@ -3,3 +3,89 @@
    cada pista escreve só no seu, e o app.css não vira ponto de conflito.
    Use os tokens do app.css (--primary, --warn-*, --info-*, --border...) e escreva
    as regras sob .proposta, para não mexer nas outras telas. */
+
+/* ---- item 13: cada linha do escopo numa grade de 4 colunas ----
+   rótulo | Sem/Com | a opção e de onde vem o custo | o custo. O campo de custo
+   fica sempre na 4ª coluna (antes caía em x≈548, x≈700 ou na borda, conforme o
+   tamanho do texto da origem). Cabe em ~900 px: o notebook de 1366 com o menu
+   recolhido. A classe .toolbar fica na linha só para quem a procura pelo nome.
+   O Sem/Com tem largura fixa (botões de 52 px): com a coluna fixa, as linhas
+   das instrumentações, que não têm o controle, alinham com as outras em
+   qualquer fonte (Segoe UI no Windows, outra no Linux). */
+.proposta .escopo-linha {
+    display: grid;
+    grid-template-columns: 200px 108px minmax(0, 1fr) 170px;
+    align-items: center;
+    column-gap: 12px;
+    margin: 0 !important;
+    padding: 6px 0;
+    border-top: 1px solid var(--border);
+    min-height: 44px;
+}
+.proposta .escopo-rotulo {
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0;
+    font-size: 13.5px; line-height: 1.3;
+}
+.proposta .escopo-rotulo .ponto-pendente { margin: 0; }
+.proposta .escopo-linha .seg > button { width: 52px; padding-left: 0; padding-right: 0; text-align: center; }
+/* a nota âmbar ganha da cor cinza da .nota (as duas têm o mesmo peso no app.css) */
+.proposta .nota.texto-alerta { color: var(--warn-tx); }
+.proposta .escopo-escolha { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.proposta .escopo-escolha select.cell { flex: 0 1 auto; width: auto; min-width: 110px; max-width: 58%; }
+.proposta .escopo-opcao {
+    flex: 0 1 auto; max-width: 60%; font-size: 13px; color: var(--text);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* a origem encolhe com reticências (o texto inteiro fica no title) e nunca
+   empurra o custo para a linha de baixo */
+.proposta .escopo-origem { flex: 1 1 0; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.proposta .escopo-custo { min-width: 0; }
+.proposta .escopo-custo .dica-do-custo { display: block; text-align: right; margin-top: 2px; }
+
+/* as instrumentações: uma linha da grade cada, a caixa e o nome nas duas
+   primeiras colunas */
+.proposta .escopo-instrumentos { margin-bottom: 14px; border-bottom: 1px solid var(--border); }
+.proposta .escopo-linha.escopo-sub { border-top-style: dashed; min-height: 38px; padding: 3px 0; }
+.proposta .escopo-marca {
+    grid-column: 1 / 3; display: flex; align-items: center; gap: 8px; padding-left: 16px;
+    font-size: 13px; min-width: 0;
+}
+.proposta .escopo-marca input { flex: none; }
+
+/* a linha Escopo padrão: de onde o escopo veio, o desfazer e o Sem em lote */
+.proposta .escopo-padrao {
+    display: grid; grid-template-columns: 200px minmax(0, 1fr); align-items: center; column-gap: 12px;
+    margin: 0 !important; padding: 8px 0; border-top: 1px solid var(--border); min-height: 46px;
+}
+.proposta .escopo-padrao-corpo { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; min-width: 0; }
+.proposta .escopo-trazido { font-size: 13px; color: var(--info-tx); font-weight: 500; }
+.proposta .escopo-padrao .btn-link { padding: 2px; }
+/* o botão diz o que vai marcar: com o menu do app aberto ele quebra em duas
+   linhas, mas nunca corta o texto nem a contagem do fim */
+.proposta .sem-em-lote { max-width: 100%; min-width: 0; padding-top: 5px; padding-bottom: 5px; text-align: left; }
+.proposta .sem-em-lote > span { white-space: normal; overflow-wrap: anywhere; text-wrap: balance; }
+.proposta .escopo-de-onde { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; min-width: 0; }
+/* ação secundária da linha: menor, para caber ao lado da origem no notebook */
+.proposta .guardar-padrao { margin-left: auto; font-size: 12.5px; }
+.proposta .escopo-lote { flex-basis: 100%; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.proposta .oferta-opcionais { text-align: left; }
+
+/* ---- item 14: o modelo pela seleção, em botões ---- */
+.proposta .modelo-pela-selecao {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px;
+    margin: -6px 0 14px; padding: 8px 10px; border: 1px solid var(--info-bd);
+    border-radius: var(--radius-sm); background: var(--info-bg);
+}
+.proposta .modelo-pela-selecao .nota strong { color: var(--text); font-weight: 600; }
+/* modelo já escolhido: só a nota do que a seleção diz (e o "difere"), sem caixa */
+.proposta .modelo-pela-selecao.so-nota { background: none; border: none; padding: 0 2px; margin: -8px 0 12px; }
+.proposta .modelo-pela-selecao .btn-ghost.modelo-sugerido { padding: 4px 10px; font-size: 12.5px; font-weight: 500; }
+/* o destaque só quando casa diâmetro, cubo e série; sem casamento, os botões são iguais */
+.proposta .modelo-pela-selecao .btn-ghost.modelo-sugerido.casa {
+    border-color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary); color: var(--primary); font-weight: 600;
+}
+
+/* ---- item 17: "igual ao equip. 1: …" sem esticar a linha ---- */
+.proposta .aplicacao-igual {
+    max-width: 380px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left;
+}
