@@ -282,7 +282,10 @@ para comparar com o processo antigo.
 Uma proposta nova é **gravada antes do primeiro anexo** (curva ou seleção do VAX com curva). Antes ela
 ganhava um id provisório, e o primeiro "Salvar" — que via ali uma revisão nova — trocava o id e
 deixava as curvas para trás. E uma **revisão nova** leva os anexos da anterior para a pasta dela
-(`Anexos.CopiarTodos`): antes, as curvas da revisão nova abriam quebradas.
+(`Anexos.CopiarTodos`): antes, as curvas da revisão nova abriam quebradas. Uma curva **tirada**
+(Remover, ou o equipamento removido) só sai da pasta no **Salvar**, e da pasta da proposta gravada
+naquele momento: numa revisão nova ainda não gravada, a da revisão anterior (a que o cliente
+recebeu) não perde nada, e o Descartar volta a uma proposta com o arquivo da curva no lugar.
 
 ## Rascunho: recarregar a página não perde a proposta
 

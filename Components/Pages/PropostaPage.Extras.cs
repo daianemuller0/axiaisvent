@@ -420,10 +420,22 @@ public partial class PropostaPage
         // quem gera tudo costuma mandar ao cliente em seguida: o "Marcar
         // como enviada" fica no caminho, sem ir ao menu Mais
         if (_proposta.Enviada || NovaRevisaoPendente) Aviso(texto, fica: fica);
-        else Aviso(texto, fica: fica, acao: ("Marcar como enviada", MarcarEnviada));
+        else Aviso(texto, fica: fica, acao: ("Marcar como enviada", MarcarEnviadaDoAviso));
 
         _avisoDoGerarTudo = texto;
         _pastaNoAviso = _noDesktop && salvos.Count > 0 ? texto : null;
+    }
+
+    /// <summary>
+    /// O botão do aviso fica na tela até alguém fechar, e a proposta pode ter
+    /// mudado depois do Gerar tudo: marcar aí gravaria a edição sem Salvar e
+    /// registraria como enviada uma versão diferente dos documentos baixados.
+    /// Mesma regra da oferta no alto da etapa Documentos.
+    /// </summary>
+    private void MarcarEnviadaDoAviso()
+    {
+        if (OferecerMarcarEnviada) MarcarEnviada();
+        else Aviso("A proposta mudou depois do Gerar tudo: gere de novo antes de marcar como enviada.", erro: true);
     }
 
     /// <summary>"Abrir pasta" no aviso: o app abre o Explorer, só dentro da pasta das propostas.</summary>
@@ -497,7 +509,9 @@ public partial class PropostaPage
     {
         if (!PodeNovaRevisao) return;
 
-        // a lista pode estar velha (outra pessoa gravou a 01 agora há pouco)
+        // a lista pode estar velha (outra pessoa gravou a 01 agora há pouco,
+        // de outra máquina): a leitura vai à pasta, e não ao cache deste servidor
+        Repo.Atualizar();
         AtualizarGravadas();
 
         var anterior = _proposta.Revisao.Trim();
@@ -564,8 +578,9 @@ public partial class PropostaPage
 
     partial void DicaDoCusto(ItemProposta item, string chave, decimal? puxado, ref string? dica)
     {
-        // só onde falta custo: com o do cadastro ou um à mão, a dica seria barulho
-        if (puxado is not null || EhManual(item, chave)) return;
+        // só onde falta custo: com o do cadastro ou um à mão, a dica seria barulho;
+        // no "Sem", que custa nada, ela convidaria a digitar um 0
+        if (puxado is not null || EhManual(item, chave) || !FaltaCusto(item, chave, puxado)) return;
         if (ModeloDe(item) is not { } modelo || CustosAMao.Identidade(item, chave, _custo) is not { } identidade) return;
 
         var moeda = _proposta.MoedaCodigo;

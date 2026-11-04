@@ -1283,7 +1283,9 @@
                 </div>
 
                 <div class="escopo-custo">
-                    @if (linha is not null)
+                    @* o "Sem" custa nada: sem campo, a não ser que tenha custo (do
+                       cadastro ou à mão), para dar para ler e voltar *@
+                    @if (linha is not null && (temItem || Efetivo(atual, chaveDoCusto, linha.Valor) is not null))
                     {
                         @Preco(atual, chaveDoCusto, linha.Valor)
                     }
@@ -2801,6 +2803,8 @@
             var editando = EditandoDescricao(indice);
             var (titulo, inclui) = DescricaoDoCartao(item);
             var precoDeVenda = PrecoDeVenda(indice);
+            // linha sem custo: o preço do cartão (e o do documento) é só o das que têm
+            var faltaCusto = ModeloDe(item) is not null ? SemCustoNaTabela(item) : new List<string>();
             var rascunho = editando ? EscopoEmTexto.Texto(item, _custo, _proposta.Moeda, TextosDaProposta.Do(Idioma)) : "";
 
             <div class="docs-equip @(editando ? "editando" : "")">
@@ -2810,7 +2814,7 @@
                         · @item.Quantos un. ·
                         @if (precoDeVenda > 0m)
                         {
-                            <span>@DinheiroVenda(precoDeVenda)</span>
+                            <span class="@(faltaCusto.Count > 0 ? "texto-alerta" : "")">@DinheiroVenda(precoDeVenda)</span>
                         }
                         else
                         {
@@ -2829,6 +2833,13 @@
                     <div class="docs-falta texto-alerta">
                         <Icone Nome="alerta" Classe="ico-p" /> modelo não escolhido
                         <button class="btn-link" @onclick="@(() => IrAoEscopoDoCartao(indice, "f-modelo"))">escolher no Escopo</button>
+                    </div>
+                }
+                @if (faltaCusto.Count > 0)
+                {
+                    <div class="docs-falta texto-alerta docs-falta-custo">
+                        <Icone Nome="alerta" Classe="ico-p" /> @Plural(faltaCusto.Count, "linha sem custo", "linhas sem custo")@(precoDeVenda > 0m ? ": o preço sai incompleto" : "")
+                        <button class="btn-link" @onclick="@(() => CompletarCustoNoPreco(indice, faltaCusto))">completar no Preço</button>
                     </div>
                 }
                 @* o título da comercial tira horizontal ou vertical do ARRANJO (e não
@@ -2986,7 +2997,7 @@
     }
     else
     {
-        <button class="btn-accent" @onclick="GerarTudo"><Icone Nome="baixar" /> Gerar tudo</button>
+        <button class="btn-accent" disabled="@_gerandoTudo" @onclick="GerarTudo"><Icone Nome="baixar" /> Gerar tudo</button>
     }
     }
 </div>
@@ -3216,6 +3227,7 @@
         }
 
         _proposta = recuperada;
+        _anexosATirar.Clear();
         _ultimoRascunho = texto;
         _chaveRascunho = chave;
         if (recuperada.Id.Length > 0) _origem = "aberta";
@@ -3349,6 +3361,7 @@
         {
             _proposta = achada;
             _revisaoAberta = achada.Revisao;
+            _anexosATirar.Clear();
             _baseSalva = Foto();
             AjustarEscolhasLivres();
             _aberto = 0;
@@ -3718,6 +3731,8 @@
         var primeiroModelo = item.EquipamentoId.Length == 0;
         var tinha = item.PrecosManuais.TryGetValue("equipamento", out var antigo)
             && antigo.Trim().Length > 0;
+        // o diâmetro do ventilador é do modelo: o gancho compara o anterior com o novo
+        var modeloAnterior = ModeloDe(item);
 
         item.EquipamentoId = id;
         if (primeiroModelo)
@@ -3729,7 +3744,7 @@
             DepoisDoPrimeiroModelo(item);
             DadosTecnicosDoPrimeiroModelo(item);
         }
-        else DadosTecnicosDoModeloTrocado(item);
+        else DadosTecnicosDoModeloTrocado(item, modeloAnterior);
 
         if (tinha)
         {
@@ -3853,9 +3868,9 @@
     {
         if (_proposta.Itens.Count == 0) return;
 
-        // os anexos do equipamento vão com ele: sem isso as curvas ficariam na
-        // pasta sem ninguém que as mencione, e ninguém saberia que dá para
-        // apagar
+        // os anexos do equipamento vão com ele, no próximo Salvar: sem isso as
+        // curvas ficariam na pasta sem ninguém que as mencione, e ninguém
+        // saberia que dá para apagar
         foreach (var curva in _proposta.Itens[PosicaoValida].Curvas) Apagar(curva);
 
         _proposta.Itens.RemoveAt(PosicaoValida);
@@ -4679,13 +4694,53 @@
         item.Curvas.RemoveAt(posicao);
     }
 
-    /// <summary>Apaga os arquivos de uma curva: o original e a imagem dele.</summary>
+    /// <summary>
+    /// Os arquivos das curvas tiradas, com o id da proposta de onde saíram,
+    /// esperando o Salvar. Apagar na hora tirava a curva da proposta GRAVADA:
+    /// numa "Nova revisão" ainda não gravada o id é o da revisão anterior (a
+    /// que o cliente recebeu), e o Descartar voltava a uma proposta que ainda
+    /// lista uma curva cujo arquivo já não existia.
+    /// </summary>
+    private readonly List<(string Proposta, string Arquivo)> _anexosATirar = new();
+
+    /// <summary>Os arquivos de uma curva (o original e a imagem dele) saem no próximo Salvar.</summary>
     private void Apagar(CurvaAnexada curva)
     {
-        if (curva.Arquivo.Length > 0) Anexos.Apagar(_proposta.Id, curva.Arquivo);
+        if (curva.Arquivo.Length > 0) _anexosATirar.Add((_proposta.Id, curva.Arquivo));
 
         if (curva.Imagem.Length > 0 && curva.Imagem != curva.Arquivo)
-            Anexos.Apagar(_proposta.Id, curva.Imagem);
+            _anexosATirar.Add((_proposta.Id, curva.Imagem));
+    }
+
+    /// <summary>
+    /// Depois de gravar: apaga da pasta da proposta gravada agora os arquivos
+    /// das curvas tiradas que nenhum equipamento ainda menciona. Numa revisão
+    /// nova, o id já é o novo e a pasta é a cópia dela; a pasta da anterior
+    /// não é tocada. Tirados de outra proposta (abriu outra sem gravar)
+    /// ficam: um arquivo a mais na pasta não estraga nada.
+    /// </summary>
+    private void ApagarAnexosTirados(string idAnterior)
+    {
+        var usados = _proposta.Itens
+            .SelectMany(i => i.Curvas.SelectMany(c => new[] { c.Arquivo, c.Imagem }).Append(i.Curva).Append(i.CurvaImagem))
+            .Where(a => a.Length > 0)
+            .ToHashSet();
+
+        foreach (var (proposta, arquivo) in _anexosATirar)
+        {
+            if (proposta != idAnterior || usados.Contains(arquivo)) continue;
+            try
+            {
+                Anexos.Apagar(_proposta.Id, arquivo);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // aberto em outro programa: fica na pasta, sem ninguém que o mencione
+            }
+            _tamanhoDasCurvas.Remove(_proposta.Id + "/" + arquivo);
+        }
+
+        _anexosATirar.Clear();
     }
 
     private string TamanhoDaCurva(CurvaAnexada curva)
@@ -4757,7 +4812,9 @@
         {
             var revisao = _proposta.Revisao.Trim();
 
-            // a revisão que já existe não se sobrescreve nem por este caminho
+            // a revisão que já existe não se sobrescreve nem por este caminho —
+            // nem a que um colega gravou de outra máquina: a leitura vai à pasta
+            Repo.Atualizar();
             if (Repo.Todas().Any(x => x.Id != _proposta.Id && x.Numero == _proposta.Numero
                                       && x.Revisao.Trim() == revisao))
             {
@@ -4793,6 +4850,9 @@
             }
         }
 
+        // só agora, com a proposta gravada, as curvas tiradas saem da pasta
+        ApagarAnexosTirados(idAnterior);
+
         _revisaoAberta = _proposta.Revisao;
         _baseSalva = Foto();
         AtualizarGravadas();
@@ -4811,6 +4871,7 @@
     {
         _proposta = NovaComPadroes();
         _revisaoAberta = "";
+        _anexosATirar.Clear();
         _padraoDaNova = Foto();
         _baseSalva = _padraoDaNova;
         _sugestaoCliente = null;
@@ -4851,6 +4912,7 @@
 
         _proposta = achada;
         _revisaoAberta = achada.Revisao;
+        _anexosATirar.Clear();
         _baseSalva = Foto();
         AjustarEscolhasLivres();
         _aberto = 0;
@@ -4876,6 +4938,7 @@
 
         _proposta.EnviadaEm = DateTime.Now.ToString("yyyy-MM-dd");
         Repo.Salvar(_proposta);
+        ApagarAnexosTirados(_proposta.Id);
         _baseSalva = Foto();
 
         AtualizarGravadas();
@@ -4892,6 +4955,7 @@
 
         _proposta.EnviadaEm = "";
         Repo.Salvar(_proposta);
+        ApagarAnexosTirados(_proposta.Id);
         _baseSalva = Foto();
 
         AtualizarGravadas();
@@ -4919,7 +4983,7 @@
     /// separa o menu de cada lugar.
     /// </summary>
     private RenderFragment GerarTudoDividido(string onde) => @<div class="split menu-dono">
-        <button class="btn-accent split-principal" @onclick="GerarTudo"
+        <button class="btn-accent split-principal" disabled="@_gerandoTudo" @onclick="GerarTudo"
                 title="Salva e baixa a proposta comercial, a técnica e o pricing">
             <Icone Nome="baixar" /> Gerar tudo
         </button>

@@ -978,6 +978,13 @@ public sealed class PropostaRepository
 
     public Proposta? Achar(string id) => Todas().FirstOrDefault(p => p.Id == id);
 
+    /// <summary>
+    /// A próxima leitura vai à pasta, e não ao cache desta máquina: o cache só
+    /// vê o que ESTE servidor gravou, e uma revisão que um colega gravou de
+    /// outra máquina ficaria de fora da conta da próxima revisão.
+    /// </summary>
+    public void Atualizar() => _store.Atualizar(Entidade);
+
     public void Salvar(Proposta p)
     {
         if (string.IsNullOrWhiteSpace(p.Id)) p.Id = Guid.NewGuid().ToString("n");

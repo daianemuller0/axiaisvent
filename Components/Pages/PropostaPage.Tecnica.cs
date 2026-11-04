@@ -293,13 +293,34 @@ public partial class PropostaPage
     /// que o sistema lembrou para o modelo anterior — e que ninguém editou —
     /// ficaria errado no documento com a marca "confira". Ele sai e a
     /// lembrança roda de novo para o modelo novo (como no primeiro, só em
-    /// campo vazio); o digitado à mão não muda.
+    /// campo vazio). O digitado à mão também sai quando o ventilador muda de
+    /// tamanho: o 686 do Joy 27 1/7 sairia na técnica de um VAX 2400 sem
+    /// marca nenhuma (e o mesmo valia para o que veio de um equipamento
+    /// duplicado ou foi lembrado e gravado antes). Mesmo ventilador, outro
+    /// cubo: o diâmetro continua certo e fica. O campo vazio cai no aviso
+    /// "diâmetro em branco".
     /// </summary>
-    partial void DadosTecnicosDoModeloTrocado(ItemProposta item);
+    partial void DadosTecnicosDoModeloTrocado(ItemProposta item, Equipamento? anterior);
 
-    partial void DadosTecnicosDoModeloTrocado(ItemProposta item)
+    partial void DadosTecnicosDoModeloTrocado(ItemProposta item, Equipamento? anterior)
     {
-        if (_diametroLembrado.Remove(item)) item.DiametroMm = "";
+        var novo = ModeloDe(item);
+        var mesmoVentilador = anterior is not null && novo is not null
+                              && Medida.Numero(anterior.Diametro) == Medida.Numero(novo.Diametro);
+
+        if (_diametroLembrado.ContainsKey(item))
+        {
+            if (!mesmoVentilador)
+            {
+                _diametroLembrado.Remove(item);
+                item.DiametroMm = "";
+            }
+        }
+        // o digitado só sai quando dá para saber que o tamanho mudou
+        else if (item.DiametroMm.Trim().Length > 0 && anterior is not null && novo is not null && !mesmoVentilador)
+        {
+            item.DiametroMm = "";
+        }
 
         if (item.DiametroMm.Trim().Length == 0 && DiametroDeOutro(item) is { } diametro)
         {

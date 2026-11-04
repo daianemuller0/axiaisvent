@@ -492,6 +492,8 @@ span.subtitle { margin: 0; }
 }
 .btn-accent:hover { box-shadow: 0 5px 14px rgba(0, 148, 150, .45); }
 .btn-accent:active { transform: translateY(1px); }
+/* gerando: o botão diz que está ocupado (um Gerar tudo de cada vez) */
+.btn-accent:disabled { opacity: .6; cursor: progress; box-shadow: none; transform: none; }
 
 .logo-preview {
     border: 1px dashed var(--border); border-radius: var(--radius-sm);

@@ -144,6 +144,10 @@
         static string Campo(string t)
         {
             var texto = (t ?? "").Replace('\r', ' ').Replace('\n', ' ');
+            // o Número e o "Preparada por" são texto livre de qualquer usuário:
+            // começando com = + - @ o Excel do ADM leria uma fórmula (mesmo
+            // entre aspas). O apóstrofo faz o Excel ler texto
+            if (texto.Length > 0 && "=+-@\t".IndexOf(texto[0]) >= 0) texto = "'" + texto;
             if (texto.IndexOf(';') < 0 && texto.IndexOf(Aspas, StringComparison.Ordinal) < 0) return texto;
             return string.Concat(Aspas, texto.Replace(Aspas, Aspas + Aspas), Aspas);
         }

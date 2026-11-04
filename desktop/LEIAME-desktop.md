@@ -49,11 +49,16 @@ a pasta de dados se um dia precisar).
 No desktop, a comercial, a técnica, o pricing e o custo previsto não caem em
 Downloads: vão direto para `<raiz>\PRP-2026-104 rev 00` (`PastaDasPropostas.cs`).
 A raiz é `Propostas:Pasta` no `appsettings.Desktop.json`; vazia, é
-`Documentos\Propostas VA` (aceita pasta de rede e `%USERPROFILE%`). Um arquivo
+`Documentos\Propostas VA` (aceita pasta de rede e `%USERPROFILE%`). Uma
+`%VARIAVEL%` que não existe na máquina faz valer o padrão, e um nome sem
+caminho completo (`Propostas VA`) fica dentro de Documentos: nunca dentro da
+pasta da versão, que o lançador apaga. Um arquivo
 com o mesmo nome nunca é apagado: vai para `anteriores\` com a data em que foi
 gravado; se estiver aberto no Word, o novo sai com " (2)". Se a pasta falhar
-(rede fora do ar, sem permissão), o arquivo vai para Downloads como antes e a
-tela avisa. Depois do Gerar tudo, o aviso traz "Abrir pasta" (só no desktop).
+(rede fora do ar, sem permissão, ou sem resposta em 10 s), o arquivo vai para
+Downloads como antes e a tela avisa; a ida à pasta roda fora da janela, que
+não trava enquanto espera. Depois do Gerar tudo, o aviso traz "Abrir pasta"
+(só no desktop).
 
 ## Como publicar
 

@@ -52,6 +52,11 @@ public sealed class PastaDasPropostas
     /// A raiz de 'Propostas:Pasta' no appsettings.Desktop.json (ao lado do
     /// .exe), com %VARIAVEIS% do Windows; vazia ou ausente, Documentos\Propostas VA.
     /// Um arquivo ilegível também cai no padrão: a janela abre do mesmo jeito.
+    /// <para>A raiz nunca depende do diretório atual: o launcher abre o app
+    /// dentro da pasta da versão (%LOCALAPPDATA%\HowdenVA\v…), que ele mesmo
+    /// apaga duas atualizações depois — e os documentos e os "anteriores"
+    /// iriam junto, sem aviso. Uma %VARIAVEL% que não existe nesta máquina
+    /// (fica literal) cai no padrão; um nome relativo vai para Documentos.</para>
     /// </summary>
     public static string RaizConfigurada(string pastaDoApp)
     {
@@ -74,7 +79,11 @@ public sealed class PastaDasPropostas
                 && pasta.ValueKind == JsonValueKind.String
                 && pasta.GetString() is { } texto && texto.Trim().Length > 0)
             {
-                return Environment.ExpandEnvironmentVariables(texto.Trim());
+                var caminho = Environment.ExpandEnvironmentVariables(texto.Trim());
+                if (caminho.Contains('%')) return padrao;
+                if (!Path.IsPathFullyQualified(caminho))
+                    caminho = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), caminho);
+                return caminho;
             }
         }
         catch (Exception)
@@ -95,37 +104,34 @@ public sealed class PastaDasPropostas
 
     // ---------- o download ----------
 
-    private void AoComecarDownload(object? sender, CoreWebView2DownloadStartingEventArgs e)
+    /// <summary>
+    /// Quanto a pasta das propostas tem para responder. Uma pasta de rede fora
+    /// do ar (servidor desligado, VPN caída) só desiste depois do tempo-limite
+    /// do SMB, que passa de 20 s por chamada.
+    /// </summary>
+    private static readonly TimeSpan PrazoDaPasta = TimeSpan.FromSeconds(10);
+
+    /// <summary>
+    /// O WebView2 chama isto na thread da janela. A ida à pasta (criar, ver se
+    /// já existe, guardar o anterior) roda fora dela, com prazo, enquanto o
+    /// download espera (deferral): feita aqui, com a rede fora do ar, deixava
+    /// a janela inteira "Não está respondendo" por um minuto a cada Gerar tudo.
+    /// </summary>
+    private async void AoComecarDownload(object? sender, CoreWebView2DownloadStartingEventArgs e)
     {
         string nome = "";
+        CoreWebView2Deferral? adiar = null;
         try
         {
             nome = CopiaDoNavegador.Replace(Path.GetFileName(e.ResultFilePath), "");
             if (DaProposta(nome) is not { } proposta) return;
 
-            var pasta = PastaDa(proposta.Numero, proposta.Revisao);
-            Directory.CreateDirectory(pasta);
+            adiar = e.GetDeferral();
+            var (pasta, destino, anterior, outroNome) = await ComPrazo(cancelar => Preparar(proposta.Numero, proposta.Revisao, nome, cancelar));
 
-            var destino = Path.Combine(pasta, nome);
-            string? anterior = null;
-            var outroNome = false;
-
-            if (File.Exists(destino))
-            {
-                try
-                {
-                    anterior = GuardarAnterior(pasta, destino);
-                }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-                {
-                    // aberto no Word: o anterior fica onde está e o novo ganha " (2)"
-                    destino = NomeLivre(destino);
-                    outroNome = true;
-                }
-            }
-
-            // só agora, com tudo certo, o download muda de lugar: até aqui,
-            // qualquer erro deixa o arquivo ir para Downloads como antes
+            // de volta à thread da janela, e só agora, com tudo certo, o
+            // download muda de lugar: até aqui, qualquer erro deixa o arquivo
+            // ir para Downloads como antes
             e.ResultFilePath = destino;
             e.Handled = true;
 
@@ -144,6 +150,66 @@ public sealed class PastaDasPropostas
             // ResultFilePath não foi tocado e o arquivo cai em Downloads
             Avisar(new Dictionary<string, object?> { ["erroPasta"] = ex.Message, ["arquivo"] = nome });
         }
+        finally
+        {
+            adiar?.Complete();
+        }
+    }
+
+    /// <summary>
+    /// A pasta da proposta pronta para receber o arquivo: criada, e o arquivo
+    /// de mesmo nome guardado em "anteriores" (aberto no Word, o novo ganha
+    /// " (2)"). Roda fora da thread da janela; passou do prazo, para antes de
+    /// mexer em qualquer arquivo — o download já foi para Downloads.
+    /// </summary>
+    private (string Pasta, string Destino, string? Anterior, bool OutroNome) Preparar(
+        string numero, string revisao, string nome, CancellationToken cancelar)
+    {
+        var pasta = PastaDa(numero, revisao);
+        Directory.CreateDirectory(pasta);
+
+        var destino = Path.Combine(pasta, nome);
+        string? anterior = null;
+        var outroNome = false;
+
+        if (File.Exists(destino))
+        {
+            cancelar.ThrowIfCancellationRequested();
+            try
+            {
+                anterior = GuardarAnterior(pasta, destino);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // aberto no Word: o anterior fica onde está e o novo ganha " (2)"
+                destino = NomeLivre(destino);
+                outroNome = true;
+            }
+        }
+
+        return (pasta, destino, anterior, outroNome);
+    }
+
+    /// <summary>
+    /// Roda a ida à pasta fora da thread da janela e espera no máximo
+    /// <see cref="PrazoDaPasta"/>. A continuação volta à thread da janela (o
+    /// contexto do WinForms), onde o WebView2 pode ser mexido.
+    /// </summary>
+    private static async Task<T> ComPrazo<T>(Func<CancellationToken, T> trabalho)
+    {
+        // sem using: a chamada presa ainda pergunta pelo prazo depois que esta volta
+        var prazo = new CancellationTokenSource();
+        var tarefa = Task.Run(() => trabalho(prazo.Token));
+
+        if (await Task.WhenAny(tarefa, Task.Delay(PrazoDaPasta)) != tarefa)
+        {
+            prazo.Cancel();
+            // a chamada presa termina sozinha mais tarde; o erro dela não tem a quem ir
+            _ = tarefa.ContinueWith(t => _ = t.Exception, TaskContinuationOptions.OnlyOnFaulted);
+            throw new TimeoutException($"a pasta das propostas não respondeu em {PrazoDaPasta.TotalSeconds:0} s");
+        }
+
+        return await tarefa;
     }
 
     /// <summary>
@@ -168,7 +234,7 @@ public sealed class PastaDasPropostas
 
     /// <summary>
     /// &lt;raiz&gt;\PRP-2026-104 rev 00. O nome vem da página: caracteres que
-    /// o Windows não aceita viram "-", e a pasta tem de ficar dentro da raiz.
+    /// o Windows não aceita viram "_", e a pasta tem de ficar dentro da raiz.
     /// </summary>
     private string PastaDa(string numero, string revisao)
     {
@@ -188,7 +254,11 @@ public sealed class PastaDasPropostas
     private static string Limpo(string nome)
     {
         var invalidos = Path.GetInvalidFileNameChars().Concat(new[] { '\\', '/', ':', '*', '?', '"', '<', '>', '|' }).ToHashSet();
-        var limpo = new string(nome.Select(c => invalidos.Contains(c) ? '-' : c).ToArray()).Trim().TrimEnd('.');
+        // "_", e não "-": é o que o navegador põe no nome do download
+        // ("PRP 2026/104" chega como "P_PRP 2026_104-C00.docx"). Com outro
+        // caractere, o custo previsto e o "Abrir pasta", que mandam o número
+        // cru, caíam numa pasta diferente da dos documentos
+        var limpo = new string(nome.Select(c => invalidos.Contains(c) ? '_' : c).ToArray()).Trim().TrimEnd('.');
         return limpo.Length > 0 ? limpo : "sem número";
     }
 
@@ -257,7 +327,7 @@ public sealed class PastaDasPropostas
     /// rev}: abrir a pasta dela no Explorer — só uma pasta dentro da raiz, e
     /// só o explorer.exe, nunca um programa vindo da página.
     /// </summary>
-    private void AoReceberMensagem(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
+    private async void AoReceberMensagem(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
     {
         try
         {
@@ -278,7 +348,8 @@ public sealed class PastaDasPropostas
             if (Texto(raiz, "abrirPasta") is { Length: > 0 } daProposta)
             {
                 var pasta = PastaDa(daProposta, revisao);
-                if (!Directory.Exists(pasta))
+                // a pasta pode ser de rede: a pergunta vai fora da thread da janela, com prazo
+                if (!await ComPrazo(_ => Directory.Exists(pasta)))
                 {
                     Avisar(new Dictionary<string, object?>
                     {

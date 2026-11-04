@@ -90,6 +90,18 @@ public partial class PropostaPage
     private void IrAoEscopoDoCartao(int indice, string alvo) =>
         IrPara(new Pendencia("", 3, indice, "escopo", alvo));
 
+    /// <summary>
+    /// "2 linhas sem custo" no cartão: o valor dele (e o que o documento
+    /// imprime) é só o das linhas que têm custo. Leva à etapa Preço, com a
+    /// tabela do equipamento aberta, no primeiro campo vazio.
+    /// </summary>
+    private void CompletarCustoNoPreco(int indice, List<string> semCusto)
+    {
+        IrParaEtapa(4);
+        _rolarTopo = false;
+        IrAoCustoQueFalta(indice, semCusto);
+    }
+
     /// <summary>"sai em Español": a troca é na etapa Cliente e condições, no campo da língua.</summary>
     private void TrocarIdiomaDosDocumentos() =>
         IrPara(new Pendencia("", 2, Alvo: "f-idioma"));

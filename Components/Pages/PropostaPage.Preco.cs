@@ -52,9 +52,28 @@ public partial class PropostaPage
     {
         var temModelo = ModeloDe(item) is not null;
         return LinhasDePreco(item)
-            .Where(l => Efetivo(item, l.Chave, l.Puxado) is null && (temModelo || l.Chave != "equipamento"))
+            .Where(l => FaltaCusto(item, l.Chave, l.Puxado) && (temModelo || l.Chave != "equipamento"))
             .Select(l => l.Chave)
             .ToList();
+    }
+
+    /// <summary>
+    /// Falta custo na linha: nem do cadastro, nem à mão — e ela não é a
+    /// ausência ("Sem", "Não", "SEM Base", "NENHUM"), que entra no código e não
+    /// no preço: custa nada. Antes cada "Sem" contava como linha sem custo, e o
+    /// "Sem em" das listas a decidir (item 13) trocava um aviso por várias
+    /// pendências que só se limpavam digitando 0. A conta não muda: sem custo
+    /// ou zero, a linha soma zero.
+    /// </summary>
+    private bool FaltaCusto(ItemProposta item, string chave, decimal? puxado) =>
+        Efetivo(item, chave, puxado) is null && !FamiliaDePreco.EhAusencia(OpcaoDaChave(item, chave));
+
+    /// <summary>A opção escolhida de uma linha de preço; vazio no equipamento e no motor.</summary>
+    private static string OpcaoDaChave(ItemProposta item, string chave)
+    {
+        if (EscopoPadrao.ListaDaChave(chave) is { } lista) return item.Escolhas.GetValueOrDefault(lista, "");
+        if (chave == "partidor") return item.Partidor;
+        return chave.StartsWith("instr:", StringComparison.Ordinal) ? chave["instr:".Length..] : "";
     }
 
     /// <summary>

@@ -125,10 +125,14 @@ window.appIrAoCampo = (id) => {
 // no WebView2 o navegador abre o arquivo no lugar da tela, e o circuito do
 // Blazor cai no meio da proposta. Dentro da área, o InputFile que fica por
 // cima dela recebe o arquivo do jeito normal (o mesmo OnChange do clique).
+// Texto arrastado para um campo (ou dentro de uma observação) passa: só
+// arquivo e link soltos fora da área são segurados.
 (function () {
     const naArea = (e) => e.target instanceof Element && e.target.closest('.dropzone');
+    const temArquivo = (e) => !!e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files');
+    const editavel = (e) => e.target instanceof Element && e.target.closest('input, textarea, [contenteditable]');
     const segurar = (e) => {
-        if (naArea(e)) return;
+        if (naArea(e) || (!temArquivo(e) && editavel(e))) return;
         e.preventDefault();
         if (e.dataTransfer) e.dataTransfer.dropEffect = 'none';
     };

@@ -530,7 +530,8 @@ public partial class PropostaPage : IAsyncDisposable
             if (temModelo)
             {
                 // a pendência leva à PRIMEIRA linha sem custo, na ordem da tela
-                var semCusto = LinhasDePreco(item).Where(l => Efetivo(item, l.Chave, l.Puxado) is null).ToList();
+                // a ausência ("Sem", "Não") custa nada e não conta (ver FaltaCusto)
+                var semCusto = LinhasDePreco(item).Where(l => FaltaCusto(item, l.Chave, l.Puxado)).ToList();
                 if (semCusto.Count > 0)
                     DoItem(Plural(semCusto.Count, "linha sem custo", "linhas sem custo"), "escopo",
                         AlvoDoCusto(indice, semCusto[0].Chave));
@@ -648,7 +649,10 @@ public partial class PropostaPage : IAsyncDisposable
         {
             2 => _proposta.Cliente.Trim().Length > 0,
             3 or 5 => _proposta.Itens.Count > 0,
-            4 => Total > 0m,
+            // o preço só está "feito" completo: com o modelo de cada equipamento
+            // e o custo de cada linha. Essas faltas são pendências da etapa 3
+            // (o campo mora no Escopo), e o visto do Preço não pode desmenti-las
+            4 => Total > 0m && _proposta.Itens.All(i => ModeloDe(i) is not null && SemCustoNaTabela(i).Count == 0),
             _ => false,
         };
 
@@ -861,6 +865,9 @@ public partial class PropostaPage : IAsyncDisposable
             AjustarEscolhasLivres();
         }
 
+        // as curvas tiradas voltaram com a gravada: os arquivos delas ficam
+        _anexosATirar.Clear();
+
         // saindo da tela, nenhum desenho daqui em diante escreve o rascunho de novo
         if (saindo) _rascunhoPronto = false;
 
@@ -929,6 +936,11 @@ public partial class PropostaPage : IAsyncDisposable
     /// </summary>
     private async Task GerarTudo()
     {
+        // um Gerar tudo de cada vez: o segundo clique de um duplo clique chega
+        // assim que o primeiro espera o download, e baixava tudo duas vezes —
+        // e o tempo contava um "segundo Gerar tudo" (retrabalho) que não houve
+        if (_gerandoTudo) return;
+
         if (_proposta.Itens.Count == 0)
         {
             Aviso("A proposta ainda não tem equipamento nenhum.", erro: true);
@@ -1077,6 +1089,7 @@ public partial class PropostaPage : IAsyncDisposable
 
         _proposta = copia;
         _revisaoAberta = "";
+        _anexosATirar.Clear();
         // a cópia ainda não está no banco: tudo nela é alteração a gravar, e o
         // rascunho do navegador já a protege
         _baseSalva = "";
@@ -1839,6 +1852,9 @@ public partial class PropostaPage : IAsyncDisposable
         copia.RuidoDb = "";
 
         _proposta.Itens.Insert(posicao + 1, copia);
+        // o diâmetro copiado é lembrado, não digitado nesta cópia: se o modelo
+        // dela mudar (o aviso abaixo pede para conferir), ele sai com o modelo
+        if (copia.DiametroMm.Trim().Length > 0) _diametroLembrado[copia] = $"igual ao equip. {posicao + 1}";
         _faltouNaSelecao.Clear();
         _aberto = posicao + 1;
         _abaItem = "escopo";
