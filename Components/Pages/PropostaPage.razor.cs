@@ -1144,6 +1144,7 @@ public partial class PropostaPage : IAsyncDisposable
             p.ContatoTelefones = minha.ContatoTelefones;
         }
 
+        LembrarPadroes(p, minha);
         return p;
     }
 
@@ -1304,6 +1305,7 @@ public partial class PropostaPage : IAsyncDisposable
         _proposta.IncotermDestino = antes.IncotermDestino;
         _proposta.TaxaCambio = antes.TaxaCambio;
         AjustarEscolhasLivres();
+        if (_sugestaoCliente is { } desfeita) DepoisDeDesfazerCliente(desfeita.Cliente.Ultima.Numero);
 
         _sugestaoCliente = null;
         _antesDoCliente = null;
@@ -1339,6 +1341,7 @@ public partial class PropostaPage : IAsyncDisposable
 
         AjustarEscolhasLivres();
         PreencherTaxaDoDia();
+        MarcarLembrados(trazidos, de);
         return trazidos;
     }
 

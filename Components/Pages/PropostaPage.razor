@@ -248,8 +248,14 @@
 }
 @if (_etapa == 2)
 {
-<div class="panel" style="margin-bottom:14px">
-    <h2 style="margin:0 0 12px; font-size:15px">Cliente</h2>
+    @* a etapa em três cartões (item 12): primeiro o que se digita (o cliente e o
+       que é desta proposta), depois as condições em resumo, com o que muda o
+       preço na frente, e os contatos Howden para ler. O que veio lembrado fica
+       em verde até ser editado (ou confirmado, nas condições) *@
+    SincronizarCondicoes();
+    var projetosDoCliente = ProjetosDoCliente();
+<div class="panel cli-cartao">
+    <h2 class="cli-titulo">Cliente</h2>
     <div class="form3">
         <label>@Campo("Cliente", "D6 · pricing E3")
             <input id="f-cliente" class="cell" placeholder="Empresa cliente" list="clientes-gravados"
@@ -262,106 +268,222 @@
                 }
             </datalist></label>
         <label>@Campo("Aos cuidados de", "D13")
-            <input id="f-aos-cuidados" class="cell" placeholder="Nome do contato" @bind="_proposta.AosCuidados" /></label>
+            <input id="f-aos-cuidados" class="@CelulaDoCliente("contato")" title="@TituloDoLembrado("contato")"
+                   placeholder="Nome do contato"
+                   @bind="_proposta.AosCuidados" @bind:after='() => Editou("contato")' /></label>
         <label>@Campo("E-mail", "D14")
-            <input class="cell" placeholder="contato@@empresa.com" @bind="_proposta.Email" /></label>
+            <input class="@CelulaDoCliente("e-mail")" title="@TituloDoLembrado("e-mail")" placeholder="contato@@empresa.com"
+                   @bind="_proposta.Email" @bind:after='() => Editou("e-mail")' /></label>
         <label>@Campo("Telefone", "D15")
-            <input class="cell" placeholder="+55 …" @bind="_proposta.Telefone" /></label>
+            <input class="@CelulaDoCliente("telefone")" title="@TituloDoLembrado("telefone")" placeholder="+55 …"
+                   @bind="_proposta.Telefone" @bind:after='() => Editou("telefone")' /></label>
         @* a cidade e a referência do cliente existem por causa da proposta:
            saem no cabeçalho de todas as páginas, como "Ciudad" e "Su referencia" *@
         <label>@Campo("Cidade")
-            <input id="f-cidade" class="cell" placeholder="Cidade do cliente" @bind="_proposta.Cidade" /></label>
-        <label>@Campo("País")
-            <select class="cell" @bind="_proposta.Pais">
-                @foreach (var x in ListasDaProposta.Paises)
-                {
-                    <option value="@x">@x</option>
-                }
-            </select>
-            @if (!EhBrasil)
-            {
-                @* fora do Brasil o estado nem é escolha: o país vai para o J6 do
-                   pricing. Um campo travado mostrando "Chile" em "Estado / UF"
-                   parecia erro; a nota diz o que acontece *@
-                <span class="nota">pricing J6: @EstadoDoPricing · fora do Brasil, sem ICMS, PIS nem COFINS</span>
-            }
-        </label>
-        @* o estado é a chave do ICMS no pricing (J6), então só vale o que a
-           planilha aceita — digitar "São Paulo" não acharia a alíquota *@
-        @if (EhBrasil)
-        {
-            <label>@Campo("Estado / UF", "pricing J6")
-                <select id="f-uf" class="cell" @bind="_proposta.Estado">
-                    <option value="">— escolher —</option>
-                    @foreach (var uf in ListasDaProposta.Estados.Where(u => u.Length == 2))
+            <input id="f-cidade" class="@CelulaDoCliente("cidade")" title="@TituloDoLembrado("cidade")"
+                   placeholder="Cidade do cliente"
+                   @bind="_proposta.Cidade" @bind:after='() => Editou("cidade")' /></label>
+        @* país e UF numa célula só: no Brasil a UF entra ao lado, sem empurrar
+           um campo sozinho para uma linha nova *@
+        <div class="cli-pais @(EhBrasil ? "com-uf" : "")">
+            <label>@Campo("País")
+                <select class="@CelulaDoCliente("país")" title="@TituloDoLembrado("país")"
+                        @bind="_proposta.Pais" @bind:after='() => Editou("país")'>
+                    @foreach (var x in ListasDaProposta.Paises)
                     {
-                        <option value="@uf">@uf</option>
+                        <option value="@x">@x</option>
                     }
                 </select>
+                @if (!EhBrasil)
+                {
+                    @* fora do Brasil o estado nem é escolha: o país vai para o J6 do
+                       pricing. Um campo travado mostrando "Chile" em "Estado / UF"
+                       parecia erro; a nota diz o que acontece *@
+                    <span class="nota">pricing J6: @EstadoDoPricing · fora do Brasil, sem ICMS, PIS nem COFINS</span>
+                }
             </label>
-        }
-        <label>@Campo("Referência do cliente")
-            <input id="f-referencia" class="cell" placeholder="O número que o cliente deu" @bind="_proposta.ReferenciaCliente" /></label>
-        <label>@Campo("Projeto")
-            <input id="f-projeto" class="cell" @bind="_proposta.Projeto" /></label>
-    </div>
-    @if (_sugestaoCliente is { } sugestao)
-    {
-        <div class="aviso aviso-neutro lembranca-cliente">
-            <span>@sugestao.Texto</span>
-            <span style="flex:1"></span>
-            @if (sugestao.Aplicada)
+            @* o estado é a chave do ICMS no pricing (J6), então só vale o que a
+               planilha aceita — digitar "São Paulo" não acharia a alíquota *@
+            @if (EhBrasil)
             {
-                <button class="btn-link" @onclick="DesfazerCliente">desfazer</button>
-            }
-            else
-            {
-                <button class="btn-ghost" @onclick="AplicarCliente">Usar contato e condições</button>
+                <label class="cli-uf">@Campo("Estado / UF", "pricing J6")
+                    <select id="f-uf" class="@CelulaDoCliente("estado")" title="@TituloDoLembrado("estado")"
+                            @bind="_proposta.Estado" @bind:after='() => Editou("estado")'>
+                        <option value="">—</option>
+                        @foreach (var uf in ListasDaProposta.Estados.Where(u => u.Length == 2))
+                        {
+                            <option value="@uf">@uf</option>
+                        }
+                    </select>
+                </label>
             }
         </div>
+    </div>
+
+    @* o que é desta proposta, e não do cliente: o Tab vem do País direto para cá *@
+    <div class="cli-desta">
+        <div class="cli-desta-titulo">Desta proposta</div>
+        <div class="form3">
+            <label>@Campo("Referência do cliente")
+                <input id="f-referencia" class="cell" placeholder="O número que o cliente deu" @bind="_proposta.ReferenciaCliente" /></label>
+            <label>@Campo("Projeto")
+                <input id="f-projeto" class="cell" list="projetos-do-cliente"
+                       placeholder="@(projetosDoCliente.Count > 0 ? "Digite ou escolha da lista" : "")"
+                       @bind="_proposta.Projeto" @bind:after="MudouProjeto" />
+                <datalist id="projetos-do-cliente">
+                    @foreach (var projeto in projetosDoCliente)
+                    {
+                        <option value="@projeto"></option>
+                    }
+                </datalist></label>
+            @* a data é guardada como texto (aaaa-mm-dd), que é o formato do próprio
+               campo — por isso value/onchange em vez de @@bind com DateTime *@
+            <label>@Campo("Data de fechamento")
+                <input id="f-fechamento" class="cell" type="date" value="@_proposta.DataFechamento"
+                       @onchange="e => _proposta.DataFechamento = e.Value?.ToString() ?? string.Empty" /></label>
+        </div>
+    </div>
+
+    @if (_sugestaoCliente is { } sugestao)
+    {
+        var numeroDoCliente = sugestao.Cliente.Ultima.Numero;
+        if (sugestao.Aplicada && _ultimosTrazidos == 0 && LembradosDa(numeroDoCliente) == 0)
+        {
+            <div class="lembranca-cliente cli-lembrou">
+                <span>Nada a trazer da @numeroDoCliente: os campos já estão iguais aos dela.</span>
+            </div>
+        }
+        else if (sugestao.Aplicada)
+        {
+            @* o desfazer mora na linha, e não só no aviso que some *@
+            <div class="lembranca-cliente cli-lembrou">
+                <span>
+                    @(LembradosDa(numeroDoCliente) > 0 ? "Campos em verde vieram da" : "Trazido da")
+                    <strong>@numeroDoCliente</strong>
+                </span>
+                <span class="cli-sep">·</span>
+                <button class="btn-link cli-desfazer" @onclick="DesfazerCliente">
+                    <Icone Nome="desfazer" /> desfazer
+                </button>
+            </div>
+        }
+        else
+        {
+            <div class="lembranca-cliente cli-oferta">
+                <span>@sugestao.Texto</span>
+                <button class="btn-ghost" @onclick="AplicarCliente">Usar contato e condições</button>
+            </div>
+        }
     }
 </div>
-<div class="panel" style="margin-bottom:14px">
-    <h2 style="margin:0 0 12px; font-size:15px">Proposta</h2>
+
+<div class="panel cond-cartao @(_editandoCondicoes ? "editando" : "")">
+    <div class="cond-cabeca">
+        <h2>Condições</h2>
+        @if (_editandoCondicoes)
+        {
+            <span class="nota ajuda">o que sai no cabeçalho e nas condições do documento</span>
+            <span class="cond-espaco"></span>
+            <button class="btn-ghost cond-botao" @onclick="FecharCondicoes">fechar edição</button>
+        }
+        else
+        {
+            <span class="nota ajuda">clique num pedaço para editar só ele</span>
+            <span class="cond-espaco"></span>
+            <button class="btn-ghost cond-botao" @onclick="AbrirCondicoes">editar condições</button>
+        }
+    </div>
+
+    @if (!_editandoCondicoes)
+    {
+        var chips = ChipsDasCondicoes();
+        var texto = TextoDasCondicoes();
+        var verdes = chips.Concat(texto).Where(PedacoLembrado).ToList();
+
+        <div class="cond-resumo">
+        @* o que muda preço e impostos vem primeiro, cada um num chip: num
+           resumo corrido ele se perderia no meio do resto *@
+        <div class="cond-chips" aria-label="O que muda o preço e os impostos">
+            @foreach (var chip in chips)
+            {
+                var pedaco = chip;
+                <button class="cond-chip @(PedacoLembrado(pedaco) ? "lembrado" : "") @(pedaco.Falta ? "falta" : "")"
+                        title="@(pedaco.Titulo.Length > 0 ? pedaco.Titulo : null)"
+                        @onclick="() => IrAoPedaco(pedaco)">
+                    <span class="cond-chip-rotulo">@pedaco.Rotulo</span>
+                    <span class="cond-chip-valor">@pedaco.Valor</span>
+                </button>
+            }
+        </div>
+
+        @if (verdes.Count > 0)
+        {
+            <div class="cond-confirmar">
+                <span class="cond-confirmar-texto">Em verde: veio @OrigemDosVerdes(verdes). Confira antes de seguir.</span>
+                <button class="btn-ghost cond-botao btn-confirmar" @onclick="ConfirmarCondicoes">
+                    <Icone Nome="ok" /> confirmar
+                </button>
+            </div>
+        }
+
+        <p class="cond-texto">
+            @* o separador vai colado no pedaço de antes: a linha quebra depois
+               do "·", e nenhuma linha começa com ele *@
+            @for (var i = 0; i < texto.Count; i++)
+            {
+                var pedaco = texto[i];
+                var ultimo = i == texto.Count - 1;
+                <span class="cond-item"><button class="cond-pedaco @(PedacoLembrado(pedaco) ? "lembrado" : "") @(pedaco.Falta ? "falta" : "")"
+                        title="@(pedaco.Titulo.Length > 0 ? pedaco.Titulo : pedaco.Rotulo)"
+                        @onclick="() => IrAoPedaco(pedaco)">@pedaco.Valor</button>@if (!ultimo) {<span class="cond-sep">&nbsp;·</span>}</span>@(ultimo ? "" : " ")
+            }
+        </p>
+        </div>
+    }
+    else
+    {
+    <div class="cond-form">
+    <h3 class="cond-sub">Proposta</h3>
     <div class="form3">
         <label>@Campo("Número da proposta", "D4 · pricing E6")
-            <input class="cell" placeholder="@($"{_proximoNumero} (gera ao salvar)")"
+            <input id="f-numero" class="cell" placeholder="@($"{_proximoNumero} (gera ao salvar)")"
                    @bind="_proposta.Numero" /></label>
         <label>@Campo("Revisão", "pricing E7")
-            <input class="cell" @bind="_proposta.Revisao" /></label>
+            <input id="f-revisao" class="cell" @bind="_proposta.Revisao" /></label>
         @* a data é guardada como texto (aaaa-mm-dd), que é o formato do próprio
            campo — por isso value/onchange em vez de @@bind com DateTime *@
         <label>@Campo("Data")
-            <input class="cell" type="date" value="@_proposta.Data"
+            <input id="f-data" class="cell" type="date" value="@_proposta.Data"
                    @onchange="e => _proposta.Data = e.Value?.ToString() ?? string.Empty" /></label>
-        <label>@Campo("Data de fechamento")
-            <input class="cell" type="date" value="@_proposta.DataFechamento"
-                   @onchange="e => _proposta.DataFechamento = e.Value?.ToString() ?? string.Empty" /></label>
         <label>@Campo("Preparada por", "pricing E9")
-            <input class="cell" @bind="_proposta.PreparadaPor" /></label>
+            <input id="f-preparada" class="cell" @bind="_proposta.PreparadaPor" /></label>
         <label>@Campo("Idioma da proposta")
-            <select id="f-idioma" class="cell" @bind="_proposta.Idioma">
+            <select id="f-idioma" class="@CelulaDaCondicao("idioma")" title="@TituloDoLembrado("idioma")"
+                    @bind="_proposta.Idioma" @bind:after='() => Editou("idioma")'>
                 @foreach (var x in ListasDaProposta.Idiomas)
                 {
                     <option value="@x">@x</option>
                 }
             </select></label>
         <label>@Campo("Venda para", "pricing J4")
-            <select class="cell" @bind="_proposta.VendaPara">
+            <select id="f-venda-para" class="@CelulaDaCondicao("venda para")" title="@TituloDoLembrado("venda para")"
+                    @bind="_proposta.VendaPara" @bind:after='() => Editou("venda para")'>
                 @foreach (var x in ListasDaProposta.VendaPara)
                 {
                     <option value="@x">@x</option>
                 }
             </select></label>
         <label>@Campo("Destino", "pricing J5")
-            <select class="cell" @bind="_proposta.Destino">
+            <select id="f-destino" class="@CelulaDaCondicao("destino")" title="@TituloDoLembrado("destino")"
+                    @bind="_proposta.Destino" @bind:after='() => Editou("destino")'>
                 @foreach (var x in ListasDaProposta.Destinos)
                 {
                     <option value="@x">@x</option>
                 }
             </select></label>
         <label>@Campo("País de destino")
-            <select class="cell" @bind="_proposta.PaisDestino">
+            <select id="f-pais-destino" class="@CelulaDaCondicao("país de destino")" title="@TituloDoLembrado("país de destino")"
+                    @bind="_proposta.PaisDestino" @bind:after='() => Editou("país de destino")'>
                 @foreach (var x in ListasDaProposta.Paises)
                 {
                     <option value="@x">@x</option>
@@ -370,8 +492,9 @@
         @* o contato do representante não aparece aqui de propósito: ele é
            guardado com a proposta e sai no documento *@
         <label>@Campo("Representante", "pricing P5")
-            <select class="cell" value="@_proposta.Representante"
-                    @onchange="e => EscolherRepresentante(e.Value?.ToString() ?? string.Empty)">
+            <select id="f-representante" class="@CelulaDaCondicao("representante")" title="@TituloDoLembrado("representante")"
+                    value="@_proposta.Representante"
+                    @onchange='e => { EscolherRepresentante(e.Value?.ToString() ?? string.Empty); Editou("representante"); }'>
                 <option value="">— escolher —</option>
                 @foreach (var grupo in ListasDaProposta.Representantes.GroupBy(r => r.Grupo))
                 {
@@ -384,9 +507,11 @@
                 }
             </select></label>
         <label>@Campo("Validade (dias)")
-            <input class="cell num" type="number" min="0" @bind="_proposta.ValidadeDias" /></label>
+            <input id="f-validade" class="@(CelulaDaCondicao("validade") + " num")" title="@TituloDoLembrado("validade")" type="number" min="0"
+                   @bind="_proposta.ValidadeDias" @bind:after='() => Editou("validade")' /></label>
         <label>@Campo("Prazo de entrega (dias)")
-            <input class="cell num" type="number" min="0" @bind="_proposta.PrazoEntregaDias" /></label>
+            <input id="f-prazo" class="@(CelulaDaCondicao("prazo") + " num")" title="@TituloDoLembrado("prazo")" type="number" min="0"
+                   @bind="_proposta.PrazoEntregaDias" @bind:after='() => Editou("prazo")' /></label>
     </div>
     <div style="margin-top:12px">
         <button class="btn-link" @onclick="() => _maisCampos = !_maisCampos">
@@ -404,10 +529,11 @@
     {
     <div class="form3" style="margin-top:10px">
         <label>@Campo("Ano")
-            <input class="cell num" @bind="_proposta.Ano" /></label>
+            <input id="f-ano" class="cell num" @bind="_proposta.Ano" /></label>
         <label>@Campo("BU (empresa emissora)", "pricing E8")
-            <select class="cell" value="@ListasDaProposta.CodigoDaBu(_proposta.Bu)"
-                    @onchange="e => _proposta.Bu = e.Value?.ToString() ?? string.Empty">
+            <select id="f-bu" class="@CelulaDaCondicao("BU")" title="@TituloDoLembrado("BU")"
+                    value="@ListasDaProposta.CodigoDaBu(_proposta.Bu)"
+                    @onchange='e => { _proposta.Bu = e.Value?.ToString() ?? string.Empty; Editou("BU"); }'>
                 @foreach (var (codigo, rotulo) in ListasDaProposta.Bus)
                 {
                     <option value="@codigo"
@@ -415,49 +541,55 @@
                 }
             </select></label>
         <label>@Campo("Fase da proposta")
-            <select class="cell" @bind="_proposta.Fase">
+            <select id="f-fase" class="cell" @bind="_proposta.Fase">
                 @foreach (var x in ListasDaProposta.Fases)
                 {
                     <option value="@x">@x</option>
                 }
             </select></label>
         <label>@Campo("Categoria")
-            <select class="cell" @bind="_proposta.Categoria">
+            <select id="f-categoria" class="@CelulaDaCondicao("categoria")" title="@TituloDoLembrado("categoria")"
+                    @bind="_proposta.Categoria" @bind:after='() => Editou("categoria")'>
                 @foreach (var x in ListasDaProposta.Categorias)
                 {
                     <option value="@x">@x</option>
                 }
             </select></label>
         <label>@Campo("Produto")
-            <select class="cell" @bind="_proposta.Produto">
+            <select id="f-produto" class="@CelulaDaCondicao("produto")" title="@TituloDoLembrado("produto")"
+                    @bind="_proposta.Produto" @bind:after='() => Editou("produto")'>
                 @foreach (var x in ListasDaProposta.Produtos)
                 {
                     <option value="@x">@x</option>
                 }
             </select></label>
         <label>@Campo("Segmento de mercado")
-            <select class="cell" @bind="_proposta.MarketSegment">
+            <select id="f-segmento" class="@CelulaDaCondicao("segmento")" title="@TituloDoLembrado("segmento")"
+                    @bind="_proposta.MarketSegment" @bind:after='() => Editou("segmento")'>
                 @foreach (var x in ListasDaProposta.Segmentos)
                 {
                     <option value="@x">@x</option>
                 }
             </select></label>
         <label>@Campo("Portal", "pricing P4")
-            <select class="cell" @bind="_proposta.Portal">
+            <select id="f-portal" class="@CelulaDaCondicao("portal")" title="@TituloDoLembrado("portal")"
+                    @bind="_proposta.Portal" @bind:after='() => Editou("portal")'>
                 @foreach (var x in ListasDaProposta.Portais)
                 {
                     <option value="@x">@x</option>
                 }
             </select></label>
         <label>@Campo("Fiança / Seguro Garantia", "pricing P3")
-            <select class="cell" @bind="_proposta.Fianca">
+            <select id="f-fianca" class="@CelulaDaCondicao("fiança")" title="@TituloDoLembrado("fiança")"
+                    @bind="_proposta.Fianca" @bind:after='() => Editou("fiança")'>
                 <option value="Não">Não</option>
                 <option value="Sim">Sim</option>
             </select></label>
         @* o regime do cliente só existe no Brasil; fora dele fica "Sem
            benefício", e a equipe ainda pode trocar se precisar *@
         <label>@Campo("Benefícios", "pricing J9")
-            <select class="cell" @bind="_proposta.Beneficio">
+            <select id="f-beneficio" class="@CelulaDaCondicao("benefício")" title="@TituloDoLembrado("benefício")"
+                    @bind="_proposta.Beneficio" @bind:after='() => Editou("benefício")'>
                 @foreach (var x in ListasDaProposta.Beneficios)
                 {
                     <option value="@x">@x</option>
@@ -469,8 +601,9 @@
             }
         </label>
         <label>@Campo("Representante 2", "pricing P6")
-            <select class="cell" value="@_proposta.Representante2"
-                    @onchange="e => EscolherRepresentante2(e.Value?.ToString() ?? string.Empty)">
+            <select id="f-representante2" class="@CelulaDaCondicao("representante 2")" title="@TituloDoLembrado("representante 2")"
+                    value="@_proposta.Representante2"
+                    @onchange='e => { EscolherRepresentante2(e.Value?.ToString() ?? string.Empty); Editou("representante 2"); }'>
                 <option value="">— nenhum —</option>
                 @foreach (var grupo in ListasDaProposta.Representantes.GroupBy(r => r.Grupo))
                 {
@@ -489,12 +622,13 @@
        sua seção, o incoterm com a descrição do lugar e, logo abaixo dele, a
        frase de armado ou desarmado *@
     <div style="margin-top:18px; padding-top:16px; border-top:1px solid var(--border)">
-        <h3 style="margin:0 0 12px; font-size:13.5px; letter-spacing:.02em">Entrega e pagamento</h3>
+        <h3 class="cond-sub">Entrega e pagamento</h3>
 
         <div class="form3">
             <label>@Campo("Condição de pagamento")
-                <select id="f-pagamento" class="cell" value="@(_pagamentoLivre ? OutroPagamento : _proposta.CondicaoPagamento)"
-                        @onchange="e => EscolherPagamento(e.Value?.ToString() ?? string.Empty)">
+                <select id="f-pagamento" class="@CelulaDaCondicao("pagamento")" title="@TituloDoLembrado("pagamento")"
+                        value="@(_pagamentoLivre ? OutroPagamento : _proposta.CondicaoPagamento)"
+                        @onchange='e => { EscolherPagamento(e.Value?.ToString() ?? string.Empty); Editou("pagamento"); }'>
                     <option value="">— escolher —</option>
                     @foreach (var c in _condicoes)
                     {
@@ -506,8 +640,9 @@
                 </select></label>
 
             <label>@Campo("Entrega (Incoterm 2020)")
-                <select id="f-incoterm" class="cell" value="@(_incotermLivre ? OutroIncoterm : _proposta.Incoterm)"
-                        @onchange="e => EscolherIncoterm(e.Value?.ToString() ?? string.Empty)">
+                <select id="f-incoterm" class="@CelulaDaCondicao("incoterm")" title="@TituloDoLembrado("incoterm")"
+                        value="@(_incotermLivre ? OutroIncoterm : _proposta.Incoterm)"
+                        @onchange='e => { EscolherIncoterm(e.Value?.ToString() ?? string.Empty); Editou("incoterm"); }'>
                     <option value="">— escolher —</option>
                     @foreach (var i in ListasDaProposta.Incoterms)
                     {
@@ -519,7 +654,8 @@
                 </select></label>
 
             <label>@Campo("Entrega do equipamento")
-                <select id="f-armado" class="cell" @bind="_proposta.Armado">
+                <select id="f-armado" class="@CelulaDaCondicao("entrega")" title="@TituloDoLembrado("entrega")"
+                        @bind="_proposta.Armado" @bind:after='() => Editou("entrega")'>
                     <option value="">— escolher —</option>
                     @foreach (var (codigo, _) in ListasDaProposta.Armados)
                     {
@@ -545,7 +681,7 @@
             @* CIF, DAP e DDP não dizem onde: o modelo deixa "Puerto de DESTINO
                (PAÍS DE DESTINO)" para alguém preencher. O rótulo diz o que
                falta — só o lugar, porque o "Puerto de" já está na frase *@
-            <label style="display:block; margin-top:12px">@Campo(RotuloDoDestino)
+            <label class="cond-lugar">@Campo(RotuloDoDestino)
                 <input id="f-destino-incoterm" class="cell" style="width:100%"
                        placeholder="@ExemploDoDestino" @bind="_proposta.IncotermDestino" /></label>
         }
@@ -603,43 +739,33 @@
             — já com PPR, ELG e provisões.
         </p>
     }
+
+    <div class="cond-pe">
+        <button class="btn-ghost cond-botao" @onclick="FecharCondicoes">fechar edição</button>
+    </div>
+    </div>
+    }
 </div>
 
-<div class="panel" style="margin-bottom:14px">
-    <h2 style="margin:0; font-size:15px">Contatos Howden (no documento)</h2>
-    <p class="subtitle ajuda" style="margin:0 0 14px">
+<div class="panel contato-cartao">
+    <h2 class="cli-titulo">Contatos Howden (no documento)</h2>
+    <p class="subtitle ajuda" style="margin:-6px 0 12px">
         Até dois, do quadro da proposta. @ListasDaProposta.DiretorDeVendas.Nome
         (@ListasDaProposta.DiretorDeVendas.Cargo) sai sempre, junto com o contato
         do representante — nenhum dos dois precisa ser escolhido aqui.
     </p>
 
-    @Contato("Contato 1", _proposta.ContatoNome, n => EscolherContato(n, 1), "f-contato")
-    <div class="form3">
-        <label>@Campo("Nome")<input class="cell" @bind="_proposta.ContatoNome" /></label>
-        <label>@Campo("Cargo")<input class="cell" @bind="_proposta.ContatoCargo" /></label>
-        <label>@Campo("Área")<input class="cell" @bind="_proposta.ContatoArea" /></label>
-        <label>@Campo("E-mail")<input class="cell" @bind="_proposta.ContatoEmail" /></label>
-        <label>@Campo("Telefones")<input class="cell" @bind="_proposta.ContatoTelefones" /></label>
-    </div>
+    @ContatoNoCartao(1)
 
     @if (_mostrarContato2 || _proposta.Contato2Nome.Trim().Length > 0)
     {
-    <div style="margin-top:18px; padding-top:16px; border-top:1px solid var(--border)">
-        @Contato("Contato 2 (opcional)", _proposta.Contato2Nome, n => EscolherContato(n, 2))
-        <div class="form3">
-            <label>@Campo("Nome")<input class="cell" @bind="_proposta.Contato2Nome" /></label>
-            <label>@Campo("Cargo")<input class="cell" @bind="_proposta.Contato2Cargo" /></label>
-            <label>@Campo("Área")<input class="cell" @bind="_proposta.Contato2Area" /></label>
-            <label>@Campo("E-mail")<input class="cell" @bind="_proposta.Contato2Email" /></label>
-            <label>@Campo("Telefones")<input class="cell" @bind="_proposta.Contato2Telefones" /></label>
+        <div class="contato-segundo">
+            @ContatoNoCartao(2)
         </div>
-    </div>
     }
     else
     {
-        <button class="btn-link" style="margin-top:12px" @onclick="() => _mostrarContato2 = true">
-            + segundo contato (opcional)
-        </button>
+        <button class="btn-link contato-mais" @onclick="AcrescentarContato2">+ segundo contato (opcional)</button>
     }
 </div>
 
@@ -1174,16 +1300,18 @@
     }
     @if (_abaItem == "opcionais")
     {
-<div class="panel" style="margin-bottom:14px">
-    <div class="toolbar" style="flex-wrap:wrap">
-        <h2 style="margin:0; font-size:15px">Opcionais</h2>
-        <span class="subtitle ajuda" style="margin:0">
-            o que o cliente pode comprar ou não — fora do preço fechado
-        </span>
-        <span style="flex:1"></span>
+    @* a aba Opcionais (item 18): um seletor só, com uma lista por grupo, e a
+       tabela do que foi escolhido como lista principal. A conta é a de antes:
+       o custo vem de CustoDaProposta.Opcionais e o preço de PrecoDoOpcional *@
+<div class="panel opc-painel">
+    <div class="opc-cabeca">
+        <h2>Opcionais</h2>
+        <span class="subtitle ajuda">o que o cliente pode comprar ou não — fora do preço fechado</span>
+        <span class="opc-espaco"></span>
         @if (TotalDosOpcionais is { } totalOpc && totalOpc > 0m)
         {
-            <span class="val-count">@Dinheiro(totalOpc) em opcionais</span>
+            @* é preço ao cliente (custo × fator), na moeda de venda, como a coluna da tabela *@
+            <span class="val-count">@DinheiroVenda(totalOpc) em opcionais</span>
         }
     </div>
 
@@ -1195,7 +1323,12 @@
         }
         else
         {
-            <p class="subtitle ajuda" style="margin:12px 0 10px">
+            var indice = PosicaoValida;
+            var item = _proposta.Itens[indice];
+            var opcionais = _custo.Opcionais(item, _proposta.Moeda);
+            var grupos = GruposParaAdicionar(item);
+
+            <p class="subtitle ajuda opc-ajuda">
                 São as mesmas listas do escopo, menos o modelo: o equipamento sai completo e a
                 peça fica <strong>como opcional</strong>, para o cliente decidir. Eles
                 <strong>não entram no preço fechado</strong> nem no código — o preço de cada um é
@@ -1204,128 +1337,121 @@
                 que é a mesma margem, comissão e imposto do que já está fechado.
             </p>
 
-            @for (var i = 0; i < _proposta.Itens.Count; i++)
-            {
-                var indice = i;
-                if (indice != PosicaoValida) { continue; }
-                var item = _proposta.Itens[indice];
-                var opcionais = _custo.Opcionais(item, _proposta.Moeda);
-
-                <div class="panel" style="margin:0 0 14px; padding:14px">
-                    <div class="toolbar" style="flex-wrap:wrap; margin-bottom:10px">
-                        <strong>Item @((indice + 1).ToString("D2"))</strong>
-                        <span class="subtitle">
-                            @(ModeloDe(item) is { } m ? m.Rotulo : "sem modelo escolhido")
-                        </span>
-                        <span style="flex:1"></span>
-                        @if (opcionais.Count > 0)
-                        {
-                            <span class="val-count">@Plural(opcionais.Count, "opcional", "opcionais")</span>
-                        }
-                    </div>
-
-                    @foreach (var lista in ListasDeOpcionais)
-                    {
-                        var grupo = lista;
-                        var reais = OpcoesReais(grupo);
-                        if (reais.Count == 0) { continue; }
-
-                        var posta = item.Opcionais.GetValueOrDefault(grupo, "");
-
-                        <div class="toolbar" style="flex-wrap:wrap; border-top:1px solid var(--border); padding-top:10px">
-                            <strong style="min-width:210px; font-size:12.5px">@Exibir(grupo)</strong>
-                            <select class="cell" style="min-width:260px" value="@posta"
-                                    @onchange="e => MudarOpcional(item, grupo, e.Value?.ToString() ?? string.Empty)">
-                                <option value="">— nenhum —</option>
-                                @foreach (var o in reais)
-                                {
-                                    <option value="@o.Valor" selected="@(o.Valor == posta)">@o.Valor</option>
-                                }
-                            </select>
-
-                            @if (posta.Length > 0)
-                            {
-                                var linha = Resolver(item, grupo, posta);
-                                @PrecoNaLista(item, $"opc:{grupo}", "", linha.Valor, linha.Origem)
-                            }
-                        </div>
-                    }
-
-                    @* ----- motor opcional ----- *@
-                    <div class="toolbar" style="flex-wrap:wrap; border-top:1px solid var(--border); padding-top:10px">
-                        <strong style="min-width:210px; font-size:12.5px">Motor elétrico</strong>
-                        <select class="cell" style="min-width:320px" value="@item.MotorOpcionalId"
-                                @onchange="e => item.MotorOpcionalId = e.Value?.ToString() ?? string.Empty">
-                            <option value="">— nenhum —</option>
-                            @foreach (var mo in MotoresDaSerie(item))
-                            {
-                                <option value="@mo.Id" selected="@(mo.Id == item.MotorOpcionalId)">@mo.Descricao</option>
-                            }
-                        </select>
-
-                        @if (_custo.MotorOpcionalDe(item) is { } motorOpc)
-                        {
-                            @PrecoNaLista(item, "opc:motor", motorOpc.Codigo,
-                                DadosExcel.Numero(EscopoProposta.PrecoDoMotor(motorOpc, _proposta.Moeda)),
-                                "catálogo de motores")
-                        }
-                    </div>
-
-                    @* ----- instrumentação opcional ----- *@
-                    <div style="border-top:1px solid var(--border); padding-top:10px; margin-top:10px">
-                        <strong style="font-size:12.5px">@Exibir(ListaDaInstrumentacao)</strong>
-                        @foreach (var o in OpcoesReais(ListaDaInstrumentacao))
-                        {
-                            var opcao = o;
-                            var marcada = item.InstrumentacaoOpcional.Contains(opcao.Valor);
-                            var linha = Resolver(item, opcao.Grupo, opcao.Valor);
-
-                            <div class="toolbar" style="flex-wrap:wrap; margin-top:6px">
-                                <label style="display:flex; align-items:center; gap:8px; min-width:380px">
-                                    <input type="checkbox" checked="@marcada"
-                                           @onchange="e => MarcarInstrumentacaoOpcional(item, opcao.Valor, (bool)(e.Value ?? false))" />
-                                    <span>@opcao.Valor</span>
-                                </label>
-                                @if (marcada)
-                                {
-                                    @PrecoNaLista(item, $"opc:instr:{opcao.Valor}", "", linha.Valor, linha.Origem)
-                                }
-                            </div>
-                        }
-                    </div>
-
+            <div class="opc-equip">
+                <div class="opc-equip-cabeca">
+                    <strong>Equip. @(indice + 1)</strong>
+                    <span class="opc-modelo">· @(ModeloDe(item) is { } m ? m.Rotulo : "sem modelo escolhido") · @item.Quantos un.</span>
+                    <span class="opc-espaco"></span>
                     @if (opcionais.Count > 0)
                     {
-                        <div class="panel" style="padding:0; overflow-x:auto; margin:12px 0 0">
-                            <table class="grid">
-                                <thead>
-                                    <tr>
-                                        <th class="nowrap">Opcional</th>
-                                        <th class="nowrap right">Qtd.</th>
-                                        <th class="nowrap right">Custo unit. @_proposta.Moeda.Rotulo()</th>
-                                        @* o valor da coluna é o preço AO CLIENTE (custo × fator), na moeda de venda *@
-                                        <th class="nowrap right">Preço ao cliente (@_proposta.MoedaVenda.Rotulo())</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach (var linha in opcionais)
-                                    {
-                                        var unitario = _custo.CustoDoOpcional(item, linha);
-                                        <tr>
-                                            <td>@linha.Nome(EscopoTextos)</td>
-                                            <td class="nowrap right">@item.Quantos</td>
-                                            <td class="nowrap right">@Dinheiro(unitario)</td>
-                                            <td class="nowrap right">
-                                                <strong>@DinheiroVenda(PrecoDoOpcional(unitario * item.Quantos))</strong>
-                                            </td>
-                                        </tr>
-                                    }
-                                </tbody>
-                            </table>
-                        </div>
+                        <span class="val-count">@Plural(opcionais.Count, "opcional", "opcionais")</span>
                     }
                 </div>
-            }
+
+                <div class="opc-adicionar-linha">
+                    @if (grupos.Count > 0)
+                    {
+                        @* volta ao vazio depois de cada escolha (o @key sobe em AdicionarOpcional) *@
+                        <select class="cell opc-adicionar" @key="_adicionarOpcional" aria-label="Adicionar opcional"
+                                @onchange="e => AdicionarOpcional(item, e.Value?.ToString() ?? string.Empty)">
+                            <option value="">+ Adicionar opcional…</option>
+                            @foreach (var (rotulo, opcoes) in grupos)
+                            {
+                                <optgroup label="@rotulo">
+                                    @foreach (var o in opcoes)
+                                    {
+                                        <option value="@o.Valor">@o.Texto</option>
+                                    }
+                                </optgroup>
+                            }
+                        </select>
+                    }
+                    else
+                    {
+                        <span class="nota">todas as listas já têm opcional — troque a variante na linha</span>
+                    }
+                </div>
+
+                @if (opcionais.Count == 0)
+                {
+                    <div class="opc-vazio">Nenhum opcional — use <strong>+ Adicionar opcional</strong></div>
+                }
+                else
+                {
+                    <table class="grid opc-tabela">
+                        <colgroup>
+                            <col />
+                            <col class="col-qtd" />
+                            <col class="col-custo" />
+                            <col class="col-preco" />
+                            <col class="col-tirar" />
+                        </colgroup>
+                        <thead>
+                            <tr>
+                                <th>Opcional e variante</th>
+                                <th class="right">Qtd.</th>
+                                <th class="right">Custo unit. @_proposta.Moeda.Rotulo()</th>
+                                @* o valor da coluna é o preço AO CLIENTE (custo × fator, vezes a
+                                   quantidade), na moeda de venda *@
+                                <th class="right">Preço ao cliente (@_proposta.MoedaVenda.Rotulo())</th>
+                                <th><span class="opc-escondido">Remover</span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var l in opcionais)
+                            {
+                                var linha = l;
+                                var unitario = _custo.CustoDoOpcional(item, linha);
+                                var variantes = VariantesDoOpcional(item, linha);
+                                var semCusto = Efetivo(item, linha.Chave, linha.Valor) is null;
+                                var notaExtra = NotaExtraDoOpcional(item, linha.Chave);
+                                <tr>
+                                    <td>
+                                        <div class="opc-nome" title="sai no documento como: @linha.Nome(EscopoTextos)">
+                                            <strong>@NomeDoOpcional(linha)</strong>
+                                            @if (notaExtra is { Length: > 0 })
+                                            {
+                                                <span class="nota">· @notaExtra</span>
+                                            }
+                                        </div>
+                                        @if (variantes.Count > 0)
+                                        {
+                                            var atual = linha.Chave == "opc:motor" ? item.MotorOpcionalId : linha.Opcao;
+                                            <select class="cell opc-variante" aria-label="Variante de @NomeDoOpcional(linha)"
+                                                    @onchange="e => TrocarVariante(item, linha, e.Value?.ToString() ?? string.Empty)">
+                                                @foreach (var (valor, texto) in variantes)
+                                                {
+                                                    <option value="@valor" selected="@(valor == atual)">@texto</option>
+                                                }
+                                            </select>
+                                        }
+                                        else
+                                        {
+                                            <div class="opc-fixa">@VarianteFixa(item, linha)</div>
+                                        }
+                                        @if (semCusto)
+                                        {
+                                            @* o porquê de não ter custo ("escolha o motor: o custo vem da
+                                               potência dele"), em âmbar: é o que diz o que fazer *@
+                                            <span class="nota texto-alerta opc-origem opc-sem-custo">@(linha.Origem.Length > 0 ? linha.Origem : "sem custo no cadastro") — digite o custo ao lado</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="nota opc-origem" title="@linha.Origem">@(EhManual(item, linha.Chave) ? "custo à mão" : linha.Origem)</span>
+                                        }
+                                    </td>
+                                    <td class="right">@item.Quantos</td>
+                                    <td class="col-custo">@Preco(item, linha.Chave, linha.Valor)</td>
+                                    <td class="right opc-preco"><strong>@DinheiroVenda(PrecoDoOpcional(unitario * item.Quantos))</strong></td>
+                                    <td class="right">
+                                        <button class="btn-link opc-remover" @onclick="() => RemoverOpcional(item, linha)">Remover</button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
         }
 </div>
 
@@ -1878,7 +2004,7 @@
     <div class="aviso aviso-info preco-cambio">
         <div class="toolbar preco-cambio-linha">
             <strong>Preço ao cliente em</strong>
-            <div class="seg" role="group" aria-label="Moeda do preço ao cliente">
+            <div id="f-moeda-venda" class="seg" role="group" aria-label="Moeda do preço ao cliente">
                 @foreach (var m in Moedas.DePreco)
                 {
                     var moeda = m;
@@ -3903,6 +4029,77 @@
                 </select>
             </label>
         </div>
+    </text>;
+
+    /// <summary>
+    /// Um contato Howden no cartão (item 12): lido numa linha, com "trocar" (a
+    /// lista do quadro) e "editar" (os campos); sem nome, a lista já aberta.
+    /// </summary>
+    private RenderFragment ContatoNoCartao(int qual) => @<text>
+        @{
+            var c = DadosDoContato(qual);
+            var vazio = c.Nome.Trim().Length == 0;
+        }
+        @if (_editandoContato == qual)
+        {
+            <div class="contato-edita">
+                <div class="contato-rotulo">Contato @qual</div>
+                <div class="form3">
+                    <label>@Campo("Nome")<input class="cell" value="@c.Nome" @onchange='e => MudarContato(qual, "nome", e.Value?.ToString() ?? "")' /></label>
+                    <label>@Campo("Cargo")<input class="cell" value="@c.Cargo" @onchange='e => MudarContato(qual, "cargo", e.Value?.ToString() ?? "")' /></label>
+                    <label>@Campo("Área")<input class="cell" value="@c.Area" @onchange='e => MudarContato(qual, "area", e.Value?.ToString() ?? "")' /></label>
+                    <label>@Campo("E-mail")<input class="cell" value="@c.Email" @onchange='e => MudarContato(qual, "email", e.Value?.ToString() ?? "")' /></label>
+                    <label>@Campo("Telefones")<input class="cell" value="@c.Telefones" @onchange='e => MudarContato(qual, "telefones", e.Value?.ToString() ?? "")' /></label>
+                </div>
+                <div class="contato-acoes">
+                    <button class="btn-link" @onclick="FecharContato">fechar</button>
+                </div>
+            </div>
+        }
+        else if (_trocandoContato == qual || vazio)
+        {
+            <div class="contato-troca">
+                @Contato(qual == 1 ? "Contato 1" : "Contato 2 (opcional)", c.Nome, n => EscolherDoQuadro(n, qual), qual == 1 ? "f-contato" : null)
+                <div class="contato-acoes">
+                    @if (vazio)
+                    {
+                        <button class="btn-link" @onclick="() => EditarContato(qual)">digitar um contato fora do quadro</button>
+                        @if (qual == 2)
+                        {
+                            <button class="btn-link" @onclick="FecharContato">cancelar</button>
+                        }
+                    }
+                    else
+                    {
+                        <button class="btn-link" @onclick="FecharContato">cancelar</button>
+                    }
+                </div>
+            </div>
+        }
+        else
+        {
+            var cargo = string.Join(" · ", new[] { c.Cargo, c.Area }.Where(x => x.Trim().Length > 0));
+            var meios = string.Join(" · ", new[] { c.Email, c.Telefones }.Where(x => x.Trim().Length > 0));
+            var lembrado = qual == 1 && EhLembrado("contato howden");
+            <div class="contato-linha @(lembrado ? "lembrado" : "")" title="@(lembrado ? TituloDoLembrado("contato howden") : null)">
+                <span class="contato-rotulo">Contato @qual</span>
+                <div class="contato-dados">
+                    <div class="contato-nome"><strong>@c.Nome</strong>@if (cargo.Length > 0) {<span class="contato-cargo"> · @cargo</span>}</div>
+                    @if (meios.Length > 0)
+                    {
+                        <div class="nota">@meios</div>
+                    }
+                </div>
+                <div class="contato-acoes">
+                    <button class="btn-link" @onclick="() => TrocarContato(qual)">trocar</button>
+                    <button class="btn-link" @onclick="() => EditarContato(qual)">editar</button>
+                    @if (qual == 2)
+                    {
+                        <button class="btn-link" @onclick="TirarContato2">tirar</button>
+                    }
+                </div>
+            </div>
+        }
     </text>;
 
     // ---------- entrega e pagamento ----------
