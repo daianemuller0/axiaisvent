@@ -3,3 +3,169 @@
    cada pista escreve só no seu, e o app.css não vira ponto de conflito.
    Use os tokens do app.css (--primary, --warn-*, --info-*, --border...) e escreva
    as regras sob .proposta, para não mexer nas outras telas. */
+
+/* ---- etapa Preço (item 10) ----
+   Três painéis: as entradas numa faixa no alto (o Calcular preço na linha do
+   título, as três margens com o selo de cada uma e a moeda numa caixa neutra),
+   uma linha por equipamento com as linhas de custo recolhidas e a memória de
+   cálculo recolhida. Tudo cabe na coluna do meio a 1366 com o menu do app
+   aberto (cerca de 720 px), sem rolagem lateral. */
+.proposta .preco-entradas, .proposta .preco-custos, .proposta .preco-memoria-painel { padding: 16px 18px; margin-bottom: 14px; }
+.proposta .preco-cabeca { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; margin-bottom: 12px; }
+.proposta .preco-cabeca h2 { margin: 0; font-size: 15px; }
+.proposta .preco-modo { margin-left: auto; display: inline-flex; align-items: center; gap: 8px; flex: none; }
+.proposta .preco-rotulo { font-size: 12.5px; color: var(--muted); font-weight: 500; }
+.proposta .preco-rotulo .nota { font-size: 12px; }
+
+/* as três entradas: uma coluna para cada, o selo debaixo do campo. Com a
+   coluna de ~215 px, o selo vermelho cabe numa linha */
+.proposta .preco-faixa { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 18px; }
+.proposta .preco-campo { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
+.proposta .preco-entrada { display: inline-flex; align-items: center; gap: 6px; }
+.proposta .preco-entrada .cell { width: 84px; }
+.proposta .preco-campo-meta .preco-entrada .cell { width: 150px; }
+.proposta .preco-unid { color: var(--muted); font-size: 13px; }
+.proposta .preco-resultado { font-size: 12.5px; color: var(--muted); }
+.proposta .preco-resultado strong { color: var(--text); font-variant-numeric: tabular-nums; }
+.proposta .preco-selo {
+    display: inline-block; border: 1px solid; border-radius: 999px; padding: 0 9px;
+    font-size: 11.5px; font-weight: 600; line-height: 1.7; white-space: nowrap;
+}
+.proposta .preco-selo.ok { background: var(--ok-bg); border-color: var(--ok-bd); color: var(--ok-tx); }
+.proposta .preco-selo.fora { background: var(--err-bg); border-color: var(--err-bd); color: var(--err-tx); }
+@media (max-width: 700px) { .proposta .preco-faixa { grid-template-columns: 1fr; } }
+
+/* a moeda do preço e a taxa: caixa neutra, a conversão é o caso normal */
+.proposta .preco-cambio { margin-top: 14px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; }
+.proposta .preco-cambio-linha { margin: 0; flex-wrap: wrap; gap: 8px 16px; }
+.proposta .preco-cambio-linha strong { font-weight: 600; font-size: 13px; color: var(--text); }
+.proposta .preco-par { display: inline-flex; align-items: center; gap: 6px; flex: none; }
+.proposta .preco-sentido { width: auto; padding-right: 6px; }
+.proposta .preco-taxa { width: 96px; }
+.proposta .preco-seguranca { width: 56px; }
+.proposta .preco-cambio .taxa-origem { margin-top: 2px; }
+.proposta .preco-confira { font-size: 12.5px; color: var(--info-tx); font-variant-numeric: tabular-nums; }
+.proposta .preco-confira strong { font-weight: 600; }
+.proposta .preco-falta-taxa { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--err-tx); }
+.proposta .preco-oferta { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 8px; font-size: 12.5px; color: var(--info-tx); }
+.proposta .preco-oferta .btn-link { font-size: 12.5px; padding: 0; font-weight: 600; }
+
+/* uma linha por equipamento: o nome encolhe (reticências), a falta e a conta não */
+.proposta .preco-equip { border-top: 1px solid var(--border); }
+.proposta .preco-equip:first-of-type { border-top: none; }
+.proposta .preco-equip-linha { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; padding: 9px 2px; }
+.proposta .preco-equip-nome {
+    flex: 1 1 200px; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13.5px;
+}
+/* o separador leva os espaços no texto: copiado ou lido em voz alta, a linha continua legível */
+.proposta .preco-sep { color: #a3afbf; white-space: pre; }
+.proposta .preco-codigo { color: var(--muted); }
+.proposta .preco-falta { font-size: 12.5px; font-weight: 600; padding: 0; flex: none; }
+/* o link do que falta é âmbar como o resto do que falta, não azul de link */
+.proposta .btn-link.texto-alerta, .proposta .btn-link.texto-alerta:hover { color: var(--warn-tx); }
+.proposta .preco-equip-nome .preco-falta { font-size: 13px; }
+.proposta .preco-conta { flex: none; font-variant-numeric: tabular-nums; font-size: 13.5px; font-weight: 600; white-space: nowrap; }
+.proposta .preco-ver { flex: none; display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; padding: 0; white-space: nowrap; }
+.proposta .preco-ver .preco-seta { width: 13px; height: 13px; transform: rotate(-90deg); transition: transform .12s; }
+.proposta .preco-ver[aria-expanded=true] .preco-seta { transform: none; }
+.proposta .preco-equip.aberta { padding-bottom: 12px; }
+
+/* a tabela de linhas: largura fixa por coluna. Item e Código em %, o custo
+   com 160 px e a Escolha com o que sobra; a origem é a 2ª linha da escolha */
+.proposta .tabela-custo { table-layout: fixed; box-shadow: none; border-radius: var(--radius-sm); }
+.proposta .tabela-custo .col-item { width: 22%; }
+.proposta .tabela-custo .col-codigo { width: 14%; }
+.proposta .tabela-custo col.col-custo { width: 160px; }
+.proposta .tabela-custo th, .proposta .tabela-custo td { vertical-align: top; overflow-wrap: anywhere; }
+.proposta .tabela-custo td { line-height: 1.4; }
+.proposta .tabela-custo td.col-custo { padding: 5px 8px; vertical-align: middle; }
+.proposta .tabela-custo td.col-custo input.cell { max-width: none !important; width: auto; min-width: 0; flex: 1 1 auto; padding: 5px 8px; }
+.proposta .tabela-custo td.col-custo .dica-do-custo { display: block; text-align: right; margin-top: 2px; }
+.proposta .tabela-custo .preco-origem {
+    display: block; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.proposta .tabela-custo tbody tr:hover { background: transparent; }
+.proposta .tabela-custo tfoot td { background: #f7f9fc; border-top: 1px solid var(--border); border-bottom: none; font-size: 13px; }
+.proposta .tabela-custo tfoot td.right { padding-right: 14px; }
+
+.proposta .preco-total {
+    display: flex; align-items: baseline; justify-content: flex-end; flex-wrap: wrap; gap: 4px 12px;
+    border-top: 1px solid var(--border); padding-top: 12px; margin-top: 2px;
+}
+.proposta .preco-total strong { font-size: 14px; }
+.proposta .preco-total-valor { font-size: 15px; font-weight: 700; color: var(--primary); font-variant-numeric: tabular-nums; }
+
+/* a memória de cálculo: fechada, com o resultado no próprio título */
+.proposta .preco-memoria > summary {
+    cursor: pointer; list-style: none; display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 12px;
+}
+.proposta .preco-memoria > summary::-webkit-details-marker { display: none; }
+.proposta .preco-memoria > summary::before {
+    content: ""; width: 6px; height: 6px; flex: none; align-self: center; margin: 0 2px 2px 1px;
+    border-right: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor;
+    transform: rotate(-45deg); transition: transform .12s;
+}
+.proposta .preco-memoria[open] > summary::before { transform: rotate(45deg); }
+.proposta .preco-memoria-titulo { font-weight: 600; font-size: 14px; }
+.proposta .preco-memoria > summary:hover .preco-memoria-titulo { text-decoration: underline; }
+.proposta .preco-memoria > summary .nota { font-variant-numeric: tabular-nums; }
+.proposta .tabela-memoria { table-layout: fixed; box-shadow: none; border-radius: var(--radius-sm); margin-top: 12px; }
+.proposta .tabela-memoria .col-celula { width: 150px; }
+.proposta .tabela-memoria .col-valor { width: 160px; }
+.proposta .tabela-memoria .col-pct { width: 86px; }
+.proposta .tabela-memoria td { line-height: 1.4; overflow-wrap: anywhere; }
+/* número não quebra no meio ("25,00 / %") */
+.proposta .tabela-memoria td.right { overflow-wrap: normal; white-space: nowrap; }
+.proposta .tabela-memoria tbody tr:hover { background: transparent; }
+.proposta .tabela-memoria .preco-nota-impostos td { padding-top: 0; }
+.proposta .tabela-memoria .preco-convertido td { border-top: 1px solid #cdd6e3; }
+.proposta .preco-memoria-nota { margin: 10px 0 0; }
+
+/* ---- etapa Documentos (item 11) ----
+   O topo numa linha (o mesmo Gerar tudo do painel, o estado das pendências e,
+   depois de gerar, o "Marcar como enviada"), um cartão por equipamento e o
+   custo previsto numa linha que abre o pedido. */
+.proposta .docs-topo { padding: 14px 18px; margin-bottom: 14px; }
+.proposta .docs-topo-linha { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; }
+.proposta .docs-topo .split { width: auto; flex: none; }
+/* a seta abre o menu com a largura dele, e não a do botão */
+.proposta .docs-topo .split .menu-pop { right: auto; min-width: 230px; }
+.proposta .docs-estado { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 600; }
+.proposta .docs-estado.ok { color: var(--ok-tx); }
+.proposta .docs-estado.alerta { color: var(--warn-tx); }
+.proposta .docs-espaco { flex: 1; }
+.proposta .docs-topo-ajuda { margin: 8px 0 0; }
+
+.proposta .docs-comercial { padding: 16px 18px; margin-bottom: 14px; }
+.proposta .docs-cabeca { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; }
+.proposta .docs-cabeca h2 { margin: 0; font-size: 15px; }
+.proposta .docs-idioma { font-size: 12.5px; padding: 0 2px; }
+.proposta .docs-ajuda { margin: 6px 0 0; }
+
+.proposta .docs-equip {
+    border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 14px; margin-top: 10px;
+    background: #fff;
+}
+.proposta .docs-equip-cabeca { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 6px; font-size: 13.5px; }
+.proposta .docs-equip-num { color: var(--muted); font-variant-numeric: tabular-nums; }
+.proposta .docs-equip-num span:not(.texto-alerta) { color: var(--text); font-weight: 600; }
+.proposta .docs-editar { font-size: 12.5px; padding: 0; }
+/* a 1ª linha da descrição, em destaque: é o que o cliente lê primeiro */
+.proposta .docs-equip-titulo {
+    margin-top: 6px; padding: 6px 10px; border-left: 3px solid var(--primary); background: #f5f8fc;
+    border-radius: 0 6px 6px 0; font-weight: 600; font-size: 13.5px; line-height: 1.45; color: var(--text);
+}
+.proposta .docs-falta { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 6px; margin-top: 6px; font-size: 12.5px; font-weight: 600; }
+.proposta .docs-falta .btn-link { font-size: 12.5px; padding: 0 2px; font-weight: 400; }
+.proposta .docs-equip-pe { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 6px; margin-top: 6px; font-size: 12.5px; color: var(--muted); }
+.proposta .docs-sep { color: #a3afbf; }
+.proposta .docs-rascunho { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; padding: 0 2px; }
+.proposta .docs-texto { width: 100%; margin-top: 8px; font-family: inherit; line-height: 1.45; resize: vertical; }
+.proposta .docs-equip.editando { border-color: #cdd6e3; box-shadow: var(--shadow-sm); }
+
+.proposta .docs-custo-previsto { padding: 12px 18px; margin-bottom: 14px; }
+.proposta .docs-cp-linha { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 10px; }
+.proposta .docs-cp-linha .btn-link { padding: 0; font-weight: 600; }
+.proposta .docs-cp-form { flex-wrap: wrap; align-items: flex-end; gap: 10px 14px; margin: 10px 0 0; }
+.proposta .docs-cp-campo { display: flex; flex-direction: column; gap: 3px; font-size: 12.5px; color: var(--muted); font-weight: 500; }
+.proposta .docs-cp-campo .cell { width: 160px; }

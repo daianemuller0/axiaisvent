@@ -340,7 +340,7 @@
         <label>@Campo("Preparada por", "pricing E9")
             <input class="cell" @bind="_proposta.PreparadaPor" /></label>
         <label>@Campo("Idioma da proposta")
-            <select class="cell" @bind="_proposta.Idioma">
+            <select id="f-idioma" class="cell" @bind="_proposta.Idioma">
                 @foreach (var x in ListasDaProposta.Idiomas)
                 {
                     <option value="@x">@x</option>
@@ -1795,383 +1795,453 @@
 }
 @if (_etapa == 4)
 {
-<div class="panel" style="margin-bottom:14px">
-    <h2 style="margin:0 0 12px; font-size:15px">Resumo da proposta</h2>
+    @* item 10: as entradas numa faixa no alto, uma linha por equipamento com as
+       linhas de custo recolhidas e a memória de cálculo recolhida. A conta é a
+       mesma (Pricing, CalculoPricing): só muda o que a tela mostra e onde *@
+    var pricing = pricingAtual;
+    var foraRisco = Math.Abs(Risco - CalculoPricing.RiscoAdicionalPadrao) > 0.00001m;
+    var foraNegoc = Math.Abs(Negociacao - CalculoPricing.MargemNegociacaoPadrao) > 0.00001m;
+    // sem custo a conta dá margem zero: não é a margem pedida que está fora,
+    // é o custo que falta (o painel faz o mesmo)
+    var foraMargem = Total > 0m && MargemForaDoPadrao(pricing);
+    var converte = Cambio.Converte(_proposta);
+    var moedaCusto = _proposta.Moeda;
+    var moedaVenda = _proposta.MoedaVenda;
+    var oferta = OfertaDaTaxa();
 
-    @foreach (var (item, indice) in _proposta.Itens.Select((x, i) => (x, i)))
-    {
-        var doItem = item;
-        var modelo = ModeloDe(doItem);
-        var itens = Itens(doItem);
-
-        <div class="toolbar" style="flex-wrap:wrap; margin-top:@(indice == 0 ? "0" : "18px")">
-            <strong>Equipamento @(indice + 1)</strong>
-            <span class="val-count">@doItem.Quantos ×</span>
-            <span>@(modelo is null ? "sem modelo escolhido" : modelo.Rotulo)</span>
-            <span style="flex:1"></span>
-            <strong>Código:</strong>
-            <span class="val-count">@(CodigoDe(doItem).Length > 0 ? CodigoDe(doItem) : "—")</span>
-        </div>
-
-        <div class="panel" style="padding:0; overflow-x:auto">
-            <table class="grid">
-                <thead>
-                    <tr>
-                        <th class="nowrap">Item</th>
-                        <th class="nowrap">Escolha</th>
-                        <th class="nowrap">Código</th>
-                        <th class="nowrap">De onde vem o preço</th>
-                        <th class="nowrap right" style="width:210px">Unitário @_proposta.Moeda.Rotulo()</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @if (modelo is not null)
-                    {
-                        <tr>
-                            <td class="nowrap"><strong>Equipamento</strong></td>
-                            <td class="nowrap">@modelo.Rotulo</td>
-                            <td class="nowrap">@(modelo.Codigo.Length > 0 ? modelo.Codigo : "—")</td>
-                            <td class="nowrap"><span class="subtitle">lista cruzada de equipamentos</span></td>
-                            <td>@Preco(doItem, "equipamento", PrecoDoModelo(doItem))</td>
-                        </tr>
-                    }
-                    @foreach (var linha in itens)
-                    {
-                        <tr>
-                            <td class="nowrap">@Exibir(linha.Lista)</td>
-                            <td class="nowrap">@linha.Opcao</td>
-                            <td class="nowrap">@(linha.Codigo.Length > 0 ? linha.Codigo : "—")</td>
-                            <td class="nowrap"><span class="subtitle">@linha.Origem</span></td>
-                            <td>@Preco(doItem, $"lista:{linha.Lista}", linha.Valor)</td>
-                        </tr>
-                    }
-                    @if (doItem.ComMotor)
-                    {
-                        var motor = MotorDe(doItem);
-                        <tr>
-                            <td class="nowrap"><strong>Motor elétrico</strong></td>
-                            <td class="nowrap">@(motor is null ? "motor ainda não definido" : motor.Descricao)</td>
-                            <td class="nowrap">@(motor is null || motor.Codigo.Length == 0 ? "—" : motor.Codigo)</td>
-                            <td class="nowrap">
-                                <span class="subtitle">
-                                    @(motor is null
-                                        ? "aperte o filtro até sobrar um motor"
-                                        : motor.Observacoes.Length > 0 ? motor.Observacoes : "catálogo de motores")
-                                </span>
-                            </td>
-                            <td>@Preco(doItem, "motor", PrecoDoMotor(doItem))</td>
-                        </tr>
-                    }
-                    @if (doItem.ComPartidor && LinhaDoPartidor(doItem) is { } partidor)
-                    {
-                        <tr>
-                            <td class="nowrap">@Exibir(ListaDosPartidores)</td>
-                            <td class="nowrap">@(doItem.Partidor.Length > 0 ? doItem.Partidor : "não escolhido")</td>
-                            <td class="nowrap">@(partidor.Codigo.Length > 0 ? partidor.Codigo : "—")</td>
-                            <td class="nowrap"><span class="subtitle">@partidor.Origem</span></td>
-                            <td>@Preco(doItem, "partidor", partidor.Valor)</td>
-                        </tr>
-                    }
-                    @foreach (var nome in doItem.ComInstrumentacao ? doItem.Instrumentacao : new List<string>())
-                    {
-                        var linha = Resolver(doItem, ListaDaInstrumentacao, nome);
-                        <tr>
-                            <td class="nowrap">@Exibir(ListaDaInstrumentacao)</td>
-                            <td class="nowrap">@nome</td>
-                            <td class="nowrap">@(linha.Codigo.Length > 0 ? linha.Codigo : "—")</td>
-                            <td class="nowrap"><span class="subtitle">@linha.Origem</span></td>
-                            <td>@Preco(doItem, $"instr:{nome}", linha.Valor)</td>
-                        </tr>
-                    }
-                    <tr>
-                        <td colspan="4" class="right">
-                            <strong>Unitário</strong> × @doItem.Quantos
-                        </td>
-                        <td class="nowrap right"><strong>@Dinheiro(SubtotalDe(doItem))</strong></td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-    }
-
-    <div class="toolbar" style="margin:16px 0 0">
-        <span style="flex:1"></span>
-        <strong style="font-size:15px">Custo total</strong>
-        <span class="val-count" style="font-size:15px">@Dinheiro(Total)</span>
-        <span class="subtitle ajuda" style="margin:0">vai para a célula E33 do pricing</span>
-    </div>
-
-    @if (FaltaPreco > 0)
-    {
-        <p class="subtitle" style="margin:10px 0 0">
-            @Plural(FaltaPreco, "item escolhido", "itens escolhidos") ainda sem custo — nem do cadastro, nem à mão. O
-            custo conta só o que já tem valor; para os outros, digite o custo na própria linha
-            do escopo.
-        </p>
-    }
-</div>
-
-<div class="panel" style="margin-bottom:14px">
-    @{
-        var pricing = Pricing();
-        var mudouRisco = Math.Abs(Risco - CalculoPricing.RiscoAdicionalPadrao) > 0.00001m;
-        var mudouNegoc = Math.Abs(Negociacao - CalculoPricing.MargemNegociacaoPadrao) > 0.00001m;
-        var mudouMargem = Math.Abs(pricing.Margem - CalculoPricing.MargemAlvoPadrao) > 0.0005m;
-    }
-
-    <div class="toolbar" style="flex-wrap:wrap">
-        <h2 style="margin:0; font-size:15px">Pricing</h2>
-        <span class="subtitle ajuda" style="margin:0">
-            margem, comissões e impostos — a mesma conta da aba PRICING da planilha
-        </span>
-        <span style="flex:1"></span>
-        <button class="btn-primary" @onclick="GerarPricing"><Icone Nome="baixar" /> Gerar pricing</button>
-    </div>
-
-    <div class="form3">
-        <label>@Campo("Risco adicional (%)", "pricing D36")
-            <input class="cell num" value="@_proposta.RiscoAdicional"
-                   @onchange="e => _proposta.RiscoAdicional = e.Value?.ToString() ?? string.Empty" />
-            @if (mudouRisco)
-            {
-                <span class="aviso-vermelho">Solicitar aprovação de Pricing</span>
-            }
-        </label>
-
-        <label>@Campo("Margem de negociação (%)", "pricing D46")
-            <input class="cell num" value="@_proposta.MargemNegociacao"
-                   @onchange="e => _proposta.MargemNegociacao = e.Value?.ToString() ?? string.Empty" />
-            @if (mudouNegoc)
-            {
-                <span class="aviso-vermelho">Solicitar aprovação de Pricing</span>
-            }
-        </label>
-
-        <label>Calcular preço
-            <div class="seg" role="group" aria-label="Calcular preço" style="align-self:flex-start">
+<div class="panel preco-entradas">
+    <div class="preco-cabeca">
+        <h2>Pricing</h2>
+        <span class="subtitle ajuda">margem, comissões e impostos — a mesma conta da aba PRICING da planilha</span>
+        @* à direita também quando a ajuda empurra o par para a linha de baixo *@
+        <span class="preco-modo">
+            <span class="preco-rotulo">Calcular preço</span>
+            <span class="seg" role="group" aria-label="Calcular preço">
                 <button class="@(PelaMargem ? "on" : "")" aria-pressed="@(PelaMargem ? "true" : "false")"
                         @onclick="@(() => _proposta.ModoDoPreco = "margem")">pela margem</button>
                 <button class="@(PelaMargem ? "" : "on")" aria-pressed="@(PelaMargem ? "false" : "true")"
                         @onclick="@(() => _proposta.ModoDoPreco = "preco")">pelo preço</button>
-            </div>
-        </label>
+            </span>
+        </span>
+    </div>
 
+    @* cada entrada com o selo dela: o "fora do padrão" fica junto do campo que pede a aprovação *@
+    <div class="preco-faixa">
         @if (PelaMargem)
         {
-            <label>Margem pedida (%)
-                <input class="cell num" value="@_proposta.MargemAlvo"
-                       @onchange="e => _proposta.MargemAlvo = e.Value?.ToString() ?? string.Empty" />
-            </label>
+            <div class="preco-campo">
+                <label class="preco-rotulo" for="f-margem" title="célula D54 do pricing">Margem pedida</label>
+                <span class="preco-entrada">
+                    <input id="f-margem" class="cell num" value="@_proposta.MargemAlvo"
+                           @onchange="e => _proposta.MargemAlvo = e.Value?.ToString() ?? string.Empty" />
+                    <span class="preco-unid">%</span>
+                </span>
+                @SeloDoPadrao(foraMargem, Pct(CalculoPricing.MargemAlvoPadrao))
+            </div>
         }
         else
         {
-            <label>Preço-meta (@_proposta.Moeda.Rotulo())
-                <input class="cell num" placeholder="quanto o cliente aceita"
-                       value="@_proposta.PrecoMeta"
-                       @onchange="e => _proposta.PrecoMeta = e.Value?.ToString() ?? string.Empty" />
-            </label>
+            <div class="preco-campo preco-campo-meta">
+                <label class="preco-rotulo" for="f-preco-meta">Preço-meta <span class="nota">em @moedaCusto.Rotulo()</span></label>
+                <span class="preco-entrada">
+                    <input id="f-preco-meta" class="cell num" placeholder="quanto o cliente aceita"
+                           value="@_proposta.PrecoMeta"
+                           @onchange="e => _proposta.PrecoMeta = e.Value?.ToString() ?? string.Empty" />
+                </span>
+                <span class="preco-resultado">margem <strong class="@(foraMargem ? "texto-vermelho" : "")">@Pct(pricing.Margem)</strong></span>
+                @SeloDoPadrao(foraMargem, Pct(CalculoPricing.MargemAlvoPadrao))
+            </div>
         }
+        <div class="preco-campo">
+            <label class="preco-rotulo" for="f-risco" title="célula D36 do pricing">Risco adicional</label>
+            <span class="preco-entrada">
+                <input id="f-risco" class="cell num" value="@_proposta.RiscoAdicional"
+                       @onchange="e => _proposta.RiscoAdicional = e.Value?.ToString() ?? string.Empty" />
+                <span class="preco-unid">%</span>
+            </span>
+            @SeloDoPadrao(foraRisco, Pct(CalculoPricing.RiscoAdicionalPadrao))
+        </div>
+        <div class="preco-campo">
+            <label class="preco-rotulo" for="f-negociacao" title="célula D46 do pricing">Margem de negociação</label>
+            <span class="preco-entrada">
+                <input id="f-negociacao" class="cell num" value="@_proposta.MargemNegociacao"
+                       @onchange="e => _proposta.MargemNegociacao = e.Value?.ToString() ?? string.Empty" />
+                <span class="preco-unid">%</span>
+            </span>
+            @SeloDoPadrao(foraNegoc, Pct(CalculoPricing.MargemNegociacaoPadrao))
+        </div>
     </div>
 
-    @if (mudouMargem)
-    {
-        <div class="aviso aviso-erro" style="margin-top:12px">
-            <strong>Solicitar aprovação de Pricing</strong> — a margem ficou em
-            @Pct(pricing.Margem), e o padrão é @Pct(CalculoPricing.MargemAlvoPadrao).
+    @* a moeda do preço e a taxa: antes uma caixa laranja de alerta; converter é o
+       caso normal da exportação, e a caixa agora é neutra. Na mesma moeda, a
+       taxa nem aparece *@
+    <div class="aviso aviso-info preco-cambio">
+        <div class="toolbar preco-cambio-linha">
+            <strong>Preço ao cliente em</strong>
+            <div class="seg" role="group" aria-label="Moeda do preço ao cliente">
+                @foreach (var m in Moedas.DePreco)
+                {
+                    var moeda = m;
+                    <button class="@(moedaVenda == moeda ? "on" : "")" aria-pressed="@(moedaVenda == moeda ? "true" : "false")"
+                            @onclick="() => EscolherMoedaVenda(moeda)">@moeda.Rotulo()</button>
+                }
+            </div>
+            @if (converte)
+            {
+                <span class="preco-par">
+                    <label class="preco-rotulo" for="f-taxa">Taxa</label>
+                    <select class="cell preco-sentido" value="@_proposta.CambioDirecao" aria-label="Sentido da taxa"
+                            @onchange='e => _proposta.CambioDirecao = e.Value?.ToString() ?? "VendaEmCusto"'>
+                        <option value="VendaEmCusto">1 @moedaVenda.Rotulo() em @moedaCusto.Rotulo()</option>
+                        <option value="CustoEmVenda">1 @moedaCusto.Rotulo() em @moedaVenda.Rotulo()</option>
+                    </select>
+                    <span>=</span>
+                    <input id="f-taxa" class="cell num preco-taxa" placeholder="0,00" value="@_proposta.TaxaCambio"
+                           @onchange="e => MudarTaxa(e.Value?.ToString() ?? string.Empty)" />
+                </span>
+                <span class="preco-par">
+                    <label class="preco-rotulo" for="f-seguranca" title="tirada da taxa: se a moeda cair até este tanto, o valor no custo não perde">Segurança</label>
+                    <input id="f-seguranca" class="cell num preco-seguranca" placeholder="0" value="@_proposta.SegurancaCambioPct"
+                           @onchange="e => _proposta.SegurancaCambioPct = e.Value?.ToString() ?? string.Empty" />
+                    <span class="preco-unid">%</span>
+                </span>
+            }
+            else
+            {
+                <span class="nota">custo e preço em @moedaCusto.Rotulo(): sem conversão</span>
+            }
         </div>
-    }
+
+        @if (converte)
+        {
+            @if (_taxaDoDia)
+            {
+                @* é a última taxa gravada na aba Conversão, não a do dia: a data diz de quando *@
+                <span class="@(TaxaVelha ? "taxa-origem velha" : "taxa-origem")">
+                    taxa da aba Conversão@(TaxaAtualizadaEm is { } atualizada ? $", atualizada em {atualizada:dd/MM/yyyy}" : "")@(TaxaVelha ? " — confira se ainda vale" : "")
+                </span>
+            }
+            @if (Cambio.Normalizada(_proposta) > 0m)
+            {
+                var taxaBase = Cambio.Normalizada(_proposta);
+                <div class="preco-confira">
+                    Confira: <strong>1 @moedaVenda.Rotulo() = @moedaCusto.Rotulo() @taxaBase.ToString("N4", Br)</strong>
+                    · 1 @moedaCusto.Rotulo() = @moedaVenda.Rotulo() @((1m / taxaBase).ToString("N6", Br))
+                </div>
+                @if (Cambio.Seguranca(_proposta) > 0m)
+                {
+                    <div class="nota ajuda">
+                        convertendo por @moedaCusto.Rotulo() @Cambio.Efetivo(_proposta).ToString("N4", Br) por @moedaVenda.Rotulo() —
+                        se a moeda cair até @Cambio.Seguranca(_proposta).ToString("0.##", Br)%, o valor em @moedaCusto.Rotulo() não perde
+                    </div>
+                }
+            }
+            else
+            {
+                <div class="preco-falta-taxa">
+                    <Icone Nome="alerta" /> Informe a taxa de conversão — sem ela o preço sai como se já estivesse em @moedaVenda.Rotulo().
+                </div>
+            }
+            @if (oferta is not null)
+            {
+                @* a cópia e a revisão continuam com a taxa da original: a da aba
+                   Conversão é oferecida, e só entra com o clique *@
+                <div class="preco-oferta">
+                    <span>@oferta.Texto</span>
+                    <button class="btn-link" @onclick="UsarTaxaDaConversao">usar esta</button>
+                </div>
+            }
+        }
+    </div>
 
     @foreach (var aviso in pricing.Avisos)
     {
         <div class="aviso aviso-alerta" style="margin-top:8px">@aviso</div>
     }
+</div>
 
-    @{
-        var converte = Cambio.Converte(_proposta);
-        var moedaCusto = _proposta.Moeda;
-        var moedaVenda = _proposta.MoedaVenda;
-        var pt = new System.Globalization.CultureInfo("pt-BR");
-    }
-
-    <div class="toolbar" style="flex-wrap:wrap; margin-top:14px">
-        <strong>Preço ao cliente em</strong>
-        <div class="seg" role="group" aria-label="Moeda do preço ao cliente">
-            @foreach (var m in Moedas.DePreco)
-            {
-                var moeda = m;
-                <button class="@(moedaVenda == moeda ? "on" : "")" aria-pressed="@(moedaVenda == moeda ? "true" : "false")"
-                        @onclick="() => EscolherMoedaVenda(moeda)">@moeda.Rotulo()</button>
-            }
-        </div>
-        <span class="subtitle ajuda">
-            o custo e o pricing abaixo estão em @moedaCusto.Rotulo(); só o preço final é convertido
-        </span>
+<div class="panel preco-custos">
+    <div class="preco-cabeca">
+        <h2>Custo por equipamento</h2>
+        <span class="subtitle ajuda">em @moedaCusto.Rotulo() · o custo vem do cadastro; digite por cima para corrigir</span>
     </div>
 
-    @if (converte)
+    @foreach (var (item, indice) in _proposta.Itens.Select((x, i) => (x, i)))
     {
-        <div style="margin-top:10px; padding:10px 12px; background:#FFF6E5; border:2px solid #E9A23B; border-radius:8px; font-size:13px">
-            <div style="font-weight:700; color:#7A4E06; margin-bottom:6px">
-                CONVERSÃO DA MOEDA — o custo está em @moedaCusto.Rotulo() e o preço ao cliente sai em @moedaVenda.Rotulo()
-            </div>
-            <div style="display:flex; gap:18px; align-items:center; flex-wrap:wrap">
-                <span>
-                    <b>Taxa de conversão:</b>
-                    <select class="cell" style="width:auto" value="@_proposta.CambioDirecao"
-                            @onchange='e => _proposta.CambioDirecao = e.Value?.ToString() ?? "VendaEmCusto"'>
-                        <option value="VendaEmCusto">1 @moedaVenda.Rotulo() em @moedaCusto.Rotulo()</option>
-                        <option value="CustoEmVenda">1 @moedaCusto.Rotulo() em @moedaVenda.Rotulo()</option>
-                    </select>
-                    =
-                    <input id="f-taxa" class="cell num" style="width:90px" placeholder="0,00" value="@_proposta.TaxaCambio"
-                           @onchange="e => MudarTaxa(e.Value?.ToString() ?? string.Empty)" />
-                    @if (_taxaDoDia)
+        var doItem = item;
+        var doIndice = indice;
+        var modelo = ModeloDe(doItem);
+        var semCusto = SemCustoNaTabela(doItem);
+        var aberta = VerLinhas(doItem, semCusto.Count);
+        var codigo = CodigoDe(doItem);
+
+        <div class="preco-equip @(aberta ? "aberta" : "")">
+            <div class="preco-equip-linha">
+                <span class="preco-equip-nome" title="@($"{(modelo?.Rotulo ?? "sem modelo")} · {codigo}")">
+                    <strong>Equip. @(indice + 1)</strong>
+                    <span class="preco-sep"> · </span>
+                    @if (modelo is null)
                     {
-                        @* é a última taxa gravada na aba Conversão, não a do dia: a data diz de quando *@
-                        <span class="@(TaxaVelha ? "taxa-origem velha" : "taxa-origem")">
-                            taxa da aba Conversão@(TaxaAtualizadaEm is { } atualizada ? $", atualizada em {atualizada:dd/MM/yyyy}" : "")@(TaxaVelha ? " — confira se ainda vale" : "")
-                        </span>
+                        <button class="btn-link texto-alerta preco-falta" @onclick="() => EscolherModeloDoPreco(doIndice)">modelo não escolhido</button>
+                    }
+                    else
+                    {
+                        <span>@modelo.Rotulo</span>
+                    }
+                    @if (codigo.Length > 0)
+                    {
+                        <span class="preco-sep"> · </span>
+                        <span class="mono preco-codigo">@codigo</span>
                     }
                 </span>
-                <span>
-                    <b>Segurança da moeda:</b>
-                    <input class="cell num" style="width:60px" placeholder="0" value="@_proposta.SegurancaCambioPct"
-                           @onchange="e => _proposta.SegurancaCambioPct = e.Value?.ToString() ?? string.Empty" />%
-                    a menos na taxa
-                </span>
+                @if (semCusto.Count > 0)
+                {
+                    <button class="btn-link texto-alerta preco-falta" @onclick="() => IrAoCustoQueFalta(doIndice, semCusto)">
+                        @Plural(semCusto.Count, "linha sem custo", "linhas sem custo")
+                    </button>
+                }
+                <span class="preco-conta">@ContaDoEquipamento(doItem)</span>
+                <button class="btn-link preco-ver" aria-expanded="@(aberta ? "true" : "false")"
+                        @onclick="() => AlternarLinhas(doItem, semCusto.Count)">
+                    <Icone Nome="seta" Classe="preco-seta" /> @(aberta ? "fechar linhas" : "ver linhas")
+                </button>
             </div>
 
-            @if (Cambio.Normalizada(_proposta) > 0m)
+            @if (aberta)
             {
-                var taxaBase = Cambio.Normalizada(_proposta);
-                <div style="margin-top:6px; color:#5C6272">
-                    Confira: <b>1 @moedaVenda.Rotulo() = @moedaCusto.Rotulo() @taxaBase.ToString("N4", pt)</b>
-                    &nbsp;·&nbsp;
-                    <b>1 @moedaCusto.Rotulo() = @moedaVenda.Rotulo() @((1m / taxaBase).ToString("N6", pt))</b>
-                </div>
-                <div style="margin-top:3px; color:#5C6272">
-                    → convertendo por @moedaCusto.Rotulo() @Cambio.Efetivo(_proposta).ToString("N4", pt) por @moedaVenda.Rotulo() —
-                    se a moeda cair até @Cambio.Seguranca(_proposta).ToString("0.##", pt)%,
-                    o valor em @moedaCusto.Rotulo() não perde.
-                </div>
-            }
-            else
-            {
-                <div style="margin-top:6px; color:var(--err-tx); font-weight:600; display:flex; align-items:center; gap:6px">
-                    <Icone Nome="alerta" /> Informe a taxa de conversão — sem ela o preço sai como se já estivesse em @moedaVenda.Rotulo().
-                </div>
+                @* largura fixa por coluna: o custo fica sempre à vista, sem rolagem
+                   lateral, a 1366 e a 1440 com o menu do app aberto ou recolhido *@
+                <table class="grid tabela-custo">
+                    <colgroup>
+                        <col class="col-item" />
+                        <col />
+                        <col class="col-codigo" />
+                        <col class="col-custo" />
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th>Item</th>
+                            <th>Escolha</th>
+                            <th>Código</th>
+                            <th class="right">Unitário @moedaCusto.Rotulo()</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (modelo is not null)
+                        {
+                            <tr>
+                                <td><strong>Equipamento</strong></td>
+                                <td>
+                                    @modelo.Rotulo
+                                    <span class="nota preco-origem" title="lista cruzada de equipamentos">@OrigemDoCusto(doItem, "equipamento", "lista cruzada de equipamentos")</span>
+                                </td>
+                                <td>@(modelo.Codigo.Length > 0 ? modelo.Codigo : "—")</td>
+                                <td class="col-custo">@Preco(doItem, "equipamento", PrecoDoModelo(doItem))</td>
+                            </tr>
+                        }
+                        @foreach (var linha in Itens(doItem))
+                        {
+                            var chave = $"lista:{linha.Lista}";
+                            <tr>
+                                <td>@Exibir(linha.Lista)</td>
+                                <td>
+                                    @linha.Opcao
+                                    <span class="nota preco-origem" title="@linha.Origem">@OrigemDoCusto(doItem, chave, linha.Origem)</span>
+                                </td>
+                                <td>@(linha.Codigo.Length > 0 ? linha.Codigo : "—")</td>
+                                <td class="col-custo">@Preco(doItem, chave, linha.Valor)</td>
+                            </tr>
+                        }
+                        @if (doItem.ComMotor)
+                        {
+                            var motor = MotorDe(doItem);
+                            var origemDoMotor = motor is null
+                                ? "aperte o filtro até sobrar um motor"
+                                : motor.Observacoes.Length > 0 ? motor.Observacoes : "catálogo de motores";
+                            <tr>
+                                <td><strong>Motor elétrico</strong></td>
+                                <td>
+                                    @(motor is null ? "motor ainda não definido" : motor.Descricao)
+                                    <span class="nota preco-origem" title="@origemDoMotor">@OrigemDoCusto(doItem, "motor", origemDoMotor)</span>
+                                </td>
+                                <td>@(motor is null || motor.Codigo.Length == 0 ? "—" : motor.Codigo)</td>
+                                <td class="col-custo">@Preco(doItem, "motor", PrecoDoMotor(doItem))</td>
+                            </tr>
+                        }
+                        @if (doItem.ComPartidor && LinhaDoPartidor(doItem) is { } partidor)
+                        {
+                            <tr>
+                                <td>@Exibir(ListaDosPartidores)</td>
+                                <td>
+                                    @(doItem.Partidor.Length > 0 ? doItem.Partidor : "não escolhido")
+                                    <span class="nota preco-origem" title="@partidor.Origem">@OrigemDoCusto(doItem, "partidor", partidor.Origem)</span>
+                                </td>
+                                <td>@(partidor.Codigo.Length > 0 ? partidor.Codigo : "—")</td>
+                                <td class="col-custo">@Preco(doItem, "partidor", partidor.Valor)</td>
+                            </tr>
+                        }
+                        @foreach (var nome in doItem.ComInstrumentacao ? doItem.Instrumentacao : new List<string>())
+                        {
+                            var linha = Resolver(doItem, ListaDaInstrumentacao, nome);
+                            var chave = $"instr:{nome}";
+                            <tr>
+                                <td>@Exibir(ListaDaInstrumentacao)</td>
+                                <td>
+                                    @nome
+                                    <span class="nota preco-origem" title="@linha.Origem">@OrigemDoCusto(doItem, chave, linha.Origem)</span>
+                                </td>
+                                <td>@(linha.Codigo.Length > 0 ? linha.Codigo : "—")</td>
+                                <td class="col-custo">@Preco(doItem, chave, linha.Valor)</td>
+                            </tr>
+                        }
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="3" class="right">
+                                @(doItem.Quantos > 1 ? $"Subtotal ({doItem.Quantos} × unitário)" : "Subtotal")
+                            </td>
+                            <td class="right"><strong>@Dinheiro(SubtotalDe(doItem))</strong></td>
+                        </tr>
+                    </tfoot>
+                </table>
             }
         </div>
     }
-    else
-    {
-        <p class="subtitle" style="margin:8px 0 0">
-            Custo e preço na mesma moeda (@moedaCusto.Rotulo()) — sem conversão. Escolha outra moeda
-            acima para converter.
-        </p>
-    }
 
-    <div class="panel" style="padding:0; overflow-x:auto; margin-top:14px">
-        <table class="grid">
+    <div class="preco-total">
+        @{
+            var faltaCusto = _proposta.Itens.Any(i => SemCustoNaTabela(i).Count > 0);
+        }
+        <span class="nota">
+            @if (faltaCusto)
+            {
+                <span>conta só as linhas que têm custo</span>
+            }
+            <span class="ajuda">@(faltaCusto ? " · " : "")vai para a célula E33 do pricing</span>
+        </span>
+        <strong>Custo total</strong>
+        <span class="preco-total-valor">@Dinheiro(Total)</span>
+    </div>
+</div>
+
+    var memoriaAberta = MemoriaAberta(pricing);
+<div class="panel preco-memoria-painel">
+    @* a memória fica fechada: quem confere célula a célula abre; abre sozinha
+       quando a proposta pede aprovação ou falta a taxa *@
+    <details class="preco-memoria" open="@memoriaAberta">
+        <summary @onclick="() => AlternarMemoria(pricing)" @onclick:preventDefault="true">
+            <span class="preco-memoria-titulo">Memória de cálculo — célula a célula</span>
+            <span class="nota">
+                venda líquida @Dinheiro(pricing.VendaLiquida) · margem @Pct(pricing.Margem)@(converte ? $" · ao cliente {DinheiroVenda(Cambio.ParaVenda(_proposta, pricing.PrecoComImpostos))}" : "")
+            </span>
+        </summary>
+
+        <table class="grid tabela-memoria">
+            <colgroup>
+                <col />
+                <col class="col-celula" />
+                <col class="col-valor" />
+                <col class="col-pct" />
+            </colgroup>
             <thead>
                 <tr>
-                    <th class="nowrap">Linha do pricing</th>
-                    <th class="nowrap">Célula</th>
-                    <th class="nowrap right">Valor</th>
-                    <th class="nowrap right">%</th>
+                    <th>Linha do pricing</th>
+                    <th>Célula</th>
+                    <th class="right">Valor</th>
+                    <th class="right">%</th>
                 </tr>
             </thead>
             <tbody>
                 <tr>
-                    <td class="nowrap"><strong>Custo total</strong></td>
-                    <td class="nowrap"><span class="subtitle">E33</span></td>
-                    <td class="nowrap right">@Dinheiro(pricing.CustoTotal)</td>
-                    <td class="nowrap right">—</td>
+                    <td><strong>Custo total</strong></td>
+                    <td><span class="subtitle">E33</span></td>
+                    <td class="right">@Dinheiro(pricing.CustoTotal)</td>
+                    <td class="right">—</td>
                 </tr>
                 <tr>
-                    <td class="nowrap">Risco adicional</td>
-                    <td class="nowrap"><span class="subtitle">D36 · E36</span></td>
-                    <td class="nowrap right">@Dinheiro(pricing.Risco)</td>
-                    <td class="nowrap right">@Pct(Risco)</td>
+                    <td>Risco adicional</td>
+                    <td><span class="subtitle">D36 · E36</span></td>
+                    <td class="right">@Dinheiro(pricing.Risco)</td>
+                    <td class="right">@Pct(Risco)</td>
                 </tr>
                 <tr>
-                    <td class="nowrap"><strong>Custo com riscos</strong></td>
-                    <td class="nowrap"><span class="subtitle">E38</span></td>
-                    <td class="nowrap right">@Dinheiro(pricing.CustoComRiscos)</td>
-                    <td class="nowrap right">—</td>
+                    <td><strong>Custo com riscos</strong></td>
+                    <td><span class="subtitle">E38</span></td>
+                    <td class="right">@Dinheiro(pricing.CustoComRiscos)</td>
+                    <td class="right">—</td>
                 </tr>
                 <tr>
-                    <td class="nowrap">Markup</td>
-                    <td class="nowrap"><span class="subtitle">E40</span></td>
-                    <td class="nowrap right">@pricing.Markup.ToString("N4", Br)</td>
-                    <td class="nowrap right">—</td>
+                    <td>Markup</td>
+                    <td><span class="subtitle">E40</span></td>
+                    <td class="right">@pricing.Markup.ToString("N4", Br)</td>
+                    <td class="right">—</td>
                 </tr>
                 <tr>
-                    <td class="nowrap">Venda pura</td>
-                    <td class="nowrap"><span class="subtitle">E41</span></td>
-                    <td class="nowrap right">@Dinheiro(pricing.VendaPura)</td>
-                    <td class="nowrap right">—</td>
+                    <td>Venda pura</td>
+                    <td><span class="subtitle">E41</span></td>
+                    <td class="right">@Dinheiro(pricing.VendaPura)</td>
+                    <td class="right">—</td>
                 </tr>
                 <tr>
-                    <td class="nowrap">Comissões</td>
-                    <td class="nowrap"><span class="subtitle">D45</span></td>
-                    <td class="nowrap right">@Dinheiro(pricing.VendaLiquida * pricing.Comissoes)</td>
-                    <td class="nowrap right">@Pct(pricing.Comissoes)</td>
+                    <td>Comissões</td>
+                    <td><span class="subtitle">D45</span></td>
+                    <td class="right">@Dinheiro(pricing.VendaLiquida * pricing.Comissoes)</td>
+                    <td class="right">@Pct(pricing.Comissoes)</td>
                 </tr>
                 <tr>
-                    <td class="nowrap">Negociação, PM/SACH, garantia e portal</td>
-                    <td class="nowrap"><span class="subtitle">D46 · D47 · D48 · D49</span></td>
-                    <td class="nowrap right">
-                        @Dinheiro(pricing.VendaLiquida * (pricing.PercentuaisDeVenda - pricing.Comissoes))
-                    </td>
-                    <td class="nowrap right">@Pct(pricing.PercentuaisDeVenda - pricing.Comissoes)</td>
+                    <td>Negociação, PM/SACH, garantia e portal</td>
+                    <td><span class="subtitle">D46 · D47 · D48 · D49</span></td>
+                    <td class="right">@Dinheiro(pricing.VendaLiquida * (pricing.PercentuaisDeVenda - pricing.Comissoes))</td>
+                    <td class="right">@Pct(pricing.PercentuaisDeVenda - pricing.Comissoes)</td>
                 </tr>
                 <tr>
-                    <td class="nowrap"><strong>Venda líquida (sem impostos)</strong></td>
-                    <td class="nowrap"><span class="subtitle">E51</span></td>
-                    <td class="nowrap right"><strong>@Dinheiro(pricing.VendaLiquida)</strong></td>
-                    <td class="nowrap right">—</td>
+                    <td><strong>Venda líquida (sem impostos)</strong></td>
+                    <td><span class="subtitle">E51</span></td>
+                    <td class="right"><strong>@Dinheiro(pricing.VendaLiquida)</strong></td>
+                    <td class="right">—</td>
                 </tr>
                 <tr>
-                    <td class="nowrap">Margem do projeto</td>
-                    <td class="nowrap"><span class="subtitle">D54</span></td>
-                    <td class="nowrap right">@Dinheiro(pricing.VendaLiquida * pricing.Margem)</td>
-                    <td class="nowrap right">
-                        <strong class="@(mudouMargem ? "texto-vermelho" : "")">@Pct(pricing.Margem)</strong>
-                    </td>
+                    <td>Margem do projeto</td>
+                    <td><span class="subtitle">D54</span></td>
+                    <td class="right">@Dinheiro(pricing.VendaLiquida * pricing.Margem)</td>
+                    <td class="right"><strong class="@(foraMargem ? "texto-vermelho" : "")">@Pct(pricing.Margem)</strong></td>
                 </tr>
                 @if (pricing.PrecoComImpostos != pricing.VendaLiquida)
                 {
                     <tr>
-                        <td class="nowrap">PIS</td>
-                        <td class="nowrap"><span class="subtitle">E60</span></td>
-                        <td class="nowrap right">@Dinheiro(pricing.ValorPis)</td>
-                        <td class="nowrap right">@Pct(CalculoPricing.Pis)</td>
+                        <td>PIS</td>
+                        <td><span class="subtitle">E60</span></td>
+                        <td class="right">@Dinheiro(pricing.ValorPis)</td>
+                        <td class="right">@Pct(CalculoPricing.Pis)</td>
                     </tr>
                     <tr>
-                        <td class="nowrap">COFINS</td>
-                        <td class="nowrap"><span class="subtitle">E61</span></td>
-                        <td class="nowrap right">@Dinheiro(pricing.ValorCofins)</td>
-                        <td class="nowrap right">@Pct(CalculoPricing.Cofins)</td>
+                        <td>COFINS</td>
+                        <td><span class="subtitle">E61</span></td>
+                        <td class="right">@Dinheiro(pricing.ValorCofins)</td>
+                        <td class="right">@Pct(CalculoPricing.Cofins)</td>
                     </tr>
                     <tr>
-                        <td class="nowrap">ICMS</td>
-                        <td class="nowrap"><span class="subtitle">E62</span></td>
-                        <td class="nowrap right">@Dinheiro(pricing.ValorIcms)</td>
-                        <td class="nowrap right">
+                        <td>ICMS</td>
+                        <td><span class="subtitle">E62</span></td>
+                        <td class="right">@Dinheiro(pricing.ValorIcms)</td>
+                        <td class="right">
                             @Pct(CalculoPricing.IcmsDoEstado(EstadoDoPricing,
                                 ListasDaProposta.CodigoDaBu(_proposta.Bu)) ?? 0m)
                         </td>
                     </tr>
                 }
-                @if (pricing.PrecoComImpostos == pricing.VendaLiquida)
+                else
                 {
                     <tr>
-                        <td class="nowrap">Impostos</td>
-                        <td class="nowrap"><span class="subtitle">E60 · E61 · E62</span></td>
-                        <td class="nowrap right">—</td>
-                        <td class="nowrap right">
-                            <span class="subtitle">
+                        <td>Impostos</td>
+                        <td><span class="subtitle">E60 · E61 · E62</span></td>
+                        <td class="right">—</td>
+                        <td class="right">—</td>
+                    </tr>
+                    @* a nota não cabia na coluna %: ganha a linha dela *@
+                    <tr class="preco-nota-impostos">
+                        <td colspan="4">
+                            <span class="nota">
                                 @(EhBrasil
                                     ? "destino fora do Brasil: a planilha zera ICMS, PIS e COFINS"
                                     : $"venda fora do Brasil ({_proposta.Pais}): sem ICMS, PIS nem COFINS")
@@ -2180,180 +2250,208 @@
                     </tr>
                 }
                 <tr>
-                    <td class="nowrap"><strong>@(Cambio.Converte(_proposta) ? $"Preço com impostos ({_proposta.Moeda.Rotulo()}, antes da conversão)" : "Preço ao cliente")</strong></td>
-                    <td class="nowrap"><span class="subtitle">S76</span></td>
-                    <td class="nowrap right"><strong>@Dinheiro(pricing.PrecoComImpostos)</strong></td>
-                    <td class="nowrap right">—</td>
+                    <td><strong>@(converte ? $"Preço com impostos ({moedaCusto.Rotulo()}, antes da conversão)" : "Preço ao cliente")</strong></td>
+                    <td><span class="subtitle">S76</span></td>
+                    <td class="right"><strong>@Dinheiro(pricing.PrecoComImpostos)</strong></td>
+                    <td class="right">—</td>
                 </tr>
+                @if (converte)
+                {
+                    <tr class="preco-convertido">
+                        <td><strong>Venda líquida em @moedaVenda.Rotulo()</strong></td>
+                        <td><span class="subtitle">convertida</span></td>
+                        <td class="right"><strong>@DinheiroVenda(Cambio.ParaVenda(_proposta, pricing.VendaLiquida))</strong></td>
+                        <td class="right">—</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Preço com impostos em @moedaVenda.Rotulo()</strong></td>
+                        <td><span class="subtitle">convertido</span></td>
+                        <td class="right"><strong>@DinheiroVenda(Cambio.ParaVenda(_proposta, pricing.PrecoComImpostos))</strong></td>
+                        <td class="right">—</td>
+                    </tr>
+                }
             </tbody>
         </table>
-    </div>
 
-    @if (converte)
-    {
-        <div class="panel" style="padding:0; overflow-x:auto; margin-top:14px">
-            <table class="grid">
-                <thead>
-                    <tr>
-                        <th class="nowrap">Preço ao cliente em @moedaVenda.Rotulo()</th>
-                        <th class="nowrap right">Valor</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td class="nowrap"><strong>Venda líquida</strong></td>
-                        <td class="nowrap right"><strong>@DinheiroVenda(Cambio.ParaVenda(_proposta, pricing.VendaLiquida))</strong></td>
-                    </tr>
-                    <tr>
-                        <td class="nowrap"><strong>Preço com impostos</strong></td>
-                        <td class="nowrap right"><strong>@DinheiroVenda(Cambio.ParaVenda(_proposta, pricing.PrecoComImpostos))</strong></td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-    }
-
-    <p class="subtitle ajuda" style="margin:12px 0 0">
-        <strong>O sistema escreve todas as entradas do preço</strong> — inclusive BU (E8),
-        segmento (J3) e estado (J6) —, então a planilha gerada calcula exatamente a mesma
-        venda líquida que a prévia acima.
-    </p>
-
-    <p class="subtitle ajuda" style="margin:8px 0 0">
-        O botão <strong>Gerar pricing</strong> baixa a planilha da equipe com as sete abas,
-        as fórmulas e as macros intactas — só as células de entrada são preenchidas
-        (@string.Join(", ", PricingExcel.Mapa.Take(6).Select(m => m.Celula))…). O Excel
-        refaz a conta sozinho; os números acima são a prévia.
-    </p>
+        <p class="nota ajuda preco-memoria-nota">
+            O sistema escreve todas as entradas do preço — inclusive BU (E8), segmento (J3) e estado (J6) —,
+            então o pricing gerado (Gerar tudo, ou a seta dele) calcula a mesma venda líquida desta prévia;
+            só as células de entrada são preenchidas (@string.Join(", ", PricingExcel.Mapa.Take(6).Select(m => m.Celula))…).
+        </p>
+    </details>
 </div>
 
 }
 @if (_etapa == 5)
 {
-<div class="panel" style="margin-bottom:14px">
-    @* sem o título que repetia o nome da etapa: o Gerar tudo e os avulsos numa linha só *@
-    <div class="toolbar" style="flex-wrap:wrap; margin-bottom:12px">
-        <button class="btn-accent" @onclick="GerarTudo"><Icone Nome="baixar" /> Gerar tudo</button>
-        @* os avulsos são o caminho secundário: links, para caberem na linha do Gerar tudo *@
-        <span class="nota" style="margin-left:6px">ou um documento só:</span>
-        <button class="btn-link" @onclick="GerarProposta">Proposta comercial</button>
-        <button class="btn-link" @onclick="GerarTecnica">Proposta técnica</button>
-        <button class="btn-link" @onclick="GerarPricing">Pricing</button>
-        <button class="btn-link" @onclick="IrParaCustoPrevisto">Custo previsto</button>
+@* item 11: um só Gerar tudo (o mesmo do painel), as pendências numa linha — a
+   lista está no painel, ao lado — e, depois de um Gerar tudo sem falha, o
+   "Marcar como enviada" no caminho *@
+<div class="panel docs-topo">
+    <div class="docs-topo-linha">
+        @GerarTudoDividido("docs")
+        @if (pendencias.Count == 0)
+        {
+            <span class="docs-estado ok"><Icone Nome="ok" /> Nada pendente: os documentos saem completos</span>
+        }
+        else
+        {
+            <span class="docs-estado alerta">
+                <Icone Nome="alerta" /> @Plural(pendencias.Count, "pendência", "pendências") — ver no painel
+            </span>
+        }
+        <span class="docs-espaco"></span>
+        @if (OferecerMarcarEnviada)
+        {
+            <button class="btn-ghost docs-enviada" @onclick="MarcarEnviadaDosDocumentos"
+                    title="Os documentos foram gerados sem falha: registre que a proposta saiu para o cliente">
+                <Icone Nome="enviar" /> Marcar como enviada
+            </button>
+        }
     </div>
-    <p class="subtitle ajuda" style="margin:0 0 10px">
-        <strong>Gerar tudo</strong> salva a proposta e baixa a comercial, a técnica e o pricing de
-        uma vez. Os botões ao lado geram um documento só.
+    <p class="nota ajuda docs-topo-ajuda">
+        Gerar tudo salva a proposta e baixa a comercial, a técnica e o pricing de uma vez; a seta ao lado gera um documento só.
+        @if (pendencias.Count > 0)
+        {
+            <span>Com pendência, os documentos saem mesmo assim, com esses campos em branco.</span>
+        }
     </p>
-    @if (pendencias.Count == 0)
-    {
-        <div class="aviso aviso-ok">Nada pendente: os documentos saem completos.</div>
-    }
-    else
-    {
-        <div class="aviso aviso-alerta" style="font-weight:400">
-            <strong>@Plural(pendencias.Count, "pendência", "pendências").</strong> Os documentos saem mesmo assim, com
-            esses campos em branco. Clique para ir até cada uma:
-            <div class="pendencias-lista">
-                @foreach (var p in pendencias)
-                {
-                    var alvo = p;
-                    <button class="pendencia" @onclick="() => IrPara(alvo)">
-                        @p.Texto <span class="subtitle" style="margin:0">· @NomeDaEtapa(p.Etapa)</span>
-                    </button>
-                }
-            </div>
-        </div>
-    }
 </div>
 @* "Mudou desde a rev 00": o item 21 preenche este componente; por enquanto ele não desenha nada *@
 <MudancasDaRevisao Atual="_proposta" Gravadas="_gravadas" />
-<div class="panel" style="margin-bottom:14px">
-    <div class="toolbar" style="flex-wrap:wrap">
-        <h2 style="margin:0; font-size:15px">Proposta comercial</h2>
-        <span class="subtitle ajuda" style="margin:0">
-            o modelo em Word da equipe, preenchido — com o preço de VENDA, não o custo
+<div class="panel docs-comercial">
+    <div class="docs-cabeca">
+        <h2>Proposta comercial</h2>
+        <span class="nota">
+            sai em <strong>@_proposta.Idioma</strong>
+            <button class="btn-link docs-idioma" @onclick="TrocarIdiomaDosDocumentos">trocar</button>
+            · com o preço de venda, não o custo
         </span>
-        <span style="flex:1"></span>
-        <button class="btn-primary" @onclick="GerarProposta"><Icone Nome="baixar" /> Gerar proposta</button>
     </div>
 
     @if (_proposta.Itens.Count == 0)
     {
-        <div class="panel empty" style="padding:16px; margin-top:14px">
+        <div class="panel empty" style="padding:16px; margin-top:12px">
             Escolha ao menos um equipamento no escopo — a proposta comercial é a lista deles.
         </div>
     }
     else
     {
-        <p class="subtitle ajuda" style="margin:12px 0 10px">
-            Sai em <strong>@_proposta.Idioma</strong> (muda no cabeçalho). Cada equipamento vira um
-            item da tabela de preço. A lista abaixo do título é <strong>a mesma do escopo da
-            proposta técnica</strong> — mexeu lá, muda aqui. Dá para corrigir o texto na mão;
-            a partir daí ele para de acompanhar a técnica, e o <strong>↺ rascunho</strong>
-            volta a juntar as duas.
+        <p class="nota ajuda docs-ajuda">
+            Cada equipamento vira um item da tabela de preço. A lista do que ele inclui é a mesma do
+            alcance da proposta técnica — mexeu lá, muda aqui. Dá para corrigir o texto na mão; a partir
+            daí ele para de acompanhar a técnica, e o rascunho volta a juntar as duas.
         </p>
 
         @for (var i = 0; i < _proposta.Itens.Count; i++)
         {
             var indice = i;
             var item = _proposta.Itens[indice];
-            var rascunho = EscopoEmTexto.Texto(item, _custo, _proposta.Moeda, TextosDaProposta.Do(Idioma));
+            var editado = item.Descricao.Trim().Length > 0;
+            var editando = EditandoDescricao(indice);
+            var (titulo, inclui) = DescricaoDoCartao(item);
+            var precoDeVenda = PrecoDeVenda(indice);
+            var rascunho = editando ? EscopoEmTexto.Texto(item, _custo, _proposta.Moeda, TextosDaProposta.Do(Idioma)) : "";
 
-            <div class="panel" style="margin:0 0 12px; padding:14px">
-                <div class="toolbar" style="margin-bottom:8px">
-                    <strong>Item @((indice + 1).ToString("D2"))</strong>
-                    <span class="subtitle">@item.Quantos un. · @DinheiroVenda(PrecoDeVenda(indice))</span>
-                    <span style="flex:1"></span>
-                    @if (item.Descricao.Trim().Length > 0)
+            <div class="docs-equip @(editando ? "editando" : "")">
+                <div class="docs-equip-cabeca">
+                    <strong>Equipamento @(indice + 1)</strong>
+                    <span class="docs-equip-num">
+                        · @item.Quantos un. ·
+                        @if (precoDeVenda > 0m)
+                        {
+                            <span>@DinheiroVenda(precoDeVenda)</span>
+                        }
+                        else
+                        {
+                            <span class="texto-alerta">sem preço</span>
+                        }
+                    </span>
+                    <span class="docs-espaco"></span>
+                    <button class="btn-link docs-editar" aria-expanded="@(editando ? "true" : "false")"
+                            @onclick="() => AlternarDescricao(indice)">@(editando ? "fechar texto" : "editar texto")</button>
+                </div>
+
+                <div class="docs-equip-titulo">@titulo</div>
+
+                @if (ModeloDe(item) is null)
+                {
+                    <div class="docs-falta texto-alerta">
+                        <Icone Nome="alerta" Classe="ico-p" /> modelo não escolhido
+                        <button class="btn-link" @onclick="@(() => IrAoEscopoDoCartao(indice, "f-modelo"))">escolher no Escopo</button>
+                    </div>
+                }
+                @* o título da comercial tira horizontal ou vertical do ARRANJO (e não
+                   da montagem): sem ele, sai "horizontal, instalado ao piso" *@
+                @if (!editado && item.Arranjo.Trim().Length == 0)
+                {
+                    <div class="docs-falta texto-alerta">
+                        <Icone Nome="alerta" Classe="ico-p" /> arranjo não definido: o título sai horizontal, instalado ao piso
+                        <button class="btn-link" @onclick="@(() => IrAoEscopoDoCartao(indice, "f-montagem"))">definir no Escopo</button>
+                    </div>
+                }
+
+                <div class="docs-equip-pe">
+                    @if (editado)
                     {
-                        <button class="btn-ghost" title="Voltar ao rascunho do sistema"
-                                @onclick="() => VoltarDescricao(indice)">↺ rascunho</button>
+                        <span class="texto-alerta">texto editado à mão — não acompanha a técnica</span>
+                        <span class="docs-sep">·</span>
+                        <button class="btn-link docs-rascunho" title="Voltar ao rascunho do sistema, que acompanha a técnica"
+                                @onclick="() => VoltarDescricao(indice)"><Icone Nome="desfazer" Classe="ico-p" /> rascunho</button>
+                    }
+                    else if (inclui.Count > 0)
+                    {
+                        <span>@PalavraDoInclui: @Plural(inclui.Count, "item", "itens") — igual ao alcance da técnica</span>
+                    }
+                    else
+                    {
+                        <span>sem a lista do que inclui: nada escolhido no escopo</span>
                     }
                 </div>
 
-                <textarea class="cell" rows="@(rascunho.Split('\n').Length + 1)" style="width:100%; font-family:inherit"
-                          value="@(item.Descricao.Trim().Length > 0 ? item.Descricao : rascunho)"
-                          @onchange="e => MudarDescricao(indice, e.Value?.ToString() ?? string.Empty)"></textarea>
-            </div>
-        }
-
-        @if (FaltamParaProposta is { Count: > 0 } faltam)
-        {
-            <div class="aviso aviso-alerta" style="margin-top:12px; font-size:12.5px">
-                <strong>Falta preencher para o documento sair completo:</strong>
-                <div style="margin-top:4px">@string.Join(" · ", faltam)</div>
+                @if (editando)
+                {
+                    <textarea class="cell docs-texto" rows="@((editado ? item.Descricao : rascunho).Split('\n').Length + 1)"
+                              aria-label="@($"Texto do equipamento {indice + 1} na proposta comercial")"
+                              value="@(editado ? item.Descricao : rascunho)"
+                              @onchange="e => MudarDescricao(indice, e.Value?.ToString() ?? string.Empty)"></textarea>
+                }
             </div>
         }
     }
 </div>
 
-<div class="panel" id="custo-previsto" style="margin-bottom:14px">
-    <div class="toolbar" style="flex-wrap:wrap; margin-bottom:0">
-        <h2 style="margin:0; font-size:15px">Custo previsto</h2>
-        <span class="subtitle ajuda" style="margin:0">
-            a planilha que o suprimentos usa para comprar as peças — uma linha por item de cada equipamento
-        </span>
-        <span style="flex:1"></span>
-        @if (!_pedindoCustoPrevisto)
-        {
-            <button class="btn-primary" @onclick="PedirCustoPrevisto"><Icone Nome="baixar" /> Gerar custo previsto</button>
-        }
-    </div>
-
-    @if (_pedindoCustoPrevisto)
+@* o custo previsto é de outra hora (o pedido fechado): uma linha que abre o
+   pedido do projeto e do pedido; o id fica, o IrParaCustoPrevisto rola até ele *@
+<div class="panel docs-custo-previsto" id="custo-previsto">
+    @if (!_pedindoCustoPrevisto)
     {
-        <div class="toolbar" style="flex-wrap:wrap; margin:14px 0 0">
-            <strong>Número do projeto</strong>
-            <input class="cell" style="width:150px" placeholder="ex.: NB0982" value="@_cpProjeto"
-                   @oninput="e => _cpProjeto = e.Value?.ToString() ?? string.Empty" />
-            <strong>Número do pedido</strong>
-            <input class="cell" style="width:150px" value="@_cpPedido"
-                   @oninput="e => _cpPedido = e.Value?.ToString() ?? string.Empty" />
+        <div class="docs-cp-linha">
+            <strong>Custo previsto</strong>
+            <span class="nota">planilha de suprimentos, uma linha por item de cada equipamento</span>
+            <span class="docs-espaco"></span>
+            <button class="btn-link" @onclick="PedirCustoPrevisto">gerar…</button>
+        </div>
+    }
+    else
+    {
+        <div class="docs-cp-linha">
+            <strong>Custo previsto</strong>
+            <span class="nota">planilha de suprimentos</span>
+        </div>
+        <div class="toolbar docs-cp-form">
+            <label class="docs-cp-campo">Número do projeto
+                <input class="cell" placeholder="ex.: NB0982" value="@_cpProjeto"
+                       @oninput="e => _cpProjeto = e.Value?.ToString() ?? string.Empty" />
+            </label>
+            <label class="docs-cp-campo">Número do pedido
+                <input class="cell" value="@_cpPedido"
+                       @oninput="e => _cpPedido = e.Value?.ToString() ?? string.Empty" />
+            </label>
             <button class="btn-primary" @onclick="GerarCustoPrevisto"><Icone Nome="baixar" /> Gerar</button>
             <button class="btn-ghost" @onclick="@(() => _pedindoCustoPrevisto = false)">Cancelar</button>
         </div>
-        <p class="subtitle" style="margin:10px 0 0">
+        <p class="nota" style="margin:8px 0 0">
             O arquivo sai como <strong>@(CustoPrevistoExcel.NomeDoArquivo(_cpProjeto.Trim().Length > 0 ? _cpProjeto : "PROJETO"))</strong>.
             Cada equipamento leva o número do projeto com o dele atrás
             (@CustoPrevistoExcel.CodigoDaLinha(_cpProjeto.Trim().Length > 0 ? _cpProjeto : "PROJETO", 0),

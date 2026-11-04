@@ -963,6 +963,7 @@ public partial class PropostaPage : IAsyncDisposable
         }
 
         if (feitos.Count > 0) RegistrarTempo("gerar-tudo");
+        DepoisDeGerarTudo(falhas.Count == 0);
 
         if (falhas.Count == 0)
         {
