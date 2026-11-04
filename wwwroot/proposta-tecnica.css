@@ -1,0 +1,177 @@
+/* Estilos da proposta: aba Técnica do equipamento (itens 08 e 09: seleção por exceção, curva em miniatura, diâmetro, altitude e ruído).
+   Um arquivo por área da fase B, carregado depois do app.css (Components/App.razor):
+   cada pista escreve só no seu, e o app.css não vira ponto de conflito.
+   Use os tokens do app.css (--primary, --warn-*, --info-*, --border...) e escreva
+   as regras sob .proposta, para não mexer nas outras telas. */
+
+/* ---- a aba Técnica numa tela (item 08) ----
+   Um painel só por equipamento (antes era um painel dentro do outro, que
+   comia largura). Abaixo de 1280 px tudo numa coluna, na ordem em que se
+   trabalha: arquivos, tabela, parte elétrica, curvas, alcance. A partir de
+   1280 px, duas colunas: o documento à esquerda e os arquivos à direita. */
+.proposta .tec-painel { padding: 16px 18px; margin-bottom: 14px; }
+.proposta .tec-cabeca { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 12px; margin-bottom: 12px; }
+.proposta .tec-cabeca h2 { margin: 0; font-size: 15px; }
+
+.proposta .tec-grade { display: flex; flex-direction: column; gap: 14px; }
+.proposta .tec-esq, .proposta .tec-dir { display: contents; }
+.proposta .tec-arquivos { order: 1; }
+.proposta .tec-dados { order: 2; }
+.proposta .tec-eletrica { order: 3; }
+.proposta .tec-curvas { order: 4; }
+.proposta .tec-alcance { order: 5; }
+
+@media (min-width: 1280px) {
+    .proposta .tec-grade {
+        display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(260px, 1fr);
+        gap: 16px; align-items: start;
+    }
+    .proposta .tec-esq, .proposta .tec-dir { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+}
+
+.proposta .tec-bloco { min-width: 0; }
+.proposta .tec-titulo {
+    margin: 0 0 6px; font-size: 11.5px; font-weight: 700; letter-spacing: .05em;
+    text-transform: uppercase; color: var(--text);
+}
+.proposta .tec-titulo .nota { text-transform: none; letter-spacing: 0; font-weight: 400; margin-left: 4px; }
+.proposta .tec-titulo .val-count { margin-left: 4px; }
+.proposta .tec-titulo-linha { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 10px; margin-bottom: 6px; }
+.proposta .tec-titulo-linha .tec-titulo { margin: 0; }
+.proposta .tec-espaco { flex: 1; }
+
+/* ---- DATOS DEL VENTILADOR ---- */
+.proposta .tec-tabela { box-shadow: none; border-radius: var(--radius-sm); table-layout: fixed; }
+.proposta .tec-tabela td { padding: 5px 10px; font-size: 13px; line-height: 1.4; vertical-align: middle; overflow-wrap: break-word; }
+.proposta .tec-tabela tbody tr:hover { background: transparent; }
+.proposta .tec-rotulo { width: 38%; color: #475569; }
+.proposta .tec-rotulo label { cursor: pointer; }
+.proposta .tec-valor strong { font-weight: 600; }
+.proposta .tec-valor .subtitle { font-size: 12.5px; }
+.proposta .tec-valor .btn-link { font-size: 12.5px; padding: 0 2px; }
+.proposta .tec-origem { width: 96px; text-align: right; white-space: nowrap; }
+.proposta .tec-origem .val-count { font-size: 11px; padding-left: 7px; padding-right: 7px; margin-left: 0; }
+
+/* a linha de resumo da seleção: um respiro azul, que é a seleção conferida */
+.proposta .tec-resumo td { background: var(--info-bg); }
+.proposta .tec-resumo.incompleto td { background: #fffdf5; }
+.proposta .tec-resumo-topo { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 8px; }
+.proposta .tec-resumo-arquivo { color: var(--muted); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
+.proposta .tec-resumo-valores { font-weight: 600; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.proposta .tec-resumo .btn-link { font-size: 12.5px; padding: 0 2px; }
+/* o "editar" fica sempre à direita, também quando a nota longa o leva para a linha de baixo */
+.proposta .tec-resumo-topo > .btn-link { margin-left: auto; }
+.proposta .val-count.tec-ok { background: var(--ok-bg); color: var(--ok-tx); border-color: var(--ok-bd); }
+.proposta .val-count.tec-alerta { background: var(--warn-bg); color: var(--warn-tx); border-color: var(--warn-bd); }
+.proposta .tec-extra { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 6px 10px; margin-top: 8px; }
+.proposta .tec-extra label { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: var(--muted); }
+.proposta .tec-extra .cell { width: 100%; }
+
+/* linha aberta para digitar: valor e unidade; a que falta fica âmbar */
+.proposta .tec-par { display: flex; gap: 6px; }
+.proposta .tec-par .cell { flex: 1; min-width: 0; padding: 4px 8px; }
+.proposta .tec-par .cell.tec-unid { flex: none; width: 64px; background: #f8fafc; color: var(--muted); }
+.proposta .tec-campo { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; }
+.proposta .tec-campo .cell { width: 96px; padding: 4px 8px; }
+.proposta .tec-unidade { color: var(--muted); font-size: 12.5px; white-space: nowrap; }
+.proposta .tec-lembrado { font-style: italic; }
+.proposta .tec-campo .btn-link { font-size: 12.5px; padding: 0 2px; }
+.proposta .tec-aberta td .nota { display: block; margin-top: 2px; }
+.proposta .tec-aberta td .nota .btn-link { font-size: 12.5px; padding: 0 2px; }
+.proposta .tec-falta td { background: var(--warn-bg); }
+.proposta .tec-falta .cell:not(.tec-unid) { border-color: var(--warn-bd); }
+.proposta .tec-falta .cell::placeholder { color: var(--warn-tx); opacity: .7; }
+
+.proposta .tec-aviso { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 12.5px; padding: 7px 12px; }
+.proposta .tec-aviso .ico { width: 16px; height: 16px; flex: none; }
+.proposta .tec-aviso span { flex: 1; }
+.proposta .tec-aviso .btn-link { font-size: 12.5px; white-space: nowrap; }
+
+/* ---- texto fixo recolhido: parte elétrica e EXCLUIDO ---- */
+.proposta .tec-recolhido {
+    border: 1px solid var(--border); border-radius: var(--radius-sm); background: #fff;
+}
+.proposta .tec-recolhido > summary {
+    display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 10px; cursor: pointer;
+    padding: 8px 12px; font-size: 12.5px; list-style: none;
+}
+.proposta .tec-recolhido > summary::-webkit-details-marker { display: none; }
+.proposta .tec-recolhido > summary::before {
+    content: ""; width: 6px; height: 6px; flex: none; align-self: center;
+    border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted);
+    transform: rotate(-45deg); transition: transform .12s; margin-right: 2px;
+}
+.proposta .tec-recolhido[open] > summary::before { transform: rotate(45deg); }
+.proposta .tec-recolhido > summary strong { font-size: 11.5px; letter-spacing: .05em; }
+.proposta .tec-recolhido > summary:hover { background: #f8fafc; }
+/* o foco do teclado no anel da cor do sistema, como nos botões (app.css) */
+.proposta .tec-recolhido > summary:focus-visible { outline: 2px solid var(--secondary); outline-offset: -2px; border-radius: var(--radius-sm); }
+.proposta .tec-recolhido-corpo { padding: 0 12px 12px; }
+.proposta .tec-quadro { box-shadow: none; border-radius: var(--radius-sm); margin-bottom: 8px; }
+.proposta .tec-quadro td { font-size: 12.5px; padding: 4px 10px; line-height: 1.4; }
+.proposta .tec-quadro th { padding: 6px 10px; }
+.proposta .tec-quadro tbody tr:hover { background: transparent; }
+
+/* ---- alcance ---- */
+.proposta .tec-texto { width: 100%; font-family: inherit; line-height: 1.45; resize: vertical; }
+.proposta .tec-juntar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 0; }
+.proposta .tec-juntar select { max-width: 100%; min-width: 220px; color: var(--secondary); }
+.proposta .tec-juntada {
+    display: inline-flex; align-items: center; gap: 2px; padding: 1px 2px 1px 10px;
+    border: 1px solid #d4e0ef; border-radius: 999px; background: #eef3fa; color: var(--primary); font-size: 12px;
+}
+.proposta .tec-juntada .btn-icone { padding: 2px; color: var(--primary); }
+.proposta .tec-excluido { margin-top: 4px; }
+
+/* ---- arquivos: seleção e área de soltar ---- */
+.proposta .tec-arquivo {
+    display: flex; align-items: center; gap: 8px; padding: 6px 10px; margin-bottom: 8px;
+    border: 1px solid var(--border); border-radius: var(--radius-sm); background: #f8fafc; font-size: 13px;
+}
+.proposta .tec-arquivo .ico { width: 16px; height: 16px; color: var(--primary); flex: none; }
+.proposta .tec-arquivo-nome { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.proposta .tec-arquivo .btn-link { font-size: 12.5px; flex: none; }
+.proposta .tec-vazio { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; font-size: 12.5px; }
+.proposta .tec-vazio .ico { width: 15px; height: 15px; flex: none; }
+.proposta .tec-solte { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.proposta .tec-solte strong { font-size: 13px; }
+.proposta .tec-solte span { font-size: 12px; }
+
+/* o que ficou de fora da última soltura, com o motivo */
+.proposta .tec-ignorados {
+    margin-top: 8px; padding: 6px 10px; font-size: 12.5px; border-radius: var(--radius-sm);
+    background: var(--warn-bg); border: 1px solid var(--warn-bd); color: var(--warn-tx);
+}
+.proposta .tec-ignorados-topo { display: flex; align-items: center; gap: 6px; }
+.proposta .tec-ignorados .btn-icone { padding: 2px; color: var(--warn-tx); }
+.proposta .tec-ignorado { display: flex; flex-direction: column; padding: 2px 0; min-width: 0; }
+.proposta .tec-ignorado .tec-arquivo-nome { font-weight: 600; }
+.proposta .tec-ignorado .nota { color: var(--warn-tx); }
+
+/* ---- curvas em miniatura ---- */
+.proposta .curva-mini { margin: 0 0 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; background: #fff; }
+.proposta .curva-mini-img {
+    display: flex; align-items: center; justify-content: center; width: 100%; padding: 6px;
+    border: 0; background: #fff; cursor: zoom-in;
+}
+.proposta .curva-mini-img img { display: block; max-width: 100%; max-height: 200px; object-fit: contain; }
+.proposta .curva-mini-img:hover { background: #f8fafc; }
+.proposta .curva-mini-img:focus-visible { outline: 2px solid var(--secondary); outline-offset: -2px; }
+.proposta .curva-mini figcaption {
+    display: flex; align-items: center; gap: 8px; padding: 5px 10px; border-top: 1px solid var(--border);
+    background: #f8fafc; font-size: 12.5px;
+}
+.proposta .curva-mini-nome { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.proposta .curva-mini figcaption .nota { white-space: nowrap; }
+.proposta .curva-mini figcaption .btn-link { font-size: 12.5px; flex: none; }
+
+/* ---- a curva inteira, num <dialog> modal da própria página ---- */
+.curva-dialogo {
+    padding: 0; border: 0; border-radius: var(--radius); box-shadow: var(--shadow);
+    max-width: min(1100px, 94vw); max-height: 92vh; overflow: hidden;
+}
+.curva-dialogo::backdrop { background: rgba(15, 23, 42, .55); }
+.curva-dialogo-corpo { display: flex; flex-direction: column; max-height: 92vh; background: #fff; }
+.curva-dialogo-topo { display: flex; align-items: center; gap: 10px; padding: 8px 10px 8px 16px; border-bottom: 1px solid var(--border); font-size: 13px; }
+.curva-dialogo-topo .nota { white-space: nowrap; }
+.curva-dialogo img { display: block; max-width: 100%; max-height: calc(92vh - 50px); object-fit: contain; margin: 0 auto; padding: 12px; }

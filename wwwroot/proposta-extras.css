@@ -1,0 +1,89 @@
+/* Estilos da proposta: Começar, Documentos e o resto (itens 11, 19, 20, 21 e 22: área para soltar, cartões dos documentos, Mudou desde a rev, custos à mão).
+   Um arquivo por área da fase B, carregado depois do app.css (Components/App.razor):
+   cada pista escreve só no seu, e o app.css não vira ponto de conflito.
+   Use os tokens do app.css (--primary, --warn-*, --info-*, --border...) e escreva
+   as regras sob .proposta, para não mexer nas outras telas. */
+
+/* ---- item 22: o relatório "Custos digitados à mão" (Configurações) ----
+   Fora da tela da proposta, por isso sob .custos-a-mao e não sob .proposta. */
+.custos-a-mao-filtro {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px;
+    padding: 12px 18px; margin-bottom: 14px;
+}
+.custos-a-mao-filtro .btn-ghost { padding: 7px 14px; display: inline-flex; align-items: center; gap: 6px; }
+.custos-a-mao-filtro .btn-ghost:disabled { opacity: .5; cursor: default; }
+.custos-a-mao-tabela td, .custos-a-mao-tabela th { padding: 10px 14px; }
+.custos-a-mao-tabela td.num { font-variant-numeric: tabular-nums; }
+
+/* ---- item 22: a dica "último à mão" sob o campo de custo ----
+   Numa coluna estreita ela quebra em linhas do mesmo tamanho, e não com uma
+   palavra sozinha no fim. */
+.proposta .dica-do-custo { text-wrap: balance; }
+
+/* ---- item 19: a etapa Começar ----
+   Importar à esquerda (o começo mais comum), as recentes à direita; o
+   "começar em branco" virou um link sob a área de soltar. */
+.proposta .comecar-grid { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); align-items: start; }
+@media (max-width: 1000px) { .proposta .comecar-grid { grid-template-columns: minmax(0, 1fr); } }
+.proposta .comecar-box { gap: 12px; }
+.proposta .comecar-soltar { min-height: 132px; }
+.proposta .comecar-branco { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 4px; font-size: 13.5px; color: var(--muted); }
+.proposta .comecar-branco .btn-link { padding: 2px 0; font-weight: 600; }
+.proposta .comecar-branco .nota { margin: 0; }
+
+/* a lista "arquivo → destino": o nome corta com reticências (o inteiro no
+   title), o destino quebra antes de cortar */
+.proposta .importados { gap: 0; border-top: 1px solid var(--border); padding-top: 8px; }
+.proposta .importados-titulo { font-size: 12px; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+.proposta .importados-titulo .nota { font-weight: 400; }
+.proposta .importado {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1.25fr);
+    align-items: center; gap: 8px; padding: 4px 0; font-size: 12.5px;
+    border-bottom: 1px dashed var(--border);
+}
+.proposta .importado:last-child { border-bottom: 0; }
+.proposta .importado-nome { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.proposta .importado-seta { color: var(--muted); }
+.proposta .importado-destino { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; color: var(--muted); min-width: 0; }
+.proposta .importado-destino .nota { margin: 0; font-size: 12px; }
+/* largura fixa: sem ela o select toma a largura da opção mais comprida
+   ("equip. 2 · troca de lugar"), e fechado ele só mostra "equip. 1" */
+.proposta .destino-equip { width: 7.6em; padding: 3px 4px 3px 8px; font-size: 12.5px; }
+
+/* as recentes: a linha inteira abre (número, revisão, data e o cliente
+   inteiro na 2ª linha); copiar é o botão só com o ícone */
+.proposta .lista-gravadas .linha { padding: 2px 0; gap: 2px; align-items: center; }
+.proposta .linha-abrir {
+    flex: 1; min-width: 0; display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto;
+    align-items: center; column-gap: 8px; row-gap: 2px; padding: 7px 8px;
+    background: none; border: 0; border-radius: 6px; font: inherit; color: var(--text);
+    text-align: left; cursor: pointer;
+}
+.proposta .linha-abrir:hover { background: #f2f7fd; }
+.proposta .linha-abrir:focus-visible { outline: 2px solid var(--secondary); outline-offset: -2px; }
+.proposta .linha-abrir .numero { font-weight: 600; white-space: nowrap; }
+.proposta .linha-abrir .prop-chip { font-size: 11px; padding: 0 7px; line-height: 1.5; }
+.proposta .linha-abrir .data { grid-column: 4; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.proposta .linha-abrir .cliente { grid-column: 1 / -1; color: var(--muted); font-size: 12.5px; line-height: 1.35; overflow-wrap: anywhere; }
+.proposta .linha-copiar { flex: none; align-self: center; padding: 7px; }
+
+/* ---- item 21: "Nova revisão" no menu Mais ----
+   Sem ícone próprio: o texto fica alinhado com o dos itens que têm ícone
+   (10 px de margem + 16 px do ícone + 9 px de espaço). */
+.proposta .menu-pop [role=menuitem].sem-icone { padding-left: 35px; }
+
+/* ---- item 21: "Mudou desde a rev 00" na etapa Documentos ---- */
+.proposta .mudancas-revisao { margin-bottom: 14px; border-left: 3px solid var(--primary); }
+.proposta .mudancas-cabeca { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin-bottom: 8px; }
+.proposta .mudancas-cabeca h2 { margin: 0; font-size: 15px; }
+.proposta .mudancas-lista { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: auto auto minmax(0, 1fr); column-gap: 14px; }
+.proposta .mudancas-lista li { display: contents; }
+.proposta .mudancas-lista li > span { padding: 5px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+.proposta .mudancas-lista li:last-child > span { border-bottom: 0; }
+.proposta .mudanca-onde { color: var(--muted); white-space: nowrap; }
+.proposta .mudanca-o-que { font-weight: 600; color: var(--text); }
+.proposta .mudanca-valores { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; min-width: 0; }
+.proposta .mudanca-antes { color: var(--muted); text-decoration: line-through; text-decoration-color: rgba(100, 116, 139, .5); }
+.proposta .mudanca-seta { color: var(--muted); }
+.proposta .mudanca-depois { color: var(--text); font-weight: 600; }
+.proposta .mudancas-todas { margin-top: 6px; padding-left: 0; }

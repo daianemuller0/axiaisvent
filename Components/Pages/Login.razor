@@ -1,12 +1,20 @@
 @page "/login"
 @layout EmptyLayout
 @attribute [AllowAnonymous]
+@inject BrandingRepository Branding
 
 <div class="login2">
     <div class="login2-left">
         <div class="login2-top">
             <div class="login2-logo">
-                <div class="login2-logo-fallback">Howden<small>A Chart Industries Company</small></div>
+                @if (_logo is not null)
+                {
+                    <img src="@_logo" alt="Logo" />
+                }
+                else
+                {
+                    <div class="login2-logo-fallback">Howden<small>A Chart Industries Company</small></div>
+                }
             </div>
             <div class="login2-tag">Enterprise Platform · Ventiladores Axiais</div>
         </div>
@@ -66,4 +74,8 @@
     public string? ErrorFlag { get; set; }
 
     private bool Error => ErrorFlag == "1";
+
+    private string? _logo;
+
+    protected override void OnInitialized() => _logo = Branding.GetLogoPaginaInicial();
 }

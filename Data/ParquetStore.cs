@@ -79,6 +79,14 @@ public sealed class ParquetStore
         _versao.AddOrUpdate(entity, 1, (_, v) => v + 1);
 
     /// <summary>
+    /// A próxima leitura desta entidade vai ao disco, e não ao cache. É o
+    /// <see cref="Esquecer"/> de uma entidade só: serve para quando o que outra
+    /// máquina gravou na pasta de rede importa agora (ex.: o próximo número de
+    /// proposta), sem obrigar a reler todos os cadastros.
+    /// </summary>
+    public void Atualizar(string entidade) => Invalidar(entidade);
+
+    /// <summary>
     /// A partir de quantos arquivos vale a pena juntar tudo num só. Abaixo
     /// disso a leitura é rápida e compactar só daria trabalho.
     /// </summary>

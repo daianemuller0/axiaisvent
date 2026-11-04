@@ -113,6 +113,239 @@ duas escadas independentes.
 Onde a rotação está vazia, o campo sugere em cinza a rotação síncrona de polos +
 frequência; é só dica, o valor gravado é o que você digitar.
 
+## A seção Conversão
+
+Quarta seção da guia Dados (`/axiais/conversao`): converte o custo em **CLP** para **USD**. A
+equipe digita a taxa do jeito que se fala — `1 USD = X CLP` — e o **Ver o que muda** mostra
+quantos valores serão recalculados em modelos, motores, características e tabelas por
+referência. Confirmado, o USD de **todo item que tem CLP** é gravado (CLP ÷ taxa, duas casas) e
+as propostas já usam os valores novos. Item sem CLP não é tocado. A opção *só preencher o que
+está vazio* preserva o USD digitado à mão. A taxa fica gravada (`taxas_conversao`) com a data da
+última gravação; o código está em `Data/ConversaoRepository.cs`.
+
+**O real está fora de uso por enquanto.** O interruptor é `Moedas.UsaReal` (`Data/Moeda.cs`):
+desligado, a coluna R$ some das telas e das planilhas de Dados, a moeda R$ some da proposta e a
+conversão só trata o dólar. Os valores em R$ já gravados continuam no banco; para religar, basta
+trocar o valor para `true`. Na guia Dados, o que se chamava *preço* agora é *custo*.
+
+## Identidade Visual
+
+Seção **Identidade Visual** dentro de **Configurações** (`/axiais/configuracoes`, ou `/axiais/marca`): troca os dois logos do sistema, sem mexer
+em código. O **logo da página inicial** aparece na tela de entrada (login) e o **logo do
+sistema** na barra lateral, em todas as telas. Aceita PNG ou JPG de até 1 MB (de preferência
+PNG com fundo transparente); a troca vale na hora, inclusive na barra lateral de quem já está
+com o sistema aberto. Sem logo enviado, cada lugar volta ao padrão da Howden. Os logos ficam
+gravados na pasta de dados (entidade `branding`, `Data/BrandingRepository.cs`). O logo do
+documento das propostas não passa por aqui: ele é o do modelo em Word da equipe.
+
+## Conversão de moeda da proposta
+
+O custo pode estar numa moeda e o preço ao cliente em outra — o mesmo funcionamento do sistema
+de Serviços. Na tela **Proposta**: a **moeda do custo** é a do escopo (de onde o cadastro puxa o
+custo) e, na seção **Pricing**, **Preço ao cliente em** escolhe a moeda do preço. Sendo diferentes,
+aparece a caixa **Conversão da moeda**:
+
+- **Taxa de conversão**, nos dois sentidos: `1 <moeda do preço> em <moeda do custo>` ou o inverso
+  (internamente guardada sempre no primeiro). Ex.: custo em CLP, preço em USD, `1 USD = 950 CLP`.
+- **Segurança da moeda**: % tirado da taxa. Com 5% a conversão usa 902,5 em vez de 950 — o preço em
+  USD sobe, e se o dólar cair até 5% o valor em pesos não perde.
+- Preço = custo ÷ taxa efetiva, com duas casas. O custo e todo o pricing continuam na moeda do
+  custo; só o valor final é convertido (venda líquida e preço com impostos, o preço de cada
+  equipamento, os opcionais e o valor do histórico).
+- Sem taxa informada a tela avisa e o preço sai sem conversão. Custo e preço na mesma moeda nunca
+  convertem. O Word da proposta comercial sai na moeda do preço; o Custo Previsto, na do custo.
+
+O código está em `Data/Cambio.cs`; a moeda do preço, a taxa, o sentido e a segurança ficam gravados
+na proposta. A planilha **Gerar pricing** recebe o custo na moeda do custo, a **margem** usada na tela (padrão 25%) e a
+conversão na caixa **Moedas** (taxa efetiva em I35..I38 — USD, EUR, GBP, CLP — e a moeda escolhida em
+BD_pricing!A1, a ligação dos botões; o botão da moeda do preço sai marcado); o valor convertido (Q13) e a venda líquida fecham em uma casa. A caixa só tem USD, EUR, GBP e CLP:
+com PEN ou R$ como moeda do preço, a planilha fica na moeda do custo e a tela avisa.
+
+## Configurações, papéis e revisões
+
+**Configurações** (`/axiais/configuracoes`, só ADM): cria usuários com **papel de acesso** — ADM
+(tudo: Configurações, Identidade Visual, Dados e excluir propostas), Cadastro (Proposta, Base de
+Dados e Dados) e Comercial (Proposta e Base de Dados). A senha é guardada só como resumo (PBKDF2).
+Usuário inativo não entra. O acesso de `appsettings.json` (Auth:Usuario / Auth:Senha) continua
+valendo como ADM, para abrir o sistema na primeira vez. O menu mostra só o que o papel permite.
+
+**Base de Dados** (antiga lista de propostas): para o ADM, ganha a coluna **Rev.** e o botão
+**Excluir** (com confirmação; cada revisão é uma proposta à parte).
+
+**Revisões:** abrir uma proposta gravada, mudar o número da revisão e **Salvar** não sobrescreve a
+anterior — grava uma proposta nova, com o mesmo número e a revisão atualizada (ainda não enviada). Se
+a revisão já existir, o sistema recusa e avisa.
+
+A guia **Base** (planilha solta) foi retirada; o sistema abre na **Proposta**.
+
+## Proposta em etapas (montar em menos tempo)
+
+A tela de proposta deixou de ser uma página só com doze caixas abertas. Agora são **cinco etapas**
+— **Começar**, **Cliente e condições**, **Equipamentos**, **Preço** e **Documentos** —, cada uma a
+um clique na barra do alto (com o visto ou o número de pendências), e um **painel fixo à direita** com a
+venda líquida, **Salvar (Ctrl+S)**, **Gerar tudo**, o custo, a margem e as pendências. Cada etapa
+termina em **Salvar e continuar**.
+
+- **Começar**: abrir ou **copiar** uma proposta gravada (busca por cliente, número ou projeto),
+  **importar todos os arquivos de uma vez** (folha de dados, seleções e curvas — cada arquivo vai
+  para o equipamento certo: pelo número no nome, "eq2", "item 3", senão para o primeiro livre) ou
+  começar em branco.
+- **O que já se sabe não se digita**: a proposta nova nasce com os padrões de quem está logado
+  (preparada por, contato Howden, BU, idioma, validade, prazo e moeda do custo da última proposta
+  dele); ao escolher um **cliente** que já tem proposta, contato, cidade, país, condições de
+  pagamento, incoterm, entrega, representante e moedas vêm da última proposta dele — só o que ainda
+  estava em branco ou no padrão, com **desfazer**; a **taxa de câmbio** CLP↔USD vem da aba Conversão.
+- **Equipamentos**: abas por equipamento (Escopo e parte elétrica · Opcionais · Técnica),
+  **filtro** na lista de modelos, **duplicar equipamento**, **escopo padrão por série** (guardado uma
+  vez a partir de um equipamento bem montado; o próximo da série já nasce com ele) e **sugestão de
+  motor pela seleção** (potência consumida + 10% de folga; polos e frequência pela rotação, ou a
+  frequência do país de destino).
+- **Pendências**: tudo o que os documentos deixariam em branco, de todas as etapas, sempre à vista
+  e clicável — leva direto ao campo ou ao equipamento.
+- **Gerar tudo**: salva e baixa comercial, técnica e pricing de uma vez.
+- **Modo compacto**: os textos de ajuda ficam escondidos; **Mais › Mostrar ajuda** traz de volta
+  (a escolha fica lembrada no navegador). Campos que quase nunca mudam ficam em **Mais campos**.
+
+### Nota de versão — Onda 0: medir antes de mexer, gravar só o que mudou
+
+- **Medição por etapa**: o cronômetro passa a gravar também o tempo em cada etapa (a Equipamentos
+  por aba), a origem da proposta (nova, importada, cópia, aberta ou revisão), o número de
+  equipamentos e quantas vezes cada atalho da tela foi usado. Desenhos a menos de 400 ms um do outro
+  contam como uma interação só.
+- **Gravar só o que mudou**: Salvar, Salvar e continuar e Gerar tudo não escrevem outro arquivo na
+  pasta de rede quando nada mudou (o Salvar e o Ctrl+S avisam "Nada mudou desde a última
+  gravação"). Depois de gravar, só a lista de propostas é relida — e ela já traz o que os colegas
+  gravaram.
+- **Documento sempre com número**: comercial, técnica, pricing e custo previsto avulsos gravam a
+  proposta antes (nada mais de `P_SEM-NUMERO`). O número da proposta nova sai do que está na pasta
+  na hora de gravar, e não do que a tela leu ao abrir.
+- **Nada se perde sem aviso**: **+ Nova**, abrir, copiar, Duplicar e sair pelo menu do app, com
+  alteração não salva, mostram a barra *Há alterações não salvas em PRP-…* com **Salvar**,
+  **Descartar** e **Cancelar**. Nada é gravado sem clique.
+- **Rótulos que enganavam**: a coluna dos opcionais é o *Preço ao cliente* na moeda de venda; a taxa
+  diz de que data é na aba Conversão (âmbar depois de 7 dias); o painel mostra *2 itens · 3 un.* e só
+  mostra o preço com impostos quando ele é diferente; fora do Brasil, o J6 do pricing vira uma nota
+  sob o país; o segundo país se chama *País de destino*.
+
+### Nota de versão — Onda 1: base visual e moldura da tela
+
+- **Topo enxuto**: o título é o número da proposta, com os selos *rev 00* e *Em elaboração* (ou
+  *Enviada em 03/11*, que desfaz com um clique) e, embaixo, cliente · projeto. Ficam à vista só
+  **Propostas**, **+ Nova** e **Mais** — Duplicar proposta, Marcar como enviada, Mostrar/Esconder
+  ajuda e Apagar (ADM). O menu abre e anda pelo teclado (setas, Esc).
+- **Aviso em três níveis**, no pé da coluna do meio (nunca por cima do painel): o sucesso some em
+  6 s; a consequência ("Modelo trocado: o preço à mão do anterior foi descartado", "Cópia da …",
+  "Recuperei…") e o erro ficam até alguém fechar. Depois de um Gerar tudo sem falha, o aviso oferece
+  **Marcar como enviada**.
+- **Etapas que dizem a verdade**: o visto só aparece com conteúdo e nada pendente (Documentos: com
+  equipamento e nenhuma pendência em lugar nenhum); etapa não começada fica sem selo. A barra não
+  quebra linha; o cronômetro fica só nela.
+- **Painel que cabe no notebook (1366x768)**: venda líquida, **Salvar** azul quando há o que gravar e
+  "Salvo" discreto quando não, **Gerar tudo** com seta para os documentos avulsos (comercial,
+  técnica, pricing, custo previsto), os números e as pendências.
+- **Menu do app recolhível**: botão no rodapé do menu; sem escolha guardada, ele recolhe sozinho só
+  abaixo de 1400 px de largura.
+- **Base visual**: cores por função nos avisos (contraste do âmbar corrigido), ícones de traço no
+  lugar dos emojis, controle segmentado (moeda, tipo, arranjo, montagem, Sem/Com, margem/preço),
+  valores em CLP sem centavos nas telas de leitura (o campo de custo continua com até duas casas),
+  "1 item / 3 itens" no lugar de "item(ns)" e os nomes das listas como se leem ("Partidores",
+  "Conexão manga descarga") — só na tela; o que é gravado não muda.
+- **Pendências que levam ao campo**: cada pendência abre a etapa, o equipamento e a aba certos, leva
+  o campo para o meio da tela, põe o cursor nele e o marca com um anel âmbar por um instante. Um
+  equipamento sem modelo continua mostrando o que falta (seleção, curva, partidor). No painel, as
+  pendências ficam por lugar ("Equip. 2 · 3" abre a lista dele) e, num grupo cinza fechado, os
+  **avisos** — o que sai em branco mas não impede de gerar (referência do cliente, projeto,
+  aplicação, arranjo/montagem). Os avisos não entram na contagem nem no selo das etapas.
+- **Faixa do equipamento fixa**: na etapa Equipamentos, os chips "Equip. 1 · Joy 27 1/7 · 2 un."
+  (com um ponto âmbar quando há pendência), o **+ equipamento** e as abas Escopo · Opcionais ·
+  Técnica ficam presos no alto. Trocar de equipamento ou de aba com a tela rolada volta ao começo do
+  conteúdo; no alto, nada pula. A moeda do custo fica no alto do escopo.
+- **Rodapé que percorre os equipamentos**: "Continuar: Técnica do equip. 1", "Continuar: Equip. 2"
+  e, no fim, **Salvar e continuar → Preço** (só este grava). A aba Opcionais entra no caminho quando
+  algum equipamento tem opcional; senão, fica como link ao lado do botão, com o "ir para Preço".
+
+### Nota de versão — Onda 2: cada etapa numa tela (proposta v2)
+
+A meta desta onda era tirar mais 25% do tempo de uma proposta típica (nova, 2 equipamentos). A
+recontagem clique a clique na tela nova, a 1366x768, dá **485 s → 350 s (−28%)**; no navegador comum,
+sem o app desktop, 354 s (−27%). O número de verdade sai do cronômetro: compare em **Configurações ›
+Tempo das propostas** antes e depois do marco "Proposta v2" (a data do marco, em `VistaTempos`, deve ser
+a da publicação na rede).
+
+- **Cliente e condições numa tela**: o que se digita primeiro (referência, projeto, data de
+  fechamento) vem antes; o que veio lembrado do cliente fica em verde, com **desfazer**; as
+  condições aparecem como frase, e um clique no pedaço ("Pagamento") abre a edição já no campo.
+  O projeto sugere os do mesmo cliente.
+- **Escopo em grade**: cada lista numa linha, Sem/Com legível, o custo sempre na mesma coluna, o que
+  falta decidir em âmbar e o botão **Sem em: … (4)** para marcar de uma vez o que não vai.
+- **Modelo pela seleção em botões** ("Pela seleção: 27-21 Series 2000"), um filtro por equipamento.
+- **Escopo que nasce pronto**: do outro equipamento desta proposta, do padrão da série ou da última
+  proposta do mesmo cliente, sempre dizendo de onde veio, com **desfazer** na linha e sem passar
+  por cima do que a folha de dados respondeu.
+- **Motor fechado pela seleção**: potência, polos e frequência filtram os candidatos; o motor que
+  o cliente já comprou desempata. Escolhido, vira um cartão de resumo com **trocar**.
+- **Aplicação lembrada**: desta proposta primeiro ("igual ao equip. 1: …"), depois do mesmo cliente.
+- **Opcionais**: um seletor **+ Adicionar opcional…** e a lista do que foi escolhido; opcional
+  copiado de outra proposta diz de qual.
+- **Técnica numa tela**: a seleção é conferida por exceção ("7 de 7 lidos"; só o que faltou fica
+  aberto), a curva em miniatura (clique amplia), DATOS ELÉCTRICOS recolhido com resumo (abre
+  sozinho só quando o partidor não casa com nenhum quadro) e **diâmetro, altitude e ruído**
+  digitados na tela, e não mais completados no Word. O diâmetro de um modelo igual numa proposta
+  anterior vem lembrado; trocando o tamanho do ventilador, ele sai.
+- **Preço**: margem, risco, negociação, moeda e taxa numa faixa no alto; uma linha por equipamento,
+  recolhida quando o custo está completo; a memória de cálculo recolhida. "Sem" não conta como
+  linha sem custo, e o visto da etapa só aparece com modelo e custo em tudo.
+- **Documentos**: um cartão por equipamento com o que sai na comercial e o que falta em destaque
+  (preço parcial em âmbar, com **completar no Preço**); um só **Gerar tudo**, com a seta para os
+  documentos avulsos. Um Gerar tudo de cada vez (o duplo clique não baixa duas vezes).
+- **Importar**: área para soltar os arquivos, a curva pareada com a seleção pelo nome e o destino de
+  cada arquivo corrigível na própria lista "Onde cada arquivo entrou".
+- **Pasta da proposta (app desktop)**: comercial, técnica, pricing e custo previsto vão direto para
+  `<raiz>\PRP-2026-104 rev 00`, sem apagar versões (a anterior vai para `anteriores`); **Abrir pasta**
+  no aviso. Ver `desktop/LEIAME-desktop.md`.
+- **Nova revisão em um clique** (menu Mais), com "Mudou desde a rev 00" no alto; a revisão que outra
+  máquina já gravou é lida da pasta e não se repete.
+- **Avisos**: a consequência ("Escopo trazido da PRP-2026-104 — confira") sai do pé da tela quando
+  se troca de equipamento, de aba ou de etapa; o **desfazer** continua na linha. Erro e o aviso do
+  Gerar tudo ficam. **Marcar como enviada** no aviso só grava se nada mudou depois de gerar.
+- **Começar**: abrir pela linha inteira e **Copiar como nova…** em cada proposta gravada.
+- **Custos digitados à mão** (Configurações, ADM): o que a equipe digitou fora do cadastro, por
+  modelo e linha, com CSV para levar ao cadastro; no escopo, a dica "último à mão" só lê.
+
+### O cronômetro (tempo de cada proposta)
+
+A tela mede o tempo de trabalho em cada proposta — pausas de mais de 3 minutos não contam — e grava,
+a cada documento gerado, o tempo, o número de interações, o tempo por etapa, a origem, o número de
+equipamentos e os atalhos usados (entidade `tempos_proposta`; as linhas antigas, sem essas colunas,
+continuam sendo lidas). Em **Configurações › Tempo das propostas** (ADM) ficam o filtro por origem e
+por número de equipamentos (o padrão é a proposta típica da meta: nova ou importada, com 2
+equipamentos), a mediana, a lista, a comparação **antes e depois de cada mudança da tela** (a lista
+de marcos fica no próprio componente `VistaTempos`), o tempo por etapa, o retrabalho (gerar de novo a
+mesma revisão; segundo Gerar tudo em menos de 24 h) e os atalhos usados. Com menos de 10 propostas
+de um dos lados, a tela diz "poucos dados". Conta a primeira geração de cada revisão. É o número
+para comparar com o processo antigo.
+
+### Anexos sempre na pasta certa
+
+Uma proposta nova é **gravada antes do primeiro anexo** (curva ou seleção do VAX com curva). Antes ela
+ganhava um id provisório, e o primeiro "Salvar" — que via ali uma revisão nova — trocava o id e
+deixava as curvas para trás. E uma **revisão nova** leva os anexos da anterior para a pasta dela
+(`Anexos.CopiarTodos`): antes, as curvas da revisão nova abriam quebradas. Uma curva **tirada**
+(Remover, ou o equipamento removido) só sai da pasta no **Salvar**, e da pasta da proposta gravada
+naquele momento: numa revisão nova ainda não gravada, a da revisão anterior (a que o cliente
+recebeu) não perde nada, e o Descartar volta a uma proposta com o arquivo da curva no lugar.
+
+## Rascunho: recarregar a página não perde a proposta
+
+A proposta em andamento é copiada para o navegador (localStorage) a cada alteração e volta quando a
+página abre — inclusive depois de recarregar (F5) ou de o servidor reiniciar. O rascunho vale
+enquanto a proposta não for gravada: **Salvar** o apaga, e **Descartar** (na barra de alteração não
+salva) também. Abrindo uma proposta gravada,
+só é recuperado o que for diferente do que está gravado. Cada proposta tem o seu rascunho; sem id na
+rota, volta a que estava sendo editada por último. O rascunho é do navegador e da máquina da pessoa
+(não vai para a pasta de rede) e, como os campos de texto só confirmam ao sair deles, o que ainda está
+sendo digitado no momento do recarregamento não entra.
+
 ## A aba Base
 
 Hoje o sistema tem uma aba, **Base**, com a planilha da equipe:
@@ -154,7 +387,35 @@ no `appsettings.json`). Para testar na sua máquina, troque por `"data"`.
 
 - `desktop/` — a janela própria (WinForms + WebView2 + Kestrel no mesmo processo).
 - `launcher/` — o `VA.exe` que mora na rede, compara versões e abre o app local.
-- `.\publicar.ps1` — publica em `\\BZVCPFIL003\proj_ramires$\VA`.
+- `.\publicar.ps1` — publica em `\\BZVCPFIL003\proj_ramires$\axiais`.
 
 Detalhes de arquitetura: [ARQUITETURA.md](ARQUITETURA.md) ·
 [desktop/LEIAME-desktop.md](desktop/LEIAME-desktop.md).
+
+### Como o pricing é preenchido (imagens e botões preservados)
+
+A planilha da equipe é editada **direto no pacote .xlsm** (`Data/PacoteXlsm.cs`), sem ser regravada por uma biblioteca
+de planilhas. Assim as imagens, os botões, as caixas de seleção e as macros chegam como no modelo (antes algumas imagens
+apareciam como "Não é possível exibir esta imagem"). O sistema só escreve as células de entrada, marca o botão da moeda
+do preço na caixa **Moedas** e pede ao Excel para recalcular ao abrir.
+
+### Publicar na rede e o atalho com a logo
+
+`.\publicar.ps1` publica em `\\BZVCPFIL003\proj_ramires$\axiais` (o `VA.exe` e a pasta `app\<versão>`) e deixa lá um
+atalho **VA - Ventiladores Axiais Howden.lnk** com a logo da Howden. A logo (`howden.ico`, em `launcher/` e `desktop/`) é o
+ícone do `VA.exe`, do aplicativo e das janelas; na primeira abertura pela rede o lançador cria o mesmo atalho, com a logo,
+na área de trabalho do usuário. Rode o script no Windows, em uma máquina que enxergue a pasta de rede.
+
+### Modelos na versão publicada
+
+No aplicativo publicado os modelos (`proposta-comercial.docx` e `pricing.xlsm`) não ficam em `wwwroot/modelos`, e sim
+em `wwwroot/_content/HowdenAxiais.Poc/modelos` (regra do SDK para o projeto referenciado pelo desktop). O sistema procura
+nos dois lugares (`Data/Modelos.cs`), e o `publicar.ps1` copia os modelos também para `wwwroot/modelos` e confere, antes
+de mandar para a rede, se os modelos, o `pdfium.dll` (leitura do PDF da curva), o `libSkiaSharp.dll`, o `duckdb.dll` e o
+`appsettings.json` estão na versão publicada.
+
+### Curvas de performance: PDF, imagem ou TXT
+
+Na proposta técnica, a caixa **Curvas de performance** aceita PDF, PNG, JPG e **TXT**. Como no documento a curva entra
+como imagem, o PDF é desenhado em PNG (`CurvaEmImagem`) e o TXT também (`TextoEmImagem`, em fonte de largura fixa para as
+colunas dos dados de performance continuarem alinhadas). O arquivo original fica guardado nos anexos.

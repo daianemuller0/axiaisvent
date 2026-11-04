@@ -103,9 +103,12 @@
                 <th class="nowrap" style="width:105px">IEC/NEMA</th>
                 <th class="nowrap" style="width:150px">Frame</th>
                 <th class="nowrap" style="width:130px">Código</th>
-                <th class="nowrap" style="width:120px">Preço USD</th>
-                <th class="nowrap" style="width:120px">Preço CLP</th>
-                <th class="nowrap" style="width:120px">Preço R$</th>
+                <th class="nowrap" style="width:120px">Custo USD</th>
+                <th class="nowrap" style="width:120px">Custo CLP</th>
+                @if (Moedas.UsaReal)
+                {
+                    <th class="nowrap" style="width:120px">Custo R$</th>
+                }
                 <th class="nowrap" style="min-width:230px">Observações</th>
                 <th class="nowrap" style="width:110px"></th>
             </tr>
@@ -146,7 +149,10 @@
                     <td>@Campo(motor, motor.Codigo, (x, v) => x.Codigo = v, "—", 110)</td>
                     <td>@Preco(motor, Moeda.Usd)</td>
                     <td>@Preco(motor, Moeda.Clp)</td>
-                    <td>@Preco(motor, Moeda.Brl)</td>
+                    @if (Moedas.UsaReal)
+                    {
+                        <td>@Preco(motor, Moeda.Brl)</td>
+                    }
                     <td>@Campo(motor, motor.Observacoes, (x, v) => x.Observacoes = v, "—", 230)</td>
                     <td class="nowrap center">
                         <button class="btn-link" title="Subir (carcaça menor)" @onclick="() => Mover(motor, -1)">↑</button>
@@ -301,7 +307,7 @@
         Aviso($"{motor.Descricao}: gravado.");
     }
 
-    /// <summary>As três moedas em que a equipe cadastra preço.</summary>
+    /// <summary>As três moedas em que a equipe cadastra custo.</summary>
     private enum Moeda { Usd, Clp, Brl }
 
     private static string Rotulo(Moeda m) => m switch
@@ -315,8 +321,8 @@
     };
 
     /// <summary>
-    /// O preço tem validação própria: número que não dá para ler é recusado,
-    /// porque um preço errado é pior do que um preço em branco.
+    /// O custo tem validação própria: número que não dá para ler é recusado,
+    /// porque um custo errado é pior do que um custo em branco.
     /// </summary>
     private RenderFragment Preco(Motor motor, Moeda moeda) => @<text>
         <input class="cell" placeholder="—" style="max-width:100px; text-align:right"
@@ -332,7 +338,7 @@
         if (preco.Length > 0 && DadosExcel.Numero(preco) is null)
         {
             _todos = Repo.Todos();   // devolve o campo ao valor gravado
-            Aviso($"\"{preco}\" não parece um preço. Use 1234,56 ou 1234.56.", erro: true);
+            Aviso($"\"{preco}\" não parece um custo. Use 1234,56 ou 1234.56.", erro: true);
             return;
         }
 

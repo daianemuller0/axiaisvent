@@ -7,7 +7,7 @@ processo** faz três papéis — servidor ASP.NET Core (Kestrel), janela nativa
 ## Fluxo de inicialização (com a barra de %)
 
 ```
-VA.exe (lançador, na rede \\BZVCPFIL003\proj_ramires$\VA)
+VA.exe (lançador, na rede \\BZVCPFIL003\proj_ramires$\axiais)
  ├─  5% verifica app\versao.txt na rede
  ├─ 10–90% se a versão local for outra: copia app\<versão>\ →
  │          %LOCALAPPDATA%\HowdenVA\<versão>\  (barra por bytes copiados)
@@ -44,6 +44,22 @@ a base continua em `\\BZVCPFIL003\proj_ramires$\DB\axiais`, compartilhada
 por todos. O `appsettings.Desktop.json` só ajusta logging (e pode sobrepor
 a pasta de dados se um dia precisar).
 
+## Pasta das propostas
+
+No desktop, a comercial, a técnica, o pricing e o custo previsto não caem em
+Downloads: vão direto para `<raiz>\PRP-2026-104 rev 00` (`PastaDasPropostas.cs`).
+A raiz é `Propostas:Pasta` no `appsettings.Desktop.json`; vazia, é
+`Documentos\Propostas VA` (aceita pasta de rede e `%USERPROFILE%`). Uma
+`%VARIAVEL%` que não existe na máquina faz valer o padrão, e um nome sem
+caminho completo (`Propostas VA`) fica dentro de Documentos: nunca dentro da
+pasta da versão, que o lançador apaga. Um arquivo
+com o mesmo nome nunca é apagado: vai para `anteriores\` com a data em que foi
+gravado; se estiver aberto no Word, o novo sai com " (2)". Se a pasta falhar
+(rede fora do ar, sem permissão, ou sem resposta em 10 s), o arquivo vai para
+Downloads como antes e a tela avisa; a ida à pasta roda fora da janela, que
+não trava enquanto espera. Depois do Gerar tudo, o aviso traz "Abrir pasta"
+(só no desktop).
+
 ## Como publicar
 
 Na sua máquina (na pasta do projeto):
@@ -55,13 +71,14 @@ Na sua máquina (na pasta do projeto):
 O script compila o app (auto-contido — as máquinas não precisam ter .NET),
 compila o lançador, copia a versão nova para a rede, troca o `versao.txt` e
 limpa versões antigas. O atalho dos usuários aponta para
-`\\BZVCPFIL003\proj_ramires$\VA\VA.exe`.
+`\\BZVCPFIL003\proj_ramires$\axiais\VA.exe`.
 
 ## Arquivos
 
 - `Program.cs` — bootstrap: splash → Kestrel → janela → shutdown ordenado.
 - `SplashForm.cs` — tela de abertura com a barra de % de inicialização.
 - `MainForm.cs` — janela WinForms com o WebView2 (menu Início / Recarregar F5).
+- `PastaDasPropostas.cs` — os documentos da proposta direto na pasta dela.
 - `../BackendHost.cs` — fábrica do servidor, compartilhada com o modo site.
 - `../launcher/Program.cs` — o VA.exe da rede (verifica/copia versão e abre).
 - `../publicar.ps1` — publicação em um comando.

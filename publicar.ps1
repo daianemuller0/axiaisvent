@@ -1,7 +1,7 @@
 # =====================================================================
 # Publica o VA na pasta de rede, em versao nova (ninguem trava arquivo):
 #
-#   \\BZVCPFIL003\proj_ramires$\VA\
+#   \\BZVCPFIL003\proj_ramires$\axiais\
 #     VA.exe               <- lancador (atalho dos usuarios aponta pra ele)
 #     app\versao.txt       <- nome da versao atual (ex.: v2026-09-09_1530)
 #     app\v2026-09-09_1530\  <- arquivos publicados desta versao
@@ -13,7 +13,7 @@
 #       .\publicar.ps1 -Destino \\outro\caminho
 # =====================================================================
 param(
-    [string]$Destino = '\\BZVCPFIL003\proj_ramires$\VA',
+    [string]$Destino = '\\BZVCPFIL003\proj_ramires$\axiais',
     [int]$ManterVersoes = 5
 )
 
@@ -40,6 +40,29 @@ dotnet publish "$raiz\desktop\HowdenAxiais.Desktop.csproj" -c Release -r win-x64
 if ($LASTEXITCODE -ne 0) {
     Stop-Transcript | Out-Null
     throw 'Falha ao compilar o aplicativo desktop - os detalhes estao acima e em publicar.log.'
+}
+
+# Os modelos (proposta em Word e pricing) tambem ficam em wwwroot\modelos,
+# onde o sistema procura primeiro - e a publicacao so segue se tudo o que
+# gera documento e le arquivo estiver na pasta.
+$pastaApp = "$raiz\out\app\$versao"
+New-Item -ItemType Directory -Force -Path "$pastaApp\wwwroot\modelos" | Out-Null
+Copy-Item "$raiz\wwwroot\modelos\*" "$pastaApp\wwwroot\modelos" -Recurse -Force
+# a pasta de dados e o login vem do appsettings.json principal
+if (-not (Test-Path "$pastaApp\appsettings.json")) {
+    Copy-Item "$raiz\appsettings.json" "$pastaApp\appsettings.json" -Force
+}
+$faltando = @(
+    'wwwroot\modelos\proposta-comercial.docx',
+    'wwwroot\modelos\pricing.xlsm',
+    'pdfium.dll',
+    'libSkiaSharp.dll',
+    'duckdb.dll',
+    'appsettings.json'
+) | Where-Object { -not (Test-Path (Join-Path $pastaApp $_)) }
+if ($faltando.Count -gt 0) {
+    Stop-Transcript | Out-Null
+    throw "A versao publicada ficou sem: $($faltando -join ', '). Nada foi copiado para a rede."
 }
 
 # 2) Compila o lancador (um .exe unico e pequeno)
@@ -73,6 +96,21 @@ try {
     Write-Warning "Nao consegui atualizar o VA.exe (alguem deve estar abrindo o app agora). Rode de novo mais tarde se o lancador tiver mudado."
 }
 
+# Atalho pronto na propria pasta de rede, com a logo da Howden (o icone vem
+# de dentro do VA.exe). Quem abrir pela rede ganha tambem um atalho na area
+# de trabalho - o lancador cria na primeira abertura.
+try {
+    $shell = New-Object -ComObject WScript.Shell
+    $lnk = $shell.CreateShortcut("$Destino\VA - Ventiladores Axiais Howden.lnk")
+    $lnk.TargetPath = "$Destino\VA.exe"
+    $lnk.WorkingDirectory = $Destino
+    $lnk.IconLocation = "$Destino\VA.exe,0"
+    $lnk.Description = 'VA - Ventiladores Axiais - Howden'
+    $lnk.Save()
+} catch {
+    Write-Warning "Nao consegui criar o atalho na pasta de rede: $($_.Exception.Message)"
+}
+
 # 5) Limpa versoes antigas na rede (mantem as ultimas N)
 Write-Host "`n[5/5] Limpando versoes antigas..." -ForegroundColor Yellow
 Get-ChildItem "$Destino\app" -Directory -Filter 'v*' |
@@ -84,6 +122,6 @@ Get-ChildItem "$Destino\app" -Directory -Filter 'v*' |
     }
 
 Write-Host "`n== Pronto! Versao $versao publicada. ==" -ForegroundColor Green
-Write-Host "Atalho para os usuarios: $Destino\VA.exe"
+Write-Host "Atalho para os usuarios: $Destino\VA.exe (ou o .lnk com a logo, na mesma pasta)"
 Write-Host 'Quem estiver com o programa aberto recebe a atualizacao na proxima vez que abrir.'
 Stop-Transcript | Out-Null

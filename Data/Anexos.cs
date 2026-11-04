@@ -56,6 +56,26 @@ public sealed class Anexos
     }
 
     /// <summary>
+    /// Copia os anexos de uma proposta para outra. A revisão nova nasce com
+    /// outro id, e as curvas que ela herdou moram na pasta da revisão
+    /// anterior: sem a cópia, abririam quebradas e ficariam fora da técnica.
+    /// </summary>
+    public void CopiarTodos(string de, string para)
+    {
+        if (de.Trim().Length == 0 || para.Trim().Length == 0 || de == para) return;
+
+        var origem = Path.Combine(_store.Folder, "anexos", Seguro(de));
+        if (!Directory.Exists(origem)) return;
+
+        var destino = Pasta(para);
+        foreach (var arquivo in Directory.GetFiles(origem))
+        {
+            var alvo = Path.Combine(destino, Path.GetFileName(arquivo));
+            if (!File.Exists(alvo)) File.Copy(arquivo, alvo);
+        }
+    }
+
+    /// <summary>
     /// Só o nome do arquivo, sem pasta: o nome vem de fora, e ".." ou uma
     /// barra no meio dele sairiam da pasta da proposta.
     /// </summary>

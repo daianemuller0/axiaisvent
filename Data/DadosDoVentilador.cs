@@ -17,7 +17,22 @@ public static class DadosDoVentilador
     public sealed record Linha(string Rotulo, string Valor, string Origem)
     {
         public bool Falta => Valor.Trim().Length == 0;
+
+        /// <summary>
+        /// Que linha é esta ("angulo", "vazao", "diametro"…), para a tela saber
+        /// qual campo editar sem depender do rótulo, que muda com o idioma do
+        /// documento. Fica fora do construtor posicional: o gerador do Word só lê
+        /// <see cref="Rotulo"/> e <see cref="Valor"/> e não precisa saber dela.
+        /// </summary>
+        public string Chave { get; init; } = "";
     }
+
+    /// <summary>
+    /// As chaves das linhas que vêm do relatório de seleção, na ordem da
+    /// tabela. A tela as recolhe numa linha de resumo quando todas foram lidas.
+    /// </summary>
+    public static readonly string[] DaSelecao =
+        { "angulo", "densidade", "vazao", "pressao", "eficiencia", "rotacao", "potencia" };
 
     /// <summary>O que o modelo traz pronto e não depende da proposta.</summary>
     public const string RegimeDeTrabalho = "Heavy Duty Continuo";
@@ -36,30 +51,32 @@ public static class DadosDoVentilador
         var t = item.Tecnicos;
         var r = textos.RotulosDoVentilador;
 
-        var valores = new (string Valor, string Origem)[]
+        // o diâmetro, a altitude e o ruído são digitados na aba Técnica (antes
+        // saíam em branco e eram completados no Word, a cada geração)
+        var valores = new (string Chave, string Valor, string Origem)[]
         {
-            (item.Quantos.ToString(), "escopo"),
-            (modelo?.Rotulo ?? "", "escopo"),
-            (codigo, "escopo"),
-            (item.Aplicacao.Trim(), "escopo"),
-            (Dado(t, "angulo"), "seleção"),
-            (Montagem(item), "escopo"),
-            ("", ""),
-            (RegimeDeTrabalho, ""),
-            ("", ""),
-            (Dado(t, "densidade"), "seleção"),
-            (Dado(t, "vazao"), "seleção"),
-            (Dado(t, "pressao"), "seleção"),
-            (Dado(t, "eficiencia"), "seleção"),
-            (Dado(t, "rotacao"), "seleção"),
-            (Dado(t, "potencia"), "seleção"),
-            ("", ""),
-            (DoMotor(motor), "parte elétrica"),
+            ("quantidade", item.Quantos.ToString(), "escopo"),
+            ("modelo", modelo?.Rotulo ?? "", "escopo"),
+            ("codigo", codigo, "escopo"),
+            ("aplicacao", item.Aplicacao.Trim(), "escopo"),
+            ("angulo", Dado(t, "angulo"), "seleção"),
+            ("montagem", Montagem(item), "escopo"),
+            ("diametro", item.DiametroMm.Trim(), "à mão"),
+            ("regime", RegimeDeTrabalho, ""),
+            ("altitude", item.AltitudeMsnm.Trim(), "à mão"),
+            ("densidade", Dado(t, "densidade"), "seleção"),
+            ("vazao", Dado(t, "vazao"), "seleção"),
+            ("pressao", Dado(t, "pressao"), "seleção"),
+            ("eficiencia", Dado(t, "eficiencia"), "seleção"),
+            ("rotacao", Dado(t, "rotacao"), "seleção"),
+            ("potencia", Dado(t, "potencia"), "seleção"),
+            ("ruido", Ruido(item.RuidoDb), "à mão"),
+            ("motor", DoMotor(motor), "parte elétrica"),
         };
 
         return valores
             .Select((v, i) => new Linha(
-                r[i].Length > 0 ? r[i] : RotuloDaPressao(t, textos), v.Valor, v.Origem))
+                r[i].Length > 0 ? r[i] : RotuloDaPressao(t, textos), v.Valor, v.Origem) { Chave = v.Chave })
             .ToList();
     }
 
@@ -136,6 +153,22 @@ public static class DadosDoVentilador
         return limpo.EndsWith(unidade.Trim(), StringComparison.OrdinalIgnoreCase)
             ? limpo
             : limpo + unidade;
+    }
+
+    /// <summary>
+    /// O ruído com a unidade: o rótulo do documento ("Ruido a 1 m de distancia")
+    /// não diz dB(A), ao contrário do diâmetro e da altitude, que trazem a
+    /// unidade no rótulo. Só um número ganha a unidade — o que a equipe
+    /// escreveu com unidade ou com texto ("85 dB(A)", "&lt; 85") sai como está.
+    /// </summary>
+    public static string Ruido(string valor)
+    {
+        var limpo = valor.Trim();
+        if (limpo.Length == 0) return "";
+
+        return limpo.All(c => char.IsDigit(c) || c is '.' or ',' or ' ')
+            ? limpo + " dB(A)"
+            : limpo;
     }
 
     private static string Dado(Dictionary<string, DadoTecnico> tecnicos, string chave) =>

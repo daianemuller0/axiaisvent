@@ -31,9 +31,9 @@ public static class CalculoPricing
     public const decimal RiscoAdicionalPadrao = 0.02m;     // D36, para axiais NB
     /// <summary>
     /// A margem que a proposta persegue quando ninguém mexe. A planilha nasceu
-    /// com 25% (P25); a equipe subiu para 28%.
+    /// com 25% (P25), a equipe chegou a subir para 28% e voltou para 25%.
     /// </summary>
-    public const decimal MargemAlvoPadrao = 0.28m;
+    public const decimal MargemAlvoPadrao = 0.25m;
     public const decimal GarantiaDoProjeto = 0.02m;        // D48
     public const decimal Portal = 0.007m;                  // D49
     public const decimal PmSachNacional = 0.014m;          // D47
