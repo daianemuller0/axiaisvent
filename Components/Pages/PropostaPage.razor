@@ -1808,6 +1808,11 @@
         var faltouFora = FaltouForaDaTabela(indice);
         var eletrica = DadosEletricos.De(item, _custo, _proposta.Moeda, EletricaTextos);
         var soOMetodo = SoOMetodoDePartida(item);
+        // a partida direta é o caso comum (o "Com" do partidor já começa nela):
+        // a nota só informa e o bloco fica recolhido. Abre sozinho só o partidor
+        // que não casa com quadro nenhum, que é o que pede uma conferida
+        var partidaDireta = soOMetodo.Length > 0
+            && DadosEletricos.Tipo(DadosEletricos.Partidor(item, _custo, _proposta.Moeda)) == DadosEletricos.TipoDePartidor.Dol;
         var blocoDaSelecao = false;
 <div class="panel tec-painel">
     <div class="tec-cabeca">
@@ -2038,10 +2043,10 @@
             </section>
 
             @* ----- parte elétrica: texto fixo do modelo, recolhido ----- *@
-            <details class="tec-bloco tec-recolhido tec-eletrica" open="@(soOMetodo.Length > 0)">
+            <details class="tec-bloco tec-recolhido tec-eletrica" open="@(soOMetodo.Length > 0 && !partidaDireta)">
                 <summary>
                     <strong>@EletricaTextos.Secao.ToUpperInvariant()</strong>
-                    <span class="nota">@(eletrica.Count > 0 ? ResumoEletrico(eletrica) : "não sai neste equipamento")</span>
+                    <span class="nota">@(eletrica.Count > 0 ? ResumoEletrico(eletrica) : "não sai neste equipamento")@(partidaDireta ? " · partida direta, sem quadro próprio" : "")</span>
                 </summary>
                 <div class="tec-recolhido-corpo">
                     <p class="nota ajuda" style="margin:0 0 8px">sai depois da curva, em página própria</p>
@@ -2067,7 +2072,7 @@
 
                     @if (soOMetodo.Length > 0)
                     {
-                        <p class="nota texto-alerta" style="margin:8px 0 0">@soOMetodo</p>
+                        <p class="nota @(partidaDireta ? "" : "texto-alerta")" style="margin:8px 0 0">@soOMetodo</p>
                     }
                 </div>
             </details>
@@ -3155,6 +3160,9 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        // o aviso acabou de aparecer: este é o lugar dele (ver TirarConsequenciaDeOutroLugar)
+        if (_msg is not null && _lugarDoAviso is null) _lugarDoAviso = LugarAtual;
+
         if (firstRender)
         {
             // a saída pelo próprio servidor (botão Propostas) passa pela guarda de

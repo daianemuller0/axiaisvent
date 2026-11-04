@@ -86,6 +86,7 @@ public partial class PropostaPage : IAsyncDisposable
         var antes = _etapa;
         _etapa = Math.Clamp(n, 1, Etapas.Length);
         _rolarTopo = true;
+        TirarConsequenciaDeOutroLugar();
 
         // a etapa Começar mostra as gravadas: a lista vem com o que foi gravado
         // desde a última vez, e não como estava ao abrir a tela
@@ -105,6 +106,7 @@ public partial class PropostaPage : IAsyncDisposable
         _aberto = indice;
         _apagandoItem = null;
         _rolarPara = ConteudoDoEquipamento;
+        TirarConsequenciaDeOutroLugar();
     }
 
     /// <summary>Troca a aba do equipamento aberto (Escopo, Opcionais, Técnica), com a mesma regra de rolagem.</summary>
@@ -112,6 +114,7 @@ public partial class PropostaPage : IAsyncDisposable
     {
         _abaItem = aba;
         _rolarPara = ConteudoDoEquipamento;
+        TirarConsequenciaDeOutroLugar();
     }
 
     // ---------- o caminho da etapa Equipamentos ----------
@@ -371,6 +374,9 @@ public partial class PropostaPage : IAsyncDisposable
         _erro = erro;
         _avisoAcao = acao;
         _avisoFica = erro || fica || acao is not null;
+        // o lugar do aviso é onde ele aparece pela primeira vez (OnAfterRender):
+        // o mesmo clique que avisa pode também trocar de etapa ou de equipamento
+        _lugarDoAviso = null;
 
         if (_avisoFica) return;
 
@@ -408,6 +414,25 @@ public partial class PropostaPage : IAsyncDisposable
         _avisoRelogio = null;
         _msg = null;
         _avisoAcao = null;
+        _lugarDoAviso = null;
+    }
+
+    /// <summary>Etapa, equipamento e aba onde o aviso apareceu; null antes de aparecer.</summary>
+    private (int Etapa, int Equipamento, string Aba)? _lugarDoAviso;
+
+    private (int Etapa, int Equipamento, string Aba) LugarAtual => (_etapa, _aberto, _abaItem);
+
+    /// <summary>
+    /// A consequência ("Escopo trazido da PRP-2026-104: 2 linhas — confira")
+    /// é sobre o lugar onde aconteceu. Fixa no pé da coluna, ela cobria o
+    /// equipamento seguinte e a etapa Preço até alguém fechar. Saindo dali, ela
+    /// sai junto: o "desfazer" continua na linha afetada. O erro fica, e o
+    /// aviso do Gerar tudo também ("Marcar como enviada", "Abrir pasta").
+    /// </summary>
+    private void TirarConsequenciaDeOutroLugar()
+    {
+        if (_msg is null || _erro || !_avisoFica || _msg == _avisoDoGerarTudo) return;
+        if (_lugarDoAviso is { } lugar && lugar != LugarAtual) FecharAviso();
     }
 
     private void FazerAcaoDoAviso()
@@ -448,6 +473,7 @@ public partial class PropostaPage : IAsyncDisposable
             _apagandoItem = null;
         }
         if (p.Aba.Length > 0) _abaItem = p.Aba;
+        TirarConsequenciaDeOutroLugar();
 
         AntesDeIrAoCampo(p);
 

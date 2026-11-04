@@ -264,6 +264,54 @@ termina em **Salvar e continuar**.
   e, no fim, **Salvar e continuar → Preço** (só este grava). A aba Opcionais entra no caminho quando
   algum equipamento tem opcional; senão, fica como link ao lado do botão, com o "ir para Preço".
 
+### Nota de versão — Onda 2: cada etapa numa tela (proposta v2)
+
+A meta desta onda era tirar mais 25% do tempo de uma proposta típica (nova, 2 equipamentos). A
+recontagem clique a clique na tela nova, a 1366x768, dá **485 s → 350 s (−28%)**; no navegador comum,
+sem o app desktop, 354 s (−27%). O número de verdade sai do cronômetro: compare em **Configurações ›
+Tempo das propostas** antes e depois do marco "Proposta v2" (a data do marco, em `VistaTempos`, deve ser
+a da publicação na rede).
+
+- **Cliente e condições numa tela**: o que se digita primeiro (referência, projeto, data de
+  fechamento) vem antes; o que veio lembrado do cliente fica em verde, com **desfazer**; as
+  condições aparecem como frase, e um clique no pedaço ("Pagamento") abre a edição já no campo.
+  O projeto sugere os do mesmo cliente.
+- **Escopo em grade**: cada lista numa linha, Sem/Com legível, o custo sempre na mesma coluna, o que
+  falta decidir em âmbar e o botão **Sem em: … (4)** para marcar de uma vez o que não vai.
+- **Modelo pela seleção em botões** ("Pela seleção: 27-21 Series 2000"), um filtro por equipamento.
+- **Escopo que nasce pronto**: do outro equipamento desta proposta, do padrão da série ou da última
+  proposta do mesmo cliente, sempre dizendo de onde veio, com **desfazer** na linha e sem passar
+  por cima do que a folha de dados respondeu.
+- **Motor fechado pela seleção**: potência, polos e frequência filtram os candidatos; o motor que
+  o cliente já comprou desempata. Escolhido, vira um cartão de resumo com **trocar**.
+- **Aplicação lembrada**: desta proposta primeiro ("igual ao equip. 1: …"), depois do mesmo cliente.
+- **Opcionais**: um seletor **+ Adicionar opcional…** e a lista do que foi escolhido; opcional
+  copiado de outra proposta diz de qual.
+- **Técnica numa tela**: a seleção é conferida por exceção ("7 de 7 lidos"; só o que faltou fica
+  aberto), a curva em miniatura (clique amplia), DATOS ELÉCTRICOS recolhido com resumo (abre
+  sozinho só quando o partidor não casa com nenhum quadro) e **diâmetro, altitude e ruído**
+  digitados na tela, e não mais completados no Word. O diâmetro de um modelo igual numa proposta
+  anterior vem lembrado; trocando o tamanho do ventilador, ele sai.
+- **Preço**: margem, risco, negociação, moeda e taxa numa faixa no alto; uma linha por equipamento,
+  recolhida quando o custo está completo; a memória de cálculo recolhida. "Sem" não conta como
+  linha sem custo, e o visto da etapa só aparece com modelo e custo em tudo.
+- **Documentos**: um cartão por equipamento com o que sai na comercial e o que falta em destaque
+  (preço parcial em âmbar, com **completar no Preço**); um só **Gerar tudo**, com a seta para os
+  documentos avulsos. Um Gerar tudo de cada vez (o duplo clique não baixa duas vezes).
+- **Importar**: área para soltar os arquivos, a curva pareada com a seleção pelo nome e o destino de
+  cada arquivo corrigível na própria lista "Onde cada arquivo entrou".
+- **Pasta da proposta (app desktop)**: comercial, técnica, pricing e custo previsto vão direto para
+  `<raiz>\PRP-2026-104 rev 00`, sem apagar versões (a anterior vai para `anteriores`); **Abrir pasta**
+  no aviso. Ver `desktop/LEIAME-desktop.md`.
+- **Nova revisão em um clique** (menu Mais), com "Mudou desde a rev 00" no alto; a revisão que outra
+  máquina já gravou é lida da pasta e não se repete.
+- **Avisos**: a consequência ("Escopo trazido da PRP-2026-104 — confira") sai do pé da tela quando
+  se troca de equipamento, de aba ou de etapa; o **desfazer** continua na linha. Erro e o aviso do
+  Gerar tudo ficam. **Marcar como enviada** no aviso só grava se nada mudou depois de gerar.
+- **Começar**: abrir pela linha inteira e **Copiar como nova…** em cada proposta gravada.
+- **Custos digitados à mão** (Configurações, ADM): o que a equipe digitou fora do cadastro, por
+  modelo e linha, com CSV para levar ao cadastro; no escopo, a dica "último à mão" só lê.
+
 ### O cronômetro (tempo de cada proposta)
 
 A tela mede o tempo de trabalho em cada proposta — pausas de mais de 3 minutos não contam — e grava,
