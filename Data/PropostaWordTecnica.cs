@@ -147,11 +147,11 @@ internal sealed partial class Preenchimento
 
     /// <summary>
     /// As notas de componente, embaixo do texto do ventilador. Saem em toda
-    /// proposta, sem olhar o escopo — ver <see cref="NotasDosComponentes"/>.
+    /// proposta que tem a peça no escopo — ver <see cref="NotasDosComponentes.Sai"/>.
     /// </summary>
     private void Componentes(OpenXmlElement? fim)
     {
-        foreach (var nota in _notas)
+        foreach (var nota in _notas.Where(n => NotasDosComponentes.Sai(n.Chave, _p, _custo)))
         {
             Antes(fim, Titulo(nota.Titulo));
             CorpoDaNota(fim, nota.Linhas);
@@ -190,7 +190,8 @@ internal sealed partial class Preenchimento
 
             Fechar();
 
-            if (linha.StartsWith("-- ")) Antes(fim, Marcador(linha[3..].Trim(), nivel: 2));
+            if (linha.StartsWith("# ")) Antes(fim, Paragrafo(linha[2..].Trim(), negrito: true));
+            else if (linha.StartsWith("-- ")) Antes(fim, Marcador(linha[3..].Trim(), nivel: 2));
             else if (linha.StartsWith("- ")) Antes(fim, Marcador(linha[2..].Trim()));
             else Antes(fim, Paragrafo(linha));
         }
@@ -238,8 +239,7 @@ internal sealed partial class Preenchimento
     }
 
     /// <summary>
-    /// "Informaciones Adicionales": os anexos, os documentos do cliente e as
-    /// normas. É tudo da proposta, e não do equipamento, então sai uma vez, em
+    /// "Informaciones Adicionales": os anexos e os documentos do cliente. É tudo da proposta, e não do equipamento, então sai uma vez, em
     /// página própria como no modelo.
     /// </summary>
     private void Informacoes(OpenXmlElement? fim)
@@ -253,10 +253,6 @@ internal sealed partial class Preenchimento
 
         Antes(fim, Paragrafo(_te.DocumentosDoCliente, negrito: true));
         foreach (var linha in _te.LinhasDosDocumentosDoCliente) Antes(fim, Marcador(linha));
-
-        Antes(fim, Titulo(_te.Estandares));
-        Antes(fim, Paragrafo(_te.AberturaDosEstandares));
-        foreach (var linha in _te.LinhasDosEstandares) Antes(fim, Marcador(linha));
     }
 
     /// <summary>

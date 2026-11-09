@@ -1,0 +1,177 @@
+/* Estilos da proposta: etapa Cliente e condições (item 12: campos lembrados, condições em resumo, contatos Howden).
+   Um arquivo por área da fase B, carregado depois do app.css (Components/App.razor):
+   cada pista escreve só no seu, e o app.css não vira ponto de conflito.
+   Use os tokens do app.css (--primary, --warn-*, --info-*, --border...) e escreva
+   as regras sob .proposta, para não mexer nas outras telas. */
+
+/* ---- etapa Cliente e condições (item 12) ----
+   Três cartões: o cliente (com a linha "Desta proposta"), as condições em
+   resumo — chips do que muda o preço, o resto em texto corrido — e os
+   contatos Howden para ler. Verde é "veio lembrado": o mesmo verde claro dos
+   avisos de sucesso, para não inventar uma cor nova. */
+.proposta .cli-cartao, .proposta .cond-cartao, .proposta .contato-cartao { padding: 16px 18px; margin-bottom: 14px; }
+.proposta .cli-titulo { margin: 0 0 12px; font-size: 15px; }
+
+/* país e UF numa célula: a UF estreita ao lado */
+.proposta .cli-pais { display: flex; flex-direction: column; min-width: 0; }
+.proposta .cli-pais.com-uf { flex-direction: row; gap: 10px; }
+.proposta .cli-pais.com-uf > label:first-child { flex: 1 1 auto; min-width: 0; }
+.proposta .cli-pais .cli-uf { flex: 0 0 92px; }
+
+.proposta .cli-desta { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+.proposta .cli-desta-titulo {
+    font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em;
+    margin-bottom: 8px;
+}
+
+/* o campo lembrado: verde claro até ser editado */
+.proposta .cell.lembrado { background: var(--ok-bg); border-color: var(--ok-bd); }
+.proposta .cell.lembrado:focus { border-color: var(--secondary); }
+
+/* a lembrança numa linha (antes, uma caixa cinza com a lista dos campos) */
+.proposta .lembranca-cliente { margin-top: 12px; gap: 6px 8px; font-size: 13px; color: var(--text); }
+.proposta .cli-lembrou { color: var(--ok-tx); }
+.proposta .cli-lembrou strong { font-weight: 600; }
+.proposta .cli-sep { color: #a3afbf; }
+.proposta .cli-desfazer { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; padding: 0 2px; }
+.proposta .cli-oferta { color: var(--info-tx); }
+.proposta .cli-oferta .btn-ghost { padding: 5px 12px; font-size: 13px; }
+
+/* ---- condições ---- */
+.proposta .cond-cabeca { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; margin-bottom: 12px; }
+.proposta .cond-cabeca h2 { margin: 0; font-size: 15px; }
+.proposta .cond-espaco { flex: 1; }
+.proposta .cond-botao { padding: 5px 12px; font-size: 13px; }
+/* com a ajuda ligada a nota empurra o botão para a linha de baixo: ele fica à direita */
+.proposta .cond-cabeca .cond-botao { margin-left: auto; }
+.proposta .cond-botao .icone, .proposta .cond-botao svg { width: 14px; height: 14px; }
+
+/* os chips: rótulo pequeno em cima, o valor embaixo; cada um é um botão que
+   leva ao campo */
+.proposta .cond-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.proposta .cond-chip {
+    display: inline-flex; flex-direction: column; align-items: flex-start; gap: 1px; max-width: 100%;
+    padding: 5px 11px 6px; border: 1px solid var(--border); border-radius: 8px; background: #fff;
+    font-family: inherit; text-align: left; cursor: pointer; transition: border-color .12s, background .12s;
+}
+.proposta .cond-chip:hover { border-color: #c8d4e4; background: #f8fafc; }
+.proposta .cond-chip:focus-visible { outline: 2px solid var(--secondary); outline-offset: 2px; }
+.proposta .cond-chip-rotulo { font-size: 11px; font-weight: 500; color: var(--muted); line-height: 1.3; }
+.proposta .cond-chip-valor {
+    font-size: 13px; font-weight: 600; color: var(--text); line-height: 1.35; max-width: 100%;
+    overflow-wrap: anywhere;
+}
+.proposta .cond-chip.lembrado { background: var(--ok-bg); border-color: var(--ok-bd); }
+.proposta .cond-chip.lembrado:hover { border-color: #86efac; }
+.proposta .cond-chip.lembrado .cond-chip-valor { color: var(--ok-tx); }
+.proposta .cond-chip.falta { background: var(--warn-bg); border-color: var(--warn-bd); }
+.proposta .cond-chip.falta .cond-chip-valor { color: var(--warn-tx); }
+
+/* "em verde, o que veio lembrado" e o confirmar, numa linha */
+.proposta .cond-confirmar {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; margin-top: 10px;
+    font-size: 13px; color: var(--ok-tx);
+}
+.proposta .cond-confirmar-texto { flex: 0 1 auto; min-width: 0; }
+.proposta .btn-confirmar { display: inline-flex; align-items: center; gap: 5px; border-color: var(--ok-bd); color: var(--ok-tx); }
+.proposta .btn-confirmar:hover { background: var(--ok-bg); border-color: #86efac; }
+
+/* o resto em texto corrido: cada pedaço é um botão que parece texto */
+.proposta .cond-texto {
+    margin: 12px 0 0; padding-top: 10px; border-top: 1px solid var(--border);
+    font-size: 13.5px; line-height: 1.85; color: var(--text);
+}
+.proposta .cond-pedaco {
+    background: none; border: none; padding: 1px 3px; margin: 0 -1px; border-radius: 4px;
+    font: inherit; color: inherit; cursor: pointer; text-align: left;
+    text-decoration: underline dotted #b9c6d8; text-underline-offset: 3px;
+}
+.proposta .cond-pedaco:hover { background: #eef3f9; text-decoration-color: var(--secondary); }
+.proposta .cond-pedaco:focus-visible { outline: 2px solid var(--secondary); outline-offset: 1px; }
+.proposta .cond-pedaco.lembrado { background: var(--ok-bg); box-shadow: inset 0 0 0 1px var(--ok-bd); color: var(--ok-tx); }
+.proposta .cond-pedaco.falta { color: var(--warn-tx); font-weight: 600; text-decoration-color: var(--warn-barra); }
+.proposta .cond-item { white-space: nowrap; }
+.proposta .cond-sep { color: #a3afbf; }
+
+/* em edição: o formulário de antes, com subtítulos e o fechar no pé */
+.proposta .cond-sub { margin: 0 0 12px; font-size: 13.5px; letter-spacing: .02em; }
+.proposta .cond-lugar { display: block; margin-top: 12px; font-size: 12.5px; font-weight: 500; color: var(--muted); }
+.proposta .cond-pe { display: flex; justify-content: flex-end; margin-top: 14px; }
+
+/* ---- contatos Howden: lidos numa linha ---- */
+.proposta .contato-linha {
+    display: flex; align-items: center; gap: 12px; padding: 9px 12px;
+    border: 1px solid var(--border); border-radius: var(--radius-sm); background: #fff;
+}
+.proposta .contato-linha.lembrado { background: var(--ok-bg); border-color: var(--ok-bd); }
+.proposta .contato-rotulo { flex: none; width: 72px; font-size: 11.5px; font-weight: 600; color: var(--muted); }
+.proposta .contato-dados { flex: 1 1 auto; min-width: 0; line-height: 1.45; }
+.proposta .contato-nome { font-size: 13.5px; overflow-wrap: anywhere; }
+.proposta .contato-cargo { color: var(--muted); }
+.proposta .contato-dados .nota { overflow-wrap: anywhere; }
+.proposta .contato-acoes { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 6px; flex: none; }
+.proposta .contato-acoes .btn-link { font-size: 13px; padding: 2px 3px; }
+.proposta .contato-segundo { margin-top: 8px; }
+.proposta .contato-mais { margin-top: 10px; padding: 2px 0; }
+.proposta .contato-troca { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 6px 14px; }
+.proposta .contato-troca .toolbar { margin: 0; }
+.proposta .contato-troca select { min-width: 0 !important; width: 340px; max-width: 100%; }
+.proposta .contato-troca .contato-acoes { padding-bottom: 8px; }
+.proposta .contato-edita { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; }
+.proposta .contato-edita .contato-rotulo { width: auto; margin-bottom: 8px; }
+.proposta .contato-edita .contato-acoes { justify-content: flex-end; margin-top: 8px; }
+
+/* ---- aba Opcionais (item 18) ----
+   Um seletor "+ Adicionar opcional…" e a tabela do que foi escolhido. A
+   tabela tem largura fixa por coluna, como a da etapa Preço: a do opcional
+   fica com o que sobra e leva o nome, a variante e a origem do custo. */
+.proposta .opc-painel { padding: 16px 18px; margin-bottom: 14px; }
+.proposta .opc-cabeca { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 12px; }
+.proposta .opc-cabeca h2 { margin: 0; font-size: 15px; }
+.proposta .opc-espaco { flex: 1; }
+.proposta .opc-ajuda { margin: 10px 0 0; }
+
+.proposta .opc-equip { margin-top: 12px; }
+.proposta .opc-equip-cabeca { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 6px; font-size: 13.5px; }
+.proposta .opc-modelo { color: var(--muted); }
+
+/* o seletor parece uma ação: borda tracejada e texto na cor primária */
+.proposta .opc-adicionar-linha { margin-top: 10px; }
+.proposta .opc-adicionar {
+    width: 320px; max-width: 100%; border-style: dashed; border-color: #b9c6d8; background-color: #f8fbff;
+    color: var(--primary); font-weight: 600;
+}
+.proposta .opc-adicionar:hover { border-color: var(--secondary); }
+.proposta .opc-adicionar option, .proposta .opc-adicionar optgroup { color: var(--text); background: #fff; }
+.proposta .opc-adicionar optgroup { font-weight: 600; }
+.proposta .opc-adicionar option { font-weight: 400; }
+
+.proposta .opc-vazio {
+    margin-top: 10px; padding: 14px; border: 1px dashed var(--border); border-radius: var(--radius-sm);
+    background: #fafbfd; color: var(--muted); text-align: center; font-size: 13px;
+}
+
+.proposta .opc-tabela { margin-top: 10px; table-layout: fixed; box-shadow: none; border-radius: var(--radius-sm); }
+.proposta .opc-tabela .col-qtd { width: 56px; }
+.proposta .opc-tabela col.col-custo { width: 160px; }
+.proposta .opc-tabela .col-preco { width: 150px; }
+.proposta .opc-tabela .col-tirar { width: 84px; }
+.proposta .opc-tabela th, .proposta .opc-tabela td { vertical-align: top; overflow-wrap: anywhere; }
+.proposta .opc-tabela td { line-height: 1.4; }
+.proposta .opc-tabela tbody tr:hover { background: transparent; }
+.proposta .opc-tabela td.col-custo { padding: 5px 8px; }
+.proposta .opc-tabela td.col-custo input.cell { max-width: none !important; width: auto; min-width: 0; flex: 1 1 auto; padding: 5px 8px; }
+.proposta .opc-tabela td.col-custo .dica-do-custo { display: block; text-align: right; margin-top: 2px; }
+.proposta .opc-tabela td.right { padding-top: 11px; }
+.proposta .opc-tabela .opc-preco { overflow-wrap: normal; white-space: nowrap; }
+.proposta .opc-nome { font-size: 13.5px; }
+.proposta .opc-variante { margin-top: 4px; padding: 5px 8px; font-size: 13px; }
+.proposta .opc-fixa { margin-top: 2px; font-size: 13px; color: var(--text); }
+.proposta .opc-origem { display: block; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* âmbar de verdade: o .nota do app.css vem depois do .texto-alerta e o deixaria cinza */
+.proposta .opc-origem.opc-sem-custo { white-space: normal; color: var(--warn-tx); }
+.proposta .opc-remover { font-size: 13px; padding: 0; }
+.proposta .opc-escondido {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
+    clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}

@@ -72,7 +72,7 @@
     <span class="subtitle" style="margin:0">
         @_grupos.Count item(ns) · @_todas.Count subitem(ns) ·
         @_todas.Count(c => c.Codigo.Length > 0) com código ·
-        @_todas.Count(c => c.Preco.Length > 0) com preço
+        @_todas.Count(c => c.Preco.Length > 0) com custo
     </span>
     @if (_limparTudo)
     {
@@ -153,10 +153,13 @@
                     <th class="nowrap" style="width:70px">Ordem</th>
                     <th class="nowrap">Valor</th>
                     <th class="nowrap" style="width:160px">Código</th>
-                    <th class="nowrap" style="width:120px">Preço USD</th>
-                    <th class="nowrap" style="width:120px">Preço CLP</th>
-                    <th class="nowrap" style="width:120px">Preço R$</th>
-                    <th class="nowrap" style="width:190px">Preço variável</th>
+                    <th class="nowrap" style="width:120px">Custo USD</th>
+                    <th class="nowrap" style="width:120px">Custo CLP</th>
+                    @if (Moedas.UsaReal)
+                    {
+                        <th class="nowrap" style="width:120px">Custo R$</th>
+                    }
+                    <th class="nowrap" style="width:190px">Custo variável</th>
                     <th class="nowrap" style="width:130px"></th>
                 </tr>
             </thead>
@@ -176,7 +179,10 @@
                         </td>
                         <td>@Preco(item, Moeda.Usd)</td>
                         <td>@Preco(item, Moeda.Clp)</td>
-                        <td>@Preco(item, Moeda.Brl)</td>
+                        @if (Moedas.UsaReal)
+                        {
+                            <td>@Preco(item, Moeda.Brl)</td>
+                        }
                         <td class="nowrap">@PorEquipamento(item)</td>
                         <td class="nowrap center">
                             <button class="btn-link" title="Subir" @onclick="() => Mover(item, -1)">↑</button>
@@ -189,15 +195,15 @@
         </table>
     </div>
 
-    @* ---------- preço por Fan Diameter da opção aberta ---------- *@
+    @* ---------- custo por Fan Diameter da opção aberta ---------- *@
     @if (itens.FirstOrDefault(i => i.Id == _abertoPara) is { } opcao && _familia is { } familia)
     {
         var referencias = ReferenciasFiltradas();
 
         <div class="panel" style="margin-top:10px; border-left:3px solid var(--azul, #0b3d6b)">
             <div class="toolbar" style="flex-wrap:wrap">
-                <strong>@familia.Rotulo — preço por @familia.RotuloDoEixo</strong>
-                <span class="val-count">@_precos.Count com preço</span>
+                <strong>@familia.Rotulo — custo por @familia.RotuloDoEixo</strong>
+                <span class="val-count">@_precos.Count com custo</span>
 
                 <input class="cell" style="width:170px" placeholder="filtrar…"
                        value="@_buscaRef"
@@ -208,7 +214,7 @@
                 </span>
 
                 <span style="flex:1"></span>
-                <ExcelDaTabela Nome="@($"precos-{opcao.Grupo}-{opcao.Valor}")"
+                <ExcelDaTabela Nome="@($"custos-{opcao.Grupo}-{opcao.Valor}")"
                                Exportar="@(() => DadosExcel.ExportarPrecosPorReferencia(
                                    opcao.Grupo, opcao.Valor, familia,
                                    ReferenciasFiltradas(), _precos))"
@@ -221,18 +227,18 @@
                 @if (familia.Eixo == EixoDePreco.PotenciaMotor)
                 {
                     <text>
-                        O preço vale para <strong>todos os motores daquela potência</strong>, em
+                        O custo vale para <strong>todos os motores daquela potência</strong>, em
                         qualquer fabricante ou frame.
                     </text>
                 }
                 else
                 {
                     <text>
-                        O preço vale para <strong>todos os equipamentos daquele Fan Diameter</strong>
+                        O custo vale para <strong>todos os equipamentos daquele Fan Diameter</strong>
                         — VAX ou Joy, em qualquer cubo.
                     </text>
                 }
-                Linha em branco usa o preço da própria opção (@(Resumo(opcao))). @familia.Aviso
+                Linha em branco usa o custo da própria opção (@(Resumo(opcao))). @familia.Aviso
             </p>
 
             @if (_referencias.Count == 0)
@@ -266,9 +272,12 @@
                             {
                                 <th class="nowrap" style="width:150px">Diâmetro (mm)</th>
                             }
-                            <th class="nowrap" style="width:130px">Preço USD</th>
-                            <th class="nowrap" style="width:130px">Preço CLP</th>
-                            <th class="nowrap" style="width:130px">Preço R$</th>
+                            <th class="nowrap" style="width:130px">Custo USD</th>
+                            <th class="nowrap" style="width:130px">Custo CLP</th>
+                            @if (Moedas.UsaReal)
+                            {
+                                <th class="nowrap" style="width:130px">Custo R$</th>
+                            }
                         </tr>
                     </thead>
                     <tbody>
@@ -284,7 +293,10 @@
                                 }
                                 <td>@PrecoDaLinha(opcao, familia, d, Moeda.Usd)</td>
                                 <td>@PrecoDaLinha(opcao, familia, d, Moeda.Clp)</td>
-                                <td>@PrecoDaLinha(opcao, familia, d, Moeda.Brl)</td>
+                                @if (Moedas.UsaReal)
+                                {
+                                    <td>@PrecoDaLinha(opcao, familia, d, Moeda.Brl)</td>
+                                }
                             </tr>
                         }
                     </tbody>
@@ -300,7 +312,7 @@
 
     private string _busca = "";
 
-    // ---------- preço por referência (diâmetro ou potência) ----------
+    // ---------- custo por referência (diâmetro ou potência) ----------
     /// <summary>Os valores de referência do cadastro, na ordem do tamanho.</summary>
     private List<string> _referencias = new();
     /// <summary>Quantos registros cada referência alcança — contexto na tela.</summary>
@@ -308,9 +320,9 @@
     /// <summary>"equipamento/equipamentos" ou "motor/motores", conforme o eixo.</summary>
     private (string Um, string Vários) _unidade = ("equipamento", "equipamentos");
     private Dictionary<string, PrecoReferencia> _precos = new();
-    /// <summary>Id da opção cujo painel de preços está aberto; nulo = nenhum.</summary>
+    /// <summary>Id da opção cujo painel de custos está aberto; nulo = nenhum.</summary>
     private string? _abertoPara;
-    /// <summary>A família de preço da opção aberta.</summary>
+    /// <summary>A família de custo da opção aberta.</summary>
     private FamiliaDePreco? _familia;
     private string _buscaRef = "";
 
@@ -563,7 +575,7 @@
         });
 
         // o nome da opção entra na família, então renomear move a tabela de
-        // preço junto — senão ela ficaria presa a uma família que ninguém abre
+        // custo junto — senão ela ficaria presa a uma família que ninguém abre
         var de = FamiliaDePreco.De(item.Grupo, antigo);
         var para = FamiliaDePreco.De(item.Grupo, valor);
         if (de is not null && para is not null) Precos.RenomearFamilia(de.Chave, para.Chave);
@@ -585,7 +597,7 @@
             : $"\"{item.Valor}\": código {codigo}.");
     }
 
-    /// <summary>As três moedas em que a equipe cadastra preço.</summary>
+    /// <summary>As três moedas em que a equipe cadastra custo.</summary>
     private enum Moeda { Usd, Clp, Brl }
 
     private static string Rotulo(Moeda m) => m switch
@@ -611,7 +623,7 @@
 
         if (preco.Length > 0 && DadosExcel.Numero(preco) is null)
         {
-            Aviso($"\"{preco}\" não parece um preço. Use 1234,56 ou 1234.56.", erro: true);
+            Aviso($"\"{preco}\" não parece um custo. Use 1234,56 ou 1234.56.", erro: true);
             Recarregar();
             return;
         }
@@ -633,7 +645,7 @@
     {
         Repo.Apagar(item.Id);
 
-        // sem a opção, a tabela de preço dela não tem mais onde ser aberta.
+        // sem a opção, a tabela de custo dela não tem mais onde ser aberta.
         // Só some se mais ninguém dividir a família (silenciador, manga, base).
         if (FamiliaDePreco.De(item.Grupo, item.Valor) is { } familia &&
             !_todas.Any(c => c.Id != item.Id &&
@@ -685,11 +697,11 @@
         Aviso(resumo);
     }
 
-    // ---------- preço por Fan Diameter ----------
+    // ---------- custo por Fan Diameter ----------
 
     /// <summary>
-    /// O botão que abre a tabela de preço por diâmetro da opção. Mostra quantos
-    /// diâmetros já têm preço; opção de "não levar o item" não tem tabela.
+    /// O botão que abre a tabela de custo por diâmetro da opção. Mostra quantos
+    /// diâmetros já têm custo; opção de "não levar o item" não tem tabela.
     /// </summary>
     private RenderFragment PorEquipamento(Caracteristica item) => @<text>
         @if (FamiliaDePreco.De(item.Grupo, item.Valor) is { } familia)
@@ -700,7 +712,7 @@
             }
             else
             {
-                <button class="btn-link" title="@($"Preço por {familia.RotuloDoEixo}")"
+                <button class="btn-link" title="@($"Custo por {familia.RotuloDoEixo}")"
                         @onclick="() => AbrirPrecos(item, familia)">
                     ▸ @familia.RotuloDoBotao
                     @if (Precos.Quantos(familia.Chave) is var n && n > 0)
@@ -712,7 +724,7 @@
         }
         else
         {
-            <span class="subtitle" title="Preço único: o mesmo para todos os equipamentos">—</span>
+            <span class="subtitle" title="Custo único: o mesmo para todos os equipamentos">—</span>
         }
     </text>;
 
@@ -724,7 +736,7 @@
 
         // as linhas da tabela saem do cadastro, nunca de uma lista à parte: os
         // diâmetros, do cadastro de equipamentos (e são únicos — "45" é 45 em
-        // qualquer série e em qualquer cubo, que é a regra do preço); as
+        // qualquer série e em qualquer cubo, que é a regra do custo); as
         // potências, do catálogo de motores
         if (familia.Eixo == EixoDePreco.PotenciaMotor)
         {
@@ -758,7 +770,7 @@
             : _referencias.Where(d => d.Contains(busca, StringComparison.OrdinalIgnoreCase)).ToList();
     }
 
-    /// <summary>"3 equipamentos", "5 motores" — o alcance daquele preço.</summary>
+    /// <summary>"3 equipamentos", "5 motores" — o alcance daquele custo.</summary>
     private string Usos(string referencia) => _usos.GetValueOrDefault(referencia) switch
     {
         1 => $"1 {_unidade.Um}",
@@ -770,7 +782,7 @@
         var partes = new List<string>();
         if (item.PrecoUsd.Length > 0) partes.Add("USD " + item.PrecoUsd);
         if (item.PrecoClp.Length > 0) partes.Add("CLP " + item.PrecoClp);
-        if (item.Preco.Length > 0) partes.Add("R$ " + item.Preco);
+        if (Moedas.UsaReal && item.Preco.Length > 0) partes.Add("R$ " + item.Preco);
         return partes.Count == 0 ? "que também está em branco" : string.Join(" · ", partes);
     }
 
@@ -779,7 +791,7 @@
         Moeda.Usd => p.PrecoUsd, Moeda.Clp => p.PrecoClp, _ => p.Preco,
     };
 
-    /// <summary>Um dos três campos de preço de uma linha da tabela.</summary>
+    /// <summary>Um dos três campos de custo de uma linha da tabela.</summary>
     private RenderFragment PrecoDaLinha(
         Caracteristica opcao, FamiliaDePreco familia, string referencia, Moeda moeda) => @<text>
         @{
@@ -810,7 +822,7 @@
 
         if (preco.Length > 0 && DadosExcel.Numero(preco) is null)
         {
-            Aviso($"\"{preco}\" não parece um preço. Use 1234,56 ou 1234.56.", erro: true);
+            Aviso($"\"{preco}\" não parece um custo. Use 1234,56 ou 1234.56.", erro: true);
             return;
         }
 
@@ -826,7 +838,7 @@
         Gravar(linha, referencia);
 
         Aviso(preco.Length == 0
-            ? $"{familia.RotuloDoEixo} {referencia}: volta a usar o preço de \"{opcao.Valor}\"."
+            ? $"{familia.RotuloDoEixo} {referencia}: volta a usar o custo de \"{opcao.Valor}\"."
             : $"{familia.RotuloDoEixo} {referencia} · {familia.Rotulo}: {Rotulo(moeda)} {preco} " +
               $"— vale para {Usos(referencia)}.");
     }
@@ -849,7 +861,7 @@
 
     /// <summary>
     /// Grava e acerta a cópia em memória. A linha some do cadastro quando fica
-    /// sem preço e sem medida: é o mesmo que não ter exceção, e um registro vazio
+    /// sem custo e sem medida: é o mesmo que não ter exceção, e um registro vazio
     /// só atrapalharia a contagem.
     /// </summary>
     private void Gravar(PrecoReferencia linha, string referencia)
@@ -863,7 +875,7 @@
     private string SubirPrecos(Stream fluxo)
     {
         var (linhas, avisos) = DadosExcel.ImportarPrecosPorReferencia(fluxo, Precos, _referencias);
-        var texto = linhas > 0 ? $"{linhas} preço(s) gravado(s)." : "Nada foi gravado.";
+        var texto = linhas > 0 ? $"{linhas} custo(s) gravado(s)." : "Nada foi gravado.";
         return avisos.Count > 0 ? texto + " " + string.Join(" ", avisos) : texto;
     }
 

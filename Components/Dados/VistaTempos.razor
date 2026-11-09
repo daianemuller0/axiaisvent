@@ -1,0 +1,551 @@
+@inject TempoRepository Tempos
+
+<p class="subtitle">
+    Quanto tempo cada proposta levou para ser montada, medido pelo próprio sistema: o tempo de
+    trabalho na tela de proposta, desde abrir ou criar a proposta até gerar os documentos pela
+    primeira vez. Pausas de mais de 3 minutos não contam, e gerar de novo a mesma revisão não conta
+    como outra proposta. É o número para comparar com o processo antigo.
+</p>
+
+@if (_todos.Count == 0)
+{
+    <div class="aviso aviso-neutro">
+        Ainda não há propostas medidas. O tempo é gravado a cada documento gerado na tela de proposta.
+    </div>
+}
+else
+{
+    @* o padrão é a proposta típica da meta: nova ou importada, com 2 equipamentos *@
+    <div class="panel tempos-filtro">
+        <div class="tempos-filtro-linha">
+            <strong>Origem</strong>
+            @foreach (var (chave, rotulo) in Origens)
+            {
+                var origem = chave;
+                var quantas = _primeiras.Count(t => t.Origem == origem);
+                <label class="tempos-check">
+                    <input type="checkbox" checked="@_origens.Contains(origem)"
+                           @onchange="e => MarcarOrigem(origem, (bool)(e.Value ?? false))" />
+                    <span>@rotulo <span class="subtitle" style="margin:0">(@quantas)</span></span>
+                </label>
+            }
+        </div>
+        <div class="tempos-filtro-linha">
+            <label class="tempos-campo">
+                <span>Equipamentos</span>
+                <select class="cell" value="@_equipamentos" @onchange="e => Filtrar(equipamentos: e.Value?.ToString())">
+                    <option value="">qualquer</option>
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4+">4 ou mais</option>
+                </select>
+            </label>
+            <label class="tempos-campo">
+                <span>Período</span>
+                <select class="cell" value="@_periodo" @onchange="e => Filtrar(periodo: e.Value?.ToString())">
+                    <option value="">tudo</option>
+                    <option value="30">últimos 30 dias</option>
+                    <option value="90">últimos 90 dias</option>
+                    @foreach (var (data, nome) in Marcos)
+                    {
+                        <option value="@($"marco:{data:yyyy-MM-dd}")">desde @data.ToString("dd/MM/yyyy") · @Curto(nome)</option>
+                    }
+                </select>
+            </label>
+            <span style="flex:1"></span>
+            <span class="subtitle" style="margin:0">
+                @_filtradas.Count de @_primeiras.Count proposta(s) medida(s) no filtro
+            </span>
+        </div>
+        @if (_semRegistro > 0 && !_origens.Contains(""))
+        {
+            <div class="nota" style="margin-top:6px">
+                @_semRegistro proposta(s) medida(s) antes da medição por etapa não têm origem nem número de
+                equipamentos gravados: marque "sem registro" e "qualquer" para vê-las.
+            </div>
+        }
+    </div>
+
+    @if (_filtradas.Count == 0)
+    {
+        <div class="aviso aviso-neutro" style="margin-bottom:18px">Nenhuma proposta medida neste filtro.</div>
+    }
+    else
+    {
+        <div class="kpis">
+            <div class="kpi k-risk">
+                <div class="kpi-label">Propostas medidas</div>
+                <div class="kpi-value">@_filtradas.Count</div>
+                <div class="kpi-sub">primeira geração de cada revisão</div>
+            </div>
+            <div class="kpi k-plan">
+                <div class="kpi-label">Mediana</div>
+                <div class="kpi-value">@Minutos(Mediana(_filtradas.Select(t => (double)t.SegundosAtivos)))</div>
+                <div class="kpi-sub">metade das propostas leva menos que isso</div>
+            </div>
+            <div class="kpi k-ren">
+                <div class="kpi-label">Tempo médio</div>
+                <div class="kpi-value">@Minutos(_filtradas.Average(t => t.SegundosAtivos))</div>
+                <div class="kpi-sub">@Interacoes(_filtradas.Average(t => t.Interacoes)) interações em média</div>
+            </div>
+            <div class="kpi k-aten">
+                <div class="kpi-label">Últimos 30 dias</div>
+                <div class="kpi-value">@(_ultimos30.Count > 0 ? Minutos(Mediana(_ultimos30.Select(t => (double)t.SegundosAtivos))) : "—")</div>
+                <div class="kpi-sub">mediana de @_ultimos30.Count proposta(s) no período</div>
+            </div>
+        </div>
+    }
+
+    <div class="tempos-secoes">
+        <div class="panel tempos-secao">
+            <h2 class="tempos-titulo">Antes e depois de cada mudança</h2>
+            <p class="nota" style="margin:0 0 10px">
+                Mediana do tempo até o primeiro <strong>Gerar tudo</strong> de cada revisão. Com menos de
+                @MinimoParaComparar propostas de um dos lados, a comparação ainda não diz nada.
+            </p>
+            <table class="grid tempos-tabela">
+                <thead>
+                    <tr>
+                        <th>Mudança</th>
+                        <th class="right">Antes</th>
+                        <th class="right">Depois</th>
+                        <th class="right">Diferença</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var (data, nome) in Marcos)
+                    {
+                        var antes = _gerarTudo.Where(t => t.FimComoData < data).ToList();
+                        var depois = _gerarTudo.Where(t => t.FimComoData >= data).ToList();
+                        var medAntes = Mediana(antes.Select(t => (double)t.SegundosAtivos));
+                        var medDepois = Mediana(depois.Select(t => (double)t.SegundosAtivos));
+                        var comparar = antes.Count >= MinimoParaComparar && depois.Count >= MinimoParaComparar;
+                        <tr>
+                            <td>
+                                <strong>@nome</strong>
+                                <div class="nota">@data.ToString("dd/MM/yyyy")</div>
+                            </td>
+                            <td class="right nowrap">@Lado(medAntes, antes.Count, Minutos)</td>
+                            <td class="right nowrap">@Lado(medDepois, depois.Count, Minutos)</td>
+                            <td class="right nowrap">
+                                @if (comparar && medAntes > 0)
+                                {
+                                    @Diferenca(medAntes, medDepois)
+                                }
+                                else
+                                {
+                                    <span class="nota">poucos dados</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="panel tempos-secao">
+            <div class="toolbar" style="flex-wrap:wrap; margin-bottom:6px">
+                <h2 class="tempos-titulo" style="margin:0">Tempo por etapa</h2>
+                <span style="flex:1"></span>
+                <select class="cell" style="width:auto" value="@_marcoDasEtapas"
+                        @onchange="e => { _marcoDasEtapas = e.Value?.ToString() ?? string.Empty; }">
+                    @foreach (var (data, nome) in Marcos)
+                    {
+                        <option value="@data.ToString("yyyy-MM-dd")">antes e depois de @data.ToString("dd/MM/yyyy") · @Curto(nome)</option>
+                    }
+                </select>
+            </div>
+            @{
+                var marco = MarcoDasEtapas;
+                var comEtapas = _gerarTudo.Where(t => t.PorEtapa.Trim().Length > 0).ToList();
+                var etapasAntes = comEtapas.Where(t => t.FimComoData < marco).ToList();
+                var etapasDepois = comEtapas.Where(t => t.FimComoData >= marco).ToList();
+            }
+            <p class="nota" style="margin:0 0 10px">
+                Mediana dos segundos em cada etapa, no primeiro Gerar tudo de cada revisão. Só as propostas
+                medidas depois da medição por etapa (@comEtapas.Count no filtro).
+            </p>
+            <table class="grid tempos-tabela">
+                <thead>
+                    <tr>
+                        <th>Etapa</th>
+                        <th class="right">Antes</th>
+                        <th class="right">Depois</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var (chave, rotulo) in EtapasMedidas)
+                    {
+                        var etapa = chave;
+                        <tr>
+                            <td>@rotulo</td>
+                            <td class="right nowrap">@Lado(Mediana(etapasAntes.Select(t => (double)t.PorEtapaComoMapa.GetValueOrDefault(etapa))), etapasAntes.Count, Segundos)</td>
+                            <td class="right nowrap">@Lado(Mediana(etapasDepois.Select(t => (double)t.PorEtapaComoMapa.GetValueOrDefault(etapa))), etapasDepois.Count, Segundos)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <div class="panel tempos-secao">
+            <h2 class="tempos-titulo">Retrabalho</h2>
+            <p class="nota" style="margin:0 0 10px">
+                Das revisões do filtro: quantas vezes os documentos saíram de novo, e quantas vezes houve
+                um segundo Gerar tudo menos de 24 h depois do anterior (sinal de algo corrigido no Word ou
+                esquecido na tela).
+            </p>
+            <div class="side-item">
+                <span>Gerações por revisão</span>
+                <strong>@(_revisoes > 0 ? (_geracoes / (double)_revisoes).ToString("0.0", Br) : "—")</strong>
+            </div>
+            <div class="side-item">
+                <span>Revisões geradas mais de uma vez</span>
+                <strong>@_repetidas de @_revisoes</strong>
+            </div>
+            <div class="side-item">
+                <span>Segundo Gerar tudo em menos de 24 h</span>
+                <strong>@_segundoEm24h</strong>
+            </div>
+        </div>
+
+        <div class="panel tempos-secao">
+            <h2 class="tempos-titulo">Atalhos usados</h2>
+            <p class="nota" style="margin:0 0 10px">
+                Quantas vezes a pessoa aceitou o que a tela sugeriu — e quantas desfez —, somado no filtro.
+                É o que diz se uma sugestão acerta.
+            </p>
+            @if (_contadores.Count == 0)
+            {
+                <div class="nota">Nenhum atalho medido ainda no filtro.</div>
+            }
+            else
+            {
+                @foreach (var (rotulo, valor) in LinhasDosContadores())
+                {
+                    <div class="side-item"><span>@rotulo</span><strong>@valor</strong></div>
+                }
+            }
+        </div>
+    </div>
+
+    @if (_filtradas.Count > 0)
+    {
+        <div class="panel" style="padding:0; overflow-x:auto">
+            <table class="grid">
+                <thead>
+                    <tr>
+                        <th class="nowrap">Proposta</th>
+                        <th class="nowrap">Rev.</th>
+                        <th class="nowrap">Quem</th>
+                        <th class="nowrap">Gerada em</th>
+                        <th class="nowrap right">Tempo de trabalho</th>
+                        <th class="nowrap right">Interações</th>
+                        <th class="nowrap">Origem</th>
+                        <th class="nowrap right">Equip.</th>
+                        <th class="nowrap">Como</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var t in _filtradas)
+                    {
+                        <tr>
+                            <td class="nowrap"><strong>@t.Numero</strong></td>
+                            <td class="nowrap">@t.Revisao</td>
+                            <td class="nowrap">@(t.Usuario.Length > 0 ? t.Usuario : "—")</td>
+                            <td class="nowrap">@(t.FimComoData?.ToString("dd/MM/yyyy HH:mm") ?? t.Fim)</td>
+                            <td class="nowrap right">@Minutos(t.SegundosAtivos)</td>
+                            <td class="nowrap right">@t.Interacoes</td>
+                            <td class="nowrap">@RotuloDaOrigem(t.Origem)</td>
+                            <td class="nowrap right">@(t.Equipamentos > 0 ? t.Equipamentos.ToString() : "—")</td>
+                            <td class="nowrap">@Evento(t.Evento)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+}
+
+@code {
+    /// <summary>
+    /// As mudanças da tela de proposta, com a data em que entraram. A
+    /// comparação é antes e depois de cada uma — a lista cresce a cada entrega.
+    /// </summary>
+    private static readonly (DateTime Data, string Nome)[] Marcos =
+    {
+        // a tela nova inteira (itens 01 a 22 do estudo de -25%) entra de uma vez: um marco só.
+        // Se a publicação na rede for noutro dia, troque a data por ela.
+        (new DateTime(2026, 11, 9), "Proposta v2: tela redesenhada para -25% de tempo"),
+    };
+
+    /// <summary>Abaixo disto, de um dos lados, a mediana ainda é sorte: a tela mostra "poucos dados".</summary>
+    private const int MinimoParaComparar = 10;
+
+    private static readonly (string Chave, string Rotulo)[] Origens =
+    {
+        ("nova", "nova"), ("importada", "importada"), ("copia", "cópia"), ("aberta", "aberta"),
+        ("revisao", "revisão"), ("", "sem registro"),
+    };
+
+    private static readonly (string Chave, string Rotulo)[] EtapasMedidas =
+    {
+        ("1", "Começar"), ("2", "Cliente e condições"), ("3-escopo", "Equipamentos · escopo"),
+        ("3-opcionais", "Equipamentos · opcionais"), ("3-tecnica", "Equipamentos · técnica"),
+        ("4", "Preço"), ("5", "Documentos"),
+    };
+
+    private static readonly System.Globalization.CultureInfo Br = new("pt-BR");
+
+    private List<TempoProposta> _todos = new();
+
+    /// <summary>A primeira geração de cada número e revisão — o tempo de cada proposta.</summary>
+    private List<TempoProposta> _primeiras = new();
+
+    /// <summary>O primeiro Gerar tudo de cada revisão: a base da comparação antes e depois.</summary>
+    private List<TempoProposta> _primeirosGerarTudo = new();
+
+    // o que o filtro deixa à vista
+    private List<TempoProposta> _filtradas = new();
+    private List<TempoProposta> _gerarTudo = new();
+    private List<TempoProposta> _ultimos30 = new();
+    private Dictionary<string, int> _contadores = new();
+    private int _geracoes, _revisoes, _repetidas, _segundoEm24h, _semRegistro;
+
+    private readonly HashSet<string> _origens = new() { "nova", "importada" };
+    private string _equipamentos = "2";
+    private string _periodo = "";
+    private string _marcoDasEtapas = Marcos[^1].Data.ToString("yyyy-MM-dd");
+
+    private DateTime MarcoDasEtapas =>
+        DateTime.TryParseExact(_marcoDasEtapas, "yyyy-MM-dd", null, System.Globalization.DateTimeStyles.None, out var d)
+            ? d
+            : Marcos[^1].Data;
+
+    protected override void OnInitialized()
+    {
+        _todos = Tempos.Todos();
+        _primeiras = TempoRepository.PrimeiraDeCada(_todos);
+        _primeirosGerarTudo = TempoRepository.PrimeiraDeCada(_todos.Where(t => t.Evento == "gerar-tudo"));
+        _semRegistro = _primeiras.Count(t => t.Origem.Length == 0);
+        Aplicar();
+    }
+
+    private void MarcarOrigem(string origem, bool marcada)
+    {
+        if (marcada) _origens.Add(origem);
+        else _origens.Remove(origem);
+        Aplicar();
+    }
+
+    private void Filtrar(string? equipamentos = null, string? periodo = null)
+    {
+        if (equipamentos is not null) _equipamentos = equipamentos;
+        if (periodo is not null) _periodo = periodo;
+        Aplicar();
+    }
+
+    /// <summary>Passa a origem, o número de equipamentos e o período?</summary>
+    private bool NoFiltro(TempoProposta t)
+    {
+        if (!_origens.Contains(t.Origem)) return false;
+
+        var equipamentosOk = _equipamentos switch
+        {
+            "" => true,
+            "4+" => t.Equipamentos >= 4,
+            _ => int.TryParse(_equipamentos, out var n) && t.Equipamentos == n,
+        };
+        if (!equipamentosOk) return false;
+
+        return InicioDoPeriodo() is not { } desde || t.FimComoData >= desde;
+    }
+
+    private DateTime? InicioDoPeriodo() => _periodo switch
+    {
+        "" => null,
+        "30" => DateTime.Now.AddDays(-30),
+        "90" => DateTime.Now.AddDays(-90),
+        _ when _periodo.StartsWith("marco:", StringComparison.Ordinal)
+               && DateTime.TryParseExact(_periodo[6..], "yyyy-MM-dd", null,
+                   System.Globalization.DateTimeStyles.None, out var d) => d,
+        _ => null,
+    };
+
+    private void Aplicar()
+    {
+        _filtradas = _primeiras.Where(NoFiltro).ToList();
+        _gerarTudo = _primeirosGerarTudo.Where(NoFiltro).ToList();
+
+        var corte = DateTime.Now.AddDays(-30);
+        _ultimos30 = _filtradas.Where(t => t.FimComoData is { } d && d >= corte).ToList();
+
+        // retrabalho: todas as linhas das revisões que entraram no filtro (a
+        // regeração do dia seguinte pode ter outra origem, e ainda é retrabalho
+        // da mesma proposta)
+        var revisoes = _filtradas.Select(t => (t.Numero, Revisao: t.Revisao.Trim())).ToHashSet();
+        var grupos = _todos
+            .Where(t => revisoes.Contains((t.Numero, t.Revisao.Trim())))
+            .GroupBy(t => (t.Numero, Revisao: t.Revisao.Trim()))
+            .ToList();
+
+        _revisoes = grupos.Count;
+        _geracoes = grupos.Sum(g => g.Count());
+        _repetidas = grupos.Count(g => g.Count() > 1);
+        _segundoEm24h = grupos.Sum(g =>
+        {
+            var datas = g.Where(t => t.Evento == "gerar-tudo")
+                .Select(t => t.FimComoData)
+                .OfType<DateTime>()
+                .OrderBy(d => d)
+                .ToList();
+            return datas.Skip(1).Where((d, i) => (d - datas[i]).TotalHours < 24).Count();
+        });
+
+        // contadores: cada geração grava o que a sessão somou até ali, então
+        // vale a ÚLTIMA linha de cada sessão (quem + quando começou), e não a soma
+        // de todas
+        _contadores = new();
+        var sessoes = grupos
+            .SelectMany(g => g)
+            .GroupBy(t => (t.Usuario, t.Inicio))
+            .Select(g => g.OrderBy(t => t.Fim).Last());
+        foreach (var sessao in sessoes)
+            foreach (var (chave, n) in sessao.ContadoresComoMapa)
+                _contadores[chave] = _contadores.GetValueOrDefault(chave) + n;
+    }
+
+    /// <summary>Os contadores em frases: os que os atalhos conhecidos usam, e o resto como veio.</summary>
+    private List<(string Rotulo, string Valor)> LinhasDosContadores()
+    {
+        var linhas = new List<(string, string)>();
+        var usados = new HashSet<string>();
+
+        int N(string chave)
+        {
+            usados.Add(chave);
+            return _contadores.GetValueOrDefault(chave);
+        }
+
+        var botao1 = N("modelo:botao1");
+        var outroBotao = N("modelo:outro-botao");
+        var lista = N("modelo:lista");
+        if (botao1 + outroBotao + lista > 0)
+            linhas.Add(("Modelo pela seleção: 1º botão",
+                $"{botao1} de {botao1 + outroBotao + lista} (outro botão {outroBotao} · lista {lista})"));
+
+        var origemA = N("escopo:origem-a");
+        var origemB = N("escopo:origem-b");
+        var origemC = N("escopo:origem-c");
+        var origemD = N("escopo:origem-d");
+        var desfeito = N("escopo:desfeito");
+        var trazidos = origemA + origemB + origemC + origemD;
+        if (trazidos + desfeito > 0)
+        {
+            linhas.Add(("Escopo trazido", $"{trazidos} (desfeito {desfeito})"));
+            linhas.Add(("Escopo: outro equip. · cliente · série · último",
+                $"{origemA} · {origemB} · {origemC} · {origemD}"));
+        }
+
+        var fechado = N("motor:fechado-auto");
+        var trocado = N("motor:trocado-depois");
+        if (fechado + trocado > 0)
+            linhas.Add(("Motor fechado sozinho", $"{fechado} (trocado depois {trocado})"));
+
+        // os outros atalhos da tela, um por linha, com o nome que a equipe reconhece
+        foreach (var (chave, rotulo) in NomesDosAtalhos)
+        {
+            var n = N(chave);
+            if (n > 0) linhas.Add((rotulo, n.ToString()));
+        }
+
+        foreach (var (chave, n) in _contadores.OrderBy(c => c.Key, StringComparer.Ordinal))
+            if (!usados.Contains(chave)) linhas.Add((chave, n.ToString()));
+
+        return linhas;
+    }
+
+    /// <summary>
+    /// Nome legível de cada contador da tela de proposta (a chave é a que a
+    /// página passa a Contar). Mostram quanto cada atalho é de fato usado.
+    /// </summary>
+    private static readonly (string Chave, string Rotulo)[] NomesDosAtalhos =
+    {
+        ("importar:destino-trocado", "Importar: destino do arquivo trocado"),
+        ("cliente:desfazer", "Cliente: lembrança desfeita"),
+        ("cliente:projeto-da-lista", "Cliente: projeto escolhido da lista"),
+        ("cliente:confirmar", "Condições lembradas confirmadas"),
+        ("cliente:pedaco", "Condições: campo aberto pelo resumo"),
+        ("cliente:editar-condicoes", "Condições: formulário inteiro aberto"),
+        ("contato:trocar", "Contato Howden trocado"),
+        ("contato:editar", "Contato Howden editado"),
+        ("opcionais:adicionar", "Opcional adicionado"),
+        ("opcionais:remover", "Opcional removido"),
+        ("tecnica:editar-selecao", "Técnica: dados da seleção editados"),
+        ("tecnica:diametro-lembrado", "Técnica: diâmetro lembrado"),
+        ("tecnica:diametro-corrigido", "Técnica: diâmetro lembrado corrigido"),
+        ("tecnica:altitude-do-cliente", "Técnica: altitude da proposta anterior usada"),
+        ("tecnica:altitude-aos-outros", "Técnica: altitude aplicada aos outros"),
+        ("preco:ver-linhas", "Preço: linhas de custo abertas"),
+        ("preco:memoria", "Preço: memória de cálculo aberta"),
+        ("preco:taxa-da-conversao", "Preço: taxa da aba Conversão usada"),
+        ("docs:editar-texto", "Documentos: texto editado"),
+        ("docs:marcar-enviada", "Documentos: marcada como enviada"),
+        ("revisao:nova", "Nova revisão em um clique"),
+    };
+
+    /// <summary>Um lado da comparação: a mediana, ou "poucos dados" com quantas há.</summary>
+    private static RenderFragment Lado(double mediana, int quantas, Func<double, string> formato) => __builder =>
+    {
+        if (quantas >= MinimoParaComparar)
+        {
+            <span>@formato(mediana) <span class="nota">(@quantas)</span></span>
+        }
+        else
+        {
+            <span class="nota">poucos dados (@quantas)</span>
+        }
+    };
+
+    private static RenderFragment Diferenca(double antes, double depois) => __builder =>
+    {
+        var pct = (depois - antes) / antes;
+        <strong class="@(pct <= 0 ? "texto-verde" : "texto-vermelho")">
+            @((pct > 0 ? "+" : "") + pct.ToString("P0", Br))
+        </strong>
+    };
+
+    private static string Minutos(double segundos)
+    {
+        var minutos = segundos / 60d;
+        return minutos < 1 ? "< 1 min" : $"{minutos:0.#} min".Replace('.', ',');
+    }
+
+    private static string Segundos(double segundos) =>
+        segundos < 60 ? $"{Math.Round(segundos):0} s" : Minutos(segundos);
+
+    private static string Interacoes(double media) => Math.Round(media).ToString("0");
+
+    private static double Mediana(IEnumerable<double> valores)
+    {
+        var ordenados = valores.OrderBy(v => v).ToList();
+        if (ordenados.Count == 0) return 0;
+        var meio = ordenados.Count / 2;
+        return ordenados.Count % 2 == 1 ? ordenados[meio] : (ordenados[meio - 1] + ordenados[meio]) / 2d;
+    }
+
+    /// <summary>"Onda 1: moldura…" vira "Onda 1" — o nome inteiro está na tabela dos marcos.</summary>
+    private static string Curto(string marco) => marco.Split(':')[0].Trim();
+
+    private static string RotuloDaOrigem(string origem) =>
+        Origens.FirstOrDefault(o => o.Chave == origem).Rotulo ?? origem;
+
+    private static string Evento(string evento) => evento switch
+    {
+        "gerar-tudo" => "Gerar tudo",
+        "comercial" => "só a comercial",
+        "tecnica" => "só a técnica",
+        "pricing" => "só o pricing",
+        _ => evento,
+    };
+}
